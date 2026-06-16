@@ -1,0 +1,1761 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mxfile host="app.diagrams.net" agent="ChatGPT" pages="21">
+  <diagram id="ucPage01" name="UC 01 Login and Register">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p01_boundary" parent="1" value="System Boundary: User Platform - Login and Register" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p01_actor_Guest" parent="1" value="Guest" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p01_main_1" parent="1" value="Log in" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="229" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p01_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p01_actor_Guest" target="p01_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p01_inc_1_1" parent="1" value="Enter email and password" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="173.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p01_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p01_main_1" target="p01_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p01_inc_1_2" parent="1" value="Validate login details" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="231.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p01_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p01_main_1" target="p01_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p01_inc_1_3" parent="1" value="Open member home after login" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="289.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p01_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p01_main_1" target="p01_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p01_main_2" parent="1" value="Register member account" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="489" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p01_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p01_actor_Guest" target="p01_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p01_inc_2_1" parent="1" value="Enter account details" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="391.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p01_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p01_main_2" target="p01_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p01_inc_2_2" parent="1" value="Create member account" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="441.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p01_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p01_main_2" target="p01_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p01_inc_2_3" parent="1" value="Assign default Member role" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="491.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p01_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p01_main_2" target="p01_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p01_inc_2_4" parent="1" value="Create unified points wallet" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="541.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p01_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p01_main_2" target="p01_inc_2_4">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p01_inc_2_5" parent="1" value="Open member home after registration" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="591.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p01_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p01_main_2" target="p01_inc_2_5">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage02" name="UC 02 Home">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p02_boundary" parent="1" value="System Boundary: User Platform - Home" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p02_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p02_main_1" parent="1" value="Use home dashboard" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p02_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p02_actor_Member" target="p02_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_1_1" parent="1" value="View welcome dashboard" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_1" target="p02_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_1_2" parent="1" value="View points balance" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_1" target="p02_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_1_3" parent="1" value="Use main menu" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_1" target="p02_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_main_2" parent="1" value="Navigate marketplaces" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p02_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p02_actor_Member" target="p02_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_2_1" parent="1" value="Open course marketplace" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="303.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_2" target="p02_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_2_2" parent="1" value="Open content marketplace" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="361.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_2" target="p02_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_2_3" parent="1" value="Open shopping cart" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="419.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_2" target="p02_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_main_3" parent="1" value="Manage personal area" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p02_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p02_actor_Member" target="p02_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_3_1" parent="1" value="Open personal profile" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="476.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_3" target="p02_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_3_2" parent="1" value="Open My Purchases" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="526.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_3" target="p02_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_3_3" parent="1" value="Open points wallet" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="576.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_12" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_3" target="p02_inc_3_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p02_inc_3_4" parent="1" value="Open role application" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="626.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p02_include_13" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p02_main_3" target="p02_inc_3_4">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage03" name="UC 03 Personal Profile">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p03_boundary" parent="1" value="System Boundary: User Platform - My Personal Profile" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p03_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p03_main_1" parent="1" value="View personal profile" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="124" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p03_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p03_actor_Member" target="p03_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_1_1" parent="1" value="View avatar, name and bio" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="68.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_1" target="p03_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_1_2" parent="1" value="View current roles" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="126.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_1" target="p03_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_1_3" parent="1" value="View personal information" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="184.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_1" target="p03_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_main_2" parent="1" value="Maintain profile" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="299" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p03_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p03_actor_Member" target="p03_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_2_1" parent="1" value="Edit profile" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="243.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_2" target="p03_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_2_2" parent="1" value="Save changes" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="301.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_2" target="p03_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_2_3" parent="1" value="Hide profile" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="359.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_2" target="p03_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_main_3" parent="1" value="View purchase records" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="474" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p03_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p03_actor_Member" target="p03_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_3_1" parent="1" value="View purchased courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="418.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_3" target="p03_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_3_2" parent="1" value="View purchased contents" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="476.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_3" target="p03_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_3_3" parent="1" value="View refund records" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="534.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_12" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_3" target="p03_inc_3_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_main_4" parent="1" value="Preview public profile" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="649" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p03_assoc_13" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p03_actor_Member" target="p03_main_4">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p03_inc_4_1" parent="1" value="Open public profile preview" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="651.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p03_include_14" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p03_main_4" target="p03_inc_4_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage04" name="UC 04 Public Author Profile">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p04_boundary" parent="1" value="System Boundary: User Platform - Public Author Profile" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p04_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p04_main_1" parent="1" value="View public author profile" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p04_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p04_actor_Member" target="p04_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p04_inc_1_1" parent="1" value="View public bio and specialty" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p04_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p04_main_1" target="p04_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p04_inc_1_2" parent="1" value="View rating and public stats" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p04_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p04_main_1" target="p04_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p04_inc_1_3" parent="1" value="Read reviews / comments" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p04_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p04_main_1" target="p04_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p04_main_2" parent="1" value="Explore author items" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p04_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p04_actor_Member" target="p04_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p04_inc_2_1" parent="1" value="View related courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="332.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p04_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p04_main_2" target="p04_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p04_inc_2_2" parent="1" value="View related creative contents" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="390.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p04_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p04_main_2" target="p04_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p04_main_3" parent="1" value="Open item detail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p04_assoc_8" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p04_actor_Member" target="p04_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p04_inc_3_1" parent="1" value="Open course detail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="522.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p04_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p04_main_3" target="p04_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p04_inc_3_2" parent="1" value="Open content detail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="580.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p04_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p04_main_3" target="p04_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage05" name="UC 05 Course Marketplace">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p05_boundary" parent="1" value="System Boundary: User Platform - Course Marketplace" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p05_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p05_main_1" parent="1" value="Browse trainer courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p05_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p05_actor_Member" target="p05_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_inc_1_1" parent="1" value="Search / filter courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p05_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p05_main_1" target="p05_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_inc_1_2" parent="1" value="View course list" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p05_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p05_main_1" target="p05_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_inc_1_3" parent="1" value="View points balance" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p05_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p05_main_1" target="p05_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_main_2" parent="1" value="Inspect course option" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p05_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p05_actor_Member" target="p05_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_inc_2_1" parent="1" value="View course detail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="303.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p05_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p05_main_2" target="p05_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_inc_2_2" parent="1" value="View trainer public profile" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="361.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p05_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p05_main_2" target="p05_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_inc_2_3" parent="1" value="Compare price and status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="419.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p05_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p05_main_2" target="p05_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_main_3" parent="1" value="Prepare course purchase" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p05_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p05_actor_Member" target="p05_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_inc_3_1" parent="1" value="Add course to cart" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="493.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p05_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p05_main_3" target="p05_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_inc_3_2" parent="1" value="Open shopping cart" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="551.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p05_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p05_main_3" target="p05_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p05_inc_3_3" parent="1" value="Buy course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="609.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p05_include_12" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p05_main_3" target="p05_inc_3_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage06" name="UC 06 Course Detail 1">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p06_boundary" parent="1" value="System Boundary: User Platform - Course Detail 1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p06_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p06_main_1" parent="1" value="View offline course detail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p06_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p06_actor_Member" target="p06_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_inc_1_1" parent="1" value="View course description" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p06_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p06_main_1" target="p06_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_inc_1_2" parent="1" value="View course information" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p06_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p06_main_1" target="p06_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_inc_1_3" parent="1" value="View course status and watch time" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p06_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p06_main_1" target="p06_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_main_2" parent="1" value="Purchase offline course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p06_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p06_actor_Member" target="p06_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_inc_2_1" parent="1" value="Add to cart" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="303.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p06_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p06_main_2" target="p06_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_inc_2_2" parent="1" value="Buy now" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="361.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p06_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p06_main_2" target="p06_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_inc_2_3" parent="1" value="Use unified points wallet" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="419.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p06_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p06_main_2" target="p06_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_main_3" parent="1" value="Manage offline course after purchase" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p06_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p06_actor_Member" target="p06_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_inc_3_1" parent="1" value="Request refund under watch-time rule" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="522.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p06_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p06_main_3" target="p06_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p06_inc_3_2" parent="1" value="Score the course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="580.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p06_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p06_main_3" target="p06_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage07" name="UC 07 Course Detail 2">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p07_boundary" parent="1" value="System Boundary: User Platform - Course Detail 2" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p07_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p07_main_1" parent="1" value="View online course detail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p07_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p07_actor_Member" target="p07_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_inc_1_1" parent="1" value="View live broadcast time" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p07_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p07_main_1" target="p07_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_inc_1_2" parent="1" value="View course information" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p07_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p07_main_1" target="p07_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_inc_1_3" parent="1" value="View course status and watch time" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p07_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p07_main_1" target="p07_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_main_2" parent="1" value="Purchase online course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p07_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p07_actor_Member" target="p07_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_inc_2_1" parent="1" value="Add to cart" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="303.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p07_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p07_main_2" target="p07_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_inc_2_2" parent="1" value="Buy now" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="361.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p07_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p07_main_2" target="p07_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_inc_2_3" parent="1" value="Use unified points wallet" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="419.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p07_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p07_main_2" target="p07_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_main_3" parent="1" value="Manage online course after purchase" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p07_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p07_actor_Member" target="p07_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_inc_3_1" parent="1" value="Request refund before course starts" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="522.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p07_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p07_main_3" target="p07_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p07_inc_3_2" parent="1" value="Score the course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="580.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p07_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p07_main_3" target="p07_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage08" name="UC 08 Content Marketplace">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p08_boundary" parent="1" value="System Boundary: User Platform - Content Marketplace" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p08_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p08_main_1" parent="1" value="Browse creator contents" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p08_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p08_actor_Member" target="p08_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_inc_1_1" parent="1" value="Search / filter contents" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p08_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p08_main_1" target="p08_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_inc_1_2" parent="1" value="View content list" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p08_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p08_main_1" target="p08_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_inc_1_3" parent="1" value="View type and point price" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p08_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p08_main_1" target="p08_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_main_2" parent="1" value="Inspect content option" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p08_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p08_actor_Member" target="p08_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_inc_2_1" parent="1" value="View content detail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="332.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p08_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p08_main_2" target="p08_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_inc_2_2" parent="1" value="View creator public profile" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="390.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p08_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p08_main_2" target="p08_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_main_3" parent="1" value="Prepare content purchase" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p08_assoc_8" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p08_actor_Member" target="p08_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_inc_3_1" parent="1" value="Check points balance" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="493.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p08_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p08_main_3" target="p08_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_inc_3_2" parent="1" value="Use points wallet" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="551.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p08_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p08_main_3" target="p08_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p08_inc_3_3" parent="1" value="Confirm content purchase" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="609.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p08_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p08_main_3" target="p08_inc_3_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage09" name="UC 09 Content Detail">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p09_boundary" parent="1" value="System Boundary: User Platform - Content Detail" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p09_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p09_main_1" parent="1" value="View content detail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p09_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p09_actor_Member" target="p09_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_inc_1_1" parent="1" value="View content description" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p09_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p09_main_1" target="p09_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_inc_1_2" parent="1" value="View creator information" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p09_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p09_main_1" target="p09_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_inc_1_3" parent="1" value="View purchase summary" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p09_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p09_main_1" target="p09_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_main_2" parent="1" value="Confirm content purchase" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p09_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p09_actor_Member" target="p09_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_inc_2_1" parent="1" value="Check balance after purchase" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="286.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p09_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p09_main_2" target="p09_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_inc_2_2" parent="1" value="Deduct points" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="336.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p09_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p09_main_2" target="p09_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_inc_2_3" parent="1" value="Unlock download / view permission" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="386.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p09_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p09_main_2" target="p09_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_inc_2_4" parent="1" value="Update creator income" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="436.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p09_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p09_main_2" target="p09_inc_2_4">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_main_3" parent="1" value="Cancel content purchase" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p09_assoc_10" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p09_actor_Member" target="p09_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p09_inc_3_1" parent="1" value="Return to content browsing" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="551.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p09_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p09_main_3" target="p09_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage10" name="UC 10 Shopping Cart">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p10_boundary" parent="1" value="System Boundary: User Platform - Course Shopping Cart" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p10_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p10_main_1" parent="1" value="Manage shopping cart" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p10_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p10_actor_Member" target="p10_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_inc_1_1" parent="1" value="Select courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p10_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p10_main_1" target="p10_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_inc_1_2" parent="1" value="Remove course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p10_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p10_main_1" target="p10_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_inc_1_3" parent="1" value="View points balance" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p10_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p10_main_1" target="p10_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_main_2" parent="1" value="Review checkout summary" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p10_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p10_actor_Member" target="p10_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_inc_2_1" parent="1" value="Check selected courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="303.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p10_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p10_main_2" target="p10_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_inc_2_2" parent="1" value="Check total price" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="361.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p10_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p10_main_2" target="p10_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_inc_2_3" parent="1" value="Check remaining balance" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="419.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p10_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p10_main_2" target="p10_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_main_3" parent="1" value="Checkout course cart" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p10_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p10_actor_Member" target="p10_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_inc_3_1" parent="1" value="Confirm checkout" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="493.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p10_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p10_main_3" target="p10_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_inc_3_2" parent="1" value="Deduct unified points" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="551.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p10_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p10_main_3" target="p10_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p10_inc_3_3" parent="1" value="Create course order" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="609.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p10_include_12" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p10_main_3" target="p10_inc_3_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage11" name="UC 11 Checkout Success">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p11_boundary" parent="1" value="System Boundary: User Platform - Course Checkout Success" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p11_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p11_main_1" parent="1" value="View checkout success" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p11_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p11_actor_Member" target="p11_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p11_inc_1_1" parent="1" value="View payment result" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p11_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p11_main_1" target="p11_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p11_inc_1_2" parent="1" value="View order summary" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p11_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p11_main_1" target="p11_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p11_inc_1_3" parent="1" value="View remaining balance" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p11_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p11_main_1" target="p11_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p11_main_2" parent="1" value="Access purchased courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p11_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p11_actor_Member" target="p11_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p11_inc_2_1" parent="1" value="Go to My Courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="332.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p11_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p11_main_2" target="p11_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p11_inc_2_2" parent="1" value="View purchased course status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="390.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p11_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p11_main_2" target="p11_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p11_main_3" parent="1" value="Return to browsing" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p11_assoc_8" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p11_actor_Member" target="p11_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p11_inc_3_1" parent="1" value="Back to marketplace" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="551.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p11_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p11_main_3" target="p11_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage12" name="UC 12 My Courses and Status">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p12_boundary" parent="1" value="System Boundary: User Platform - My Courses and Contents" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p12_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p12_main_1" parent="1" value="View my courses and contents" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p12_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p12_actor_Member" target="p12_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p12_inc_1_1" parent="1" value="Filter by status tabs" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p12_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p12_main_1" target="p12_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p12_inc_1_2" parent="1" value="View course / content list" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p12_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p12_main_1" target="p12_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p12_inc_1_3" parent="1" value="View watch time" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p12_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p12_main_1" target="p12_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p12_main_2" parent="1" value="Continue learning or access content" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p12_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p12_actor_Member" target="p12_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p12_inc_2_1" parent="1" value="Start / continue course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="332.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p12_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p12_main_2" target="p12_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p12_inc_2_2" parent="1" value="Download available content" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="390.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p12_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p12_main_2" target="p12_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p12_main_3" parent="1" value="Manage purchase status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p12_assoc_8" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p12_actor_Member" target="p12_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p12_inc_3_1" parent="1" value="View refund eligibility" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="522.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p12_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p12_main_3" target="p12_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p12_inc_3_2" parent="1" value="Open refund request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="580.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p12_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p12_main_3" target="p12_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage13" name="UC 13 Refund Request">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p13_boundary" parent="1" value="System Boundary: User Platform - Course Refund Request" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p13_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p13_main_1" parent="1" value="View refund request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p13_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p13_actor_Member" target="p13_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p13_inc_1_1" parent="1" value="View course information" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p13_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p13_main_1" target="p13_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p13_inc_1_2" parent="1" value="Check refund eligibility" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p13_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p13_main_1" target="p13_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p13_inc_1_3" parent="1" value="Calculate refund amount" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p13_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p13_main_1" target="p13_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p13_main_2" parent="1" value="Submit refund request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p13_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p13_actor_Member" target="p13_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p13_inc_2_1" parent="1" value="Enter refund reason" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="303.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p13_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p13_main_2" target="p13_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p13_inc_2_2" parent="1" value="Set refund status to pending" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="361.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p13_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p13_main_2" target="p13_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p13_inc_2_3" parent="1" value="Send request to admin review" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="419.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p13_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p13_main_2" target="p13_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p13_main_3" parent="1" value="Cancel refund request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p13_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p13_actor_Member" target="p13_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p13_inc_3_1" parent="1" value="Return to My Courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="551.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p13_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p13_main_3" target="p13_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage14" name="UC 14 Role Application">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p14_boundary" parent="1" value="System Boundary: User Platform - Role Upgrade Application" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p14_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p14_main_1" parent="1" value="View role application status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p14_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p14_actor_Member" target="p14_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_inc_1_1" parent="1" value="View current roles" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p14_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p14_main_1" target="p14_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_inc_1_2" parent="1" value="View trainer application status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p14_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p14_main_1" target="p14_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_inc_1_3" parent="1" value="View creator application status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p14_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p14_main_1" target="p14_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_main_2" parent="1" value="Apply as trainer" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p14_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p14_actor_Member" target="p14_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_inc_2_1" parent="1" value="Fill trainer application form" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="303.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p14_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p14_main_2" target="p14_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_inc_2_2" parent="1" value="Upload qualification / portfolio" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="361.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p14_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p14_main_2" target="p14_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_inc_2_3" parent="1" value="Submit trainer application" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="419.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p14_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p14_main_2" target="p14_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_main_3" parent="1" value="Apply as creator" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p14_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p14_actor_Member" target="p14_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_inc_3_1" parent="1" value="Fill creator application form" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="493.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p14_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p14_main_3" target="p14_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_inc_3_2" parent="1" value="Upload sample work / portfolio" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="551.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p14_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p14_main_3" target="p14_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p14_inc_3_3" parent="1" value="Submit creator application" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="609.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p14_include_12" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p14_main_3" target="p14_inc_3_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage15" name="UC 15 Trainer Course Publish Edit">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p15_boundary" parent="1" value="System Boundary: User Platform - Trainer Course Publish/Edit" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p15_actor_Trainer" parent="1" value="Trainer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p15_main_1" parent="1" value="Create / edit course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="124" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p15_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p15_actor_Trainer" target="p15_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_inc_1_1" parent="1" value="Fill course title, price and capacity" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="68.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p15_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p15_main_1" target="p15_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_inc_1_2" parent="1" value="Enter course description" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="126.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p15_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p15_main_1" target="p15_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_inc_1_3" parent="1" value="Upload course media / materials" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="184.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p15_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p15_main_1" target="p15_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_main_2" parent="1" value="Set course publishing settings" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="299" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p15_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p15_actor_Trainer" target="p15_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_inc_2_1" parent="1" value="Set category and schedule" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="243.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p15_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p15_main_2" target="p15_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_inc_2_2" parent="1" value="Set refund policy information" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="301.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p15_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p15_main_2" target="p15_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_inc_2_3" parent="1" value="Choose draft / published status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="359.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p15_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p15_main_2" target="p15_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_main_3" parent="1" value="Save or publish course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="474" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p15_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p15_actor_Trainer" target="p15_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_inc_3_1" parent="1" value="Save draft" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="447.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p15_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p15_main_3" target="p15_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_inc_3_2" parent="1" value="Publish course" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="505.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p15_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p15_main_3" target="p15_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_main_4" parent="1" value="Use course publishing help" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="649" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p15_assoc_12" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p15_actor_Trainer" target="p15_main_4">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p15_inc_4_1" parent="1" value="Open video tutorial" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="651.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p15_include_13" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p15_main_4" target="p15_inc_4_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage16" name="UC 16 Creator Content Publish Edit">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p16_boundary" parent="1" value="System Boundary: User Platform - Creator Content Publish/Edit" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p16_actor_Creator" parent="1" value="Creator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p16_main_1" parent="1" value="Create / edit creative content" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="124" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p16_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p16_actor_Creator" target="p16_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_inc_1_1" parent="1" value="Fill content title, price and type" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="68.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p16_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p16_main_1" target="p16_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_inc_1_2" parent="1" value="Enter content description" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="126.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p16_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p16_main_1" target="p16_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_inc_1_3" parent="1" value="Upload content file or link" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="184.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p16_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p16_main_1" target="p16_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_main_2" parent="1" value="Set content publishing settings" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="299" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p16_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p16_actor_Creator" target="p16_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_inc_2_1" parent="1" value="Set category and preview" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="243.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p16_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p16_main_2" target="p16_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_inc_2_2" parent="1" value="Set visibility" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="301.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p16_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p16_main_2" target="p16_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_inc_2_3" parent="1" value="Choose draft / published status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="359.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p16_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p16_main_2" target="p16_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_main_3" parent="1" value="Save or publish content" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="474" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p16_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p16_actor_Creator" target="p16_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_inc_3_1" parent="1" value="Save draft" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="447.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p16_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p16_main_3" target="p16_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_inc_3_2" parent="1" value="Publish content" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="505.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p16_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p16_main_3" target="p16_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_main_4" parent="1" value="Use content publishing help" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="649" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p16_assoc_12" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p16_actor_Creator" target="p16_main_4">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p16_inc_4_1" parent="1" value="Open video tutorial" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="651.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p16_include_13" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p16_main_4" target="p16_inc_4_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage17" name="UC 17 Published Course and Content">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p17_boundary" parent="1" value="System Boundary: User Platform - Published Course and Content" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p17_actor_Trainer" parent="1" value="Trainer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="275" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p17_actor_Creator" parent="1" value="Creator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="475" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p17_main_1" parent="1" value="Manage published course and content" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="229" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p17_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p17_actor_Trainer" target="p17_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p17_assoc_2" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p17_actor_Creator" target="p17_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p17_inc_1_1" parent="1" value="Search published items" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="173.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p17_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p17_main_1" target="p17_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p17_inc_1_2" parent="1" value="View published courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="231.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p17_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p17_main_1" target="p17_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p17_inc_1_3" parent="1" value="View published contents" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="289.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p17_include_5" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p17_main_1" target="p17_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p17_main_2" parent="1" value="Update published item" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="489" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p17_assoc_6" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p17_actor_Trainer" target="p17_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p17_assoc_7" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p17_actor_Creator" target="p17_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p17_inc_2_1" parent="1" value="Edit published item" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="433.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p17_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p17_main_2" target="p17_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p17_inc_2_2" parent="1" value="Download / update material" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="491.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p17_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p17_main_2" target="p17_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p17_inc_2_3" parent="1" value="Save item changes" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="549.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p17_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p17_main_2" target="p17_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage18" name="UC 18 Video Tutorial Modal">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p18_boundary" parent="1" value="System Boundary: Tutorial Video Pop-up / Help Center" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p18_actor_Trainer_Creator" parent="1" value="Trainer / Creator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="60" y="365" width="78" height="72"/>
+        </mxCell>
+        <mxCell id="p18_main_1" parent="1" value="View publishing tutorial" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p18_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p18_actor_Trainer_Creator" target="p18_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_inc_1_1" parent="1" value="Play tutorial video" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p18_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p18_main_1" target="p18_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_inc_1_2" parent="1" value="View tutorial chapters" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p18_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p18_main_1" target="p18_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_inc_1_3" parent="1" value="Read step-by-step guidance" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p18_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p18_main_1" target="p18_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_main_2" parent="1" value="Navigate tutorial" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p18_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p18_actor_Trainer_Creator" target="p18_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_inc_2_1" parent="1" value="Previous chapter" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="332.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p18_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p18_main_2" target="p18_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_inc_2_2" parent="1" value="Next chapter" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="390.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p18_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p18_main_2" target="p18_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_main_3" parent="1" value="Learn publishing steps" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p18_assoc_8" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p18_actor_Trainer_Creator" target="p18_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_inc_3_1" parent="1" value="Fill basic information" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="476.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p18_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p18_main_3" target="p18_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_inc_3_2" parent="1" value="Upload files or media" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="526.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p18_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p18_main_3" target="p18_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_inc_3_3" parent="1" value="Set point price" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="576.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p18_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p18_main_3" target="p18_inc_3_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p18_inc_3_4" parent="1" value="Save draft or publish" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="626.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p18_include_12" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p18_main_3" target="p18_inc_3_4">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage19" name="UC 19 Unified Points Wallet">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p19_boundary" parent="1" value="System Boundary: User Platform - Unified Points Wallet" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p19_actor_Member" parent="1" value="Member" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="205" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p19_actor_Trainer" parent="1" value="Trainer" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p19_actor_Creator" parent="1" value="Creator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="525" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p19_main_1" parent="1" value="View points wallet" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="124" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p19_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p19_actor_Member" target="p19_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_assoc_2" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p19_actor_Trainer" target="p19_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_assoc_3" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p19_actor_Creator" target="p19_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_inc_1_1" parent="1" value="View current balance" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="68.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p19_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p19_main_1" target="p19_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_inc_1_2" parent="1" value="View transaction history" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="126.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p19_include_5" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p19_main_1" target="p19_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_inc_1_3" parent="1" value="View transaction status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="184.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p19_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p19_main_1" target="p19_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_main_2" parent="1" value="Spend points" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="299" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p19_assoc_7" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p19_actor_Member" target="p19_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_inc_2_1" parent="1" value="Course cart checkout" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="272.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p19_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p19_main_2" target="p19_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_inc_2_2" parent="1" value="Single content purchase" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="330.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p19_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p19_main_2" target="p19_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_main_3" parent="1" value="Receive income" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="474" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p19_assoc_10" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p19_actor_Trainer" target="p19_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_assoc_11" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p19_actor_Creator" target="p19_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_inc_3_1" parent="1" value="Trainer course sales" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="447.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p19_include_12" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p19_main_3" target="p19_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_inc_3_2" parent="1" value="Creator content sales" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="505.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p19_include_13" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p19_main_3" target="p19_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_main_4" parent="1" value="Receive course refund" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="649" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p19_assoc_14" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p19_actor_Member" target="p19_main_4">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_inc_4_1" parent="1" value="Add points back" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="622.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p19_include_15" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p19_main_4" target="p19_inc_4_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p19_inc_4_2" parent="1" value="Apply refund rules" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="680.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p19_include_16" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p19_main_4" target="p19_inc_4_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage20" name="UC 20 Admin Dashboard">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p20_boundary" parent="1" value="System Boundary: Admin Platform - Dashboard" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p20_actor_Admin" parent="1" value="Admin" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p20_main_1" parent="1" value="View admin dashboard" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p20_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p20_actor_Admin" target="p20_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_1_1" parent="1" value="View pending role apps" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="96.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_1" target="p20_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_1_2" parent="1" value="View refund requests" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="146.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_1" target="p20_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_1_3" parent="1" value="View active courses" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="196.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_1" target="p20_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_1_4" parent="1" value="View published contents" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="246.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_5" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_1" target="p20_inc_1_4">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_main_2" parent="1" value="Review platform requests" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p20_assoc_6" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p20_actor_Admin" target="p20_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_2_1" parent="1" value="Approve / reject trainer applications" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="303.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_2" target="p20_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_2_2" parent="1" value="Approve / reject creator applications" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="361.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_2" target="p20_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_2_3" parent="1" value="Approve / reject refunds" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="419.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_9" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_2" target="p20_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_main_3" parent="1" value="Control platform data" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p20_assoc_10" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p20_actor_Admin" target="p20_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_3_1" parent="1" value="Manage users and profiles" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="493.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_3" target="p20_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_3_2" parent="1" value="Manage courses and contents" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="551.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_12" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_3" target="p20_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p20_inc_3_3" parent="1" value="Manage transactions" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="609.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p20_include_13" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p20_main_3" target="p20_inc_3_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ucPage21" name="UC 21 Admin Refund Review">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p21_boundary" parent="1" value="System Boundary: Admin Platform - Refund Review" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#000000;verticalAlign=top;align=left;spacingTop=8;spacingLeft=10;fontStyle=1;fontSize=14;" vertex="1">
+          <mxGeometry as="geometry" x="220" y="40" width="840" height="740"/>
+        </mxCell>
+        <mxCell id="p21_actor_Admin" parent="1" value="Admin" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#000000;fillColor=#ffffff;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="72" y="365" width="54" height="72"/>
+        </mxCell>
+        <mxCell id="p21_main_1" parent="1" value="Review course refund requests" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="169" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p21_assoc_1" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p21_actor_Admin" target="p21_main_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_inc_1_1" parent="1" value="Filter refund requests" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="113.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p21_include_2" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p21_main_1" target="p21_inc_1_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_inc_1_2" parent="1" value="View refund request table" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="171.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p21_include_3" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p21_main_1" target="p21_inc_1_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_inc_1_3" parent="1" value="View selected request detail" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="229.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p21_include_4" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p21_main_1" target="p21_inc_1_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_main_2" parent="1" value="Check refund eligibility" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="359" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p21_assoc_5" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p21_actor_Admin" target="p21_main_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_inc_2_1" parent="1" value="Check watch time" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="303.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p21_include_6" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p21_main_2" target="p21_inc_2_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_inc_2_2" parent="1" value="Check paid points" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="361.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p21_include_7" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p21_main_2" target="p21_inc_2_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_inc_2_3" parent="1" value="Check refund rule" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="419.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p21_include_8" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p21_main_2" target="p21_inc_2_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_main_3" parent="1" value="Decide refund request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="300" y="549" width="235" height="62"/>
+        </mxCell>
+        <mxCell id="p21_assoc_9" parent="1" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1.4;" edge="1" source="p21_actor_Admin" target="p21_main_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_inc_3_1" parent="1" value="Approve refund" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="493.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p21_include_10" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p21_main_3" target="p21_inc_3_1">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_inc_3_2" parent="1" value="Reject refund" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="551.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p21_include_11" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p21_main_3" target="p21_inc_3_2">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="p21_inc_3_3" parent="1" value="Return points if approved" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=12;" vertex="1">
+          <mxGeometry as="geometry" x="655" y="609.0" width="275" height="58"/>
+        </mxCell>
+        <mxCell id="p21_include_12" parent="1" value="«include»" style="endArrow=open;endFill=0;dashed=1;html=1;rounded=0;strokeWidth=1.2;" edge="1" source="p21_main_3" target="p21_inc_3_3">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
