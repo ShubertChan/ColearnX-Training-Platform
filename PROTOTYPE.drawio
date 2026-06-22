@@ -1,0 +1,1204 @@
+<mxfile host="app.diagrams.net" agent="ChatGPT" pages="19">
+  <diagram id="updatedPage2" name="02 Login and Register">
+    <mxGraphModel dx="1202" dy="664" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="650" width="445" x="105" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - Login" vertex="1">
+          <mxGeometry height="42" width="445" x="105" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;" value="CoLearnX" vertex="1">
+          <mxGeometry height="35" width="240" x="210" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Email" vertex="1">
+          <mxGeometry height="45" width="310" x="175" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Password" vertex="1">
+          <mxGeometry height="45" width="310" x="175" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Login" vertex="1">
+          <mxGeometry height="45" width="310" x="175" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Create Member Account" vertex="1">
+          <mxGeometry height="45" width="310" x="175" y="455" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="New user default role: Member Unified Points Wallet created" vertex="1">
+          <mxGeometry height="75" width="310" x="175" y="545" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="650" width="445" x="620" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="Register Member Account" vertex="1">
+          <mxGeometry height="42" width="445" x="620" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Create Account" vertex="1">
+          <mxGeometry height="35" width="260" x="715" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Full Name" vertex="1">
+          <mxGeometry height="40" width="300" x="690" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Email" vertex="1">
+          <mxGeometry height="40" width="300" x="690" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Password" vertex="1">
+          <mxGeometry height="40" width="300" x="690" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="16" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Confirm Password" vertex="1">
+          <mxGeometry height="40" width="300" x="690" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="18" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Register" vertex="1">
+          <mxGeometry height="45" width="300" x="692.5" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="19" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Redirect to Member Home" vertex="1">
+          <mxGeometry height="55" width="300" x="690" y="615" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage3" name="03 Member Home">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - Home" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="&amp;nbsp;Menu&amp;nbsp;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;&amp;nbsp;Home&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Profile&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Course Marketplace&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Content Marketplace&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Shopping Cart&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Courses&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Purchases&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Points Wallet&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Role Application&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Welcome back" vertex="1">
+          <mxGeometry height="35" width="420" x="290" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Points Balance 320 points" vertex="1">
+          <mxGeometry height="70" width="290" x="760" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Course Marketplace" vertex="1">
+          <mxGeometry height="130" width="350" x="290" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Content Marketplace" vertex="1">
+          <mxGeometry height="130" width="350" x="700" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="My Courses / Contents" vertex="1">
+          <mxGeometry height="130" width="350" x="290" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="My personal Profile" vertex="1">
+          <mxGeometry height="130" width="350" x="700" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Role Upgrade Apply&amp;nbsp;" vertex="1">
+          <mxGeometry height="105" width="350" x="290" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Shopping Cart&amp;nbsp;" vertex="1">
+          <mxGeometry height="105" width="350" x="700" y="550" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage4" name="04 Personal Profile Self View">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - My Personal Profile" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="&amp;nbsp;Menu&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;div&gt;&amp;nbsp;Home&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Profile&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Edit Profile&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Courses&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Contents&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Wallet&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Role Application&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="IMG" vertex="1">
+          <mxGeometry height="140" width="140" x="290" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="User Name" vertex="1">
+          <mxGeometry height="35" width="360" x="455" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Bio Short introduction, interests, skills" vertex="1">
+          <mxGeometry height="80" width="360" x="455" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Current Roles Member&amp;nbsp;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Trainer: Pending / Approved&amp;nbsp;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Creator: Not applied&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="135" width="210" x="840" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Personal Information Email Phone Location Joined date" vertex="1">
+          <mxGeometry height="130" width="360" x="290" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="&amp;nbsp;&lt;div&gt;Points balance&amp;nbsp;&lt;div&gt;Purchased courses&amp;nbsp;&lt;/div&gt;&lt;div&gt;Purchased contents&amp;nbsp;&lt;/div&gt;&lt;div&gt;Refund records&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="130" width="360" x="690" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="My Public Profile Preview&amp;nbsp;" vertex="1">
+          <mxGeometry height="120" width="760" x="290" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Edit Profile" vertex="1">
+          <mxGeometry height="50" width="220" x="390" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="View Public Profile" vertex="1">
+          <mxGeometry height="50" width="220" x="670" y="620" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage5" name="05 Public Author Profile">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - Public Profile" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="Back&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;Courses&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Contents&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="IMG" vertex="1">
+          <mxGeometry height="140" width="140" x="290" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Trainer / Creator Public Name" vertex="1">
+          <mxGeometry height="35" width="400" x="455" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Public bio Specialty, teaching area, creator category" vertex="1">
+          <mxGeometry height="80" width="370" x="455" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Public Stats Rating: 4.8&amp;nbsp;&lt;div&gt;Courses: 6&amp;nbsp;&lt;/div&gt;&lt;div&gt;Contents: 12&amp;nbsp;&lt;/div&gt;&lt;div&gt;Followers: 1.2k&lt;/div&gt;" vertex="1">
+          <mxGeometry height="135" width="200" x="850" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Related Courses - AI Basics - JavaScript Starter - Web Design Bootcamp  [View Course]" vertex="1">
+          <mxGeometry height="165" width="360" x="290" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Related Creative Contents - AI Study Notes - Pixel Art Guide - JS Practice Pack  [View Content]" vertex="1">
+          <mxGeometry height="165" width="360" x="690" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Reviews / Comments Users can check credibility before buying courses or contents." vertex="1">
+          <mxGeometry height="95" width="760" x="290" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="SUBSCRIBE" vertex="1">
+          <mxGeometry height="45" width="180" x="380" y="630" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="UNSUBSCRIBE" vertex="1">
+          <mxGeometry height="45" width="180" x="610" y="630" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="SCORE" vertex="1">
+          <mxGeometry height="45" width="180" x="840" y="630" as="geometry" />
+        </mxCell>
+        <mxCell id="Y0rF9yidwDiDhiyaR6_2-14" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1060" y="371.87" as="sourcePoint" />
+            <mxPoint x="1095" y="371.87" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Y0rF9yidwDiDhiyaR6_2-15" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="285" y="372.29" as="sourcePoint" />
+            <mxPoint x="255" y="372.52000000000004" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage6" name="06 Course Marketplace">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - Course Marketplace" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="&amp;nbsp;Menu&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;div&gt;&amp;nbsp;Home&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Course Marketplace&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Contents Marketplace&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Shopping Cart&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Courses&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Points Wallet&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Profile&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Browse Trainer Courses" vertex="1">
+          <mxGeometry height="35" width="430" x="290" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Points 320" vertex="1">
+          <mxGeometry height="65" width="140" x="760" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Cart 3 items" vertex="1">
+          <mxGeometry height="65" width="130" x="920" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Search / Filter Keyword | Category | Trainer | Date | Status | Point Price" vertex="1">
+          <mxGeometry height="65" width="760" x="290" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Course" vertex="1">
+          <mxGeometry height="42" width="200" x="290" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Trainer" vertex="1">
+          <mxGeometry height="42" width="135" x="490" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Status" vertex="1">
+          <mxGeometry height="42" width="120" x="625" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Price" vertex="1">
+          <mxGeometry height="42" width="100" x="745" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Action 1" vertex="1">
+          <mxGeometry height="42" width="110" x="845" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Action 2" vertex="1">
+          <mxGeometry height="42" width="120" x="955" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="AI Basics" vertex="1">
+          <mxGeometry height="42" width="200" x="290" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="16" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Trainer A" vertex="1">
+          <mxGeometry height="42" width="135" x="490" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="17" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Not bought" vertex="1">
+          <mxGeometry height="42" width="120" x="625" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="18" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="80" vertex="1">
+          <mxGeometry height="42" width="100" x="745" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="19" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="View" vertex="1">
+          <mxGeometry height="42" width="110" x="845" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="20" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Add to Cart" vertex="1">
+          <mxGeometry height="42" width="120" x="955" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="21" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Web Design" vertex="1">
+          <mxGeometry height="42" width="200" x="290" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="22" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Trainer B" vertex="1">
+          <mxGeometry height="42" width="135" x="490" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="23" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Unwatched" vertex="1">
+          <mxGeometry height="42" width="120" x="625" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="24" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="120" vertex="1">
+          <mxGeometry height="42" width="100" x="745" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Open" vertex="1">
+          <mxGeometry height="42" width="110" x="845" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="26" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Go to Course" vertex="1">
+          <mxGeometry height="42" width="120" x="955" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="27" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Cybersecurity" vertex="1">
+          <mxGeometry height="42" width="200" x="290" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="28" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Trainer C" vertex="1">
+          <mxGeometry height="42" width="135" x="490" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="29" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Watching" vertex="1">
+          <mxGeometry height="42" width="120" x="625" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="30" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="100" vertex="1">
+          <mxGeometry height="42" width="100" x="745" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="31" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Continue" vertex="1">
+          <mxGeometry height="42" width="110" x="845" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="32" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Refund?" vertex="1">
+          <mxGeometry height="42" width="120" x="955" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="33" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="JavaScript Starter" vertex="1">
+          <mxGeometry height="42" width="200" x="290" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="34" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Trainer D" vertex="1">
+          <mxGeometry height="42" width="135" x="490" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="35" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Watched" vertex="1">
+          <mxGeometry height="42" width="120" x="625" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="36" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="70" vertex="1">
+          <mxGeometry height="42" width="100" x="745" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="37" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Review" vertex="1">
+          <mxGeometry height="42" width="110" x="845" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="38" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="No Refund" vertex="1">
+          <mxGeometry height="42" width="120" x="955" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="39" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Course Card Rule Click trainer name/avatar -&gt; Public Author Profile Add to Cart -&gt; Shopping Cart Status shows whether user has bought/watched the course" vertex="1">
+          <mxGeometry height="105" width="760" x="290" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="40" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Go to Shopping Cart" vertex="1">
+          <mxGeometry height="45" width="225" x="825" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="9TdOiAuIFfcXswUwsrYk-40" parent="1" style="verticalLabelPosition=bottom;verticalAlign=top;html=1;shape=mxgraph.basic.tick" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="460" y="395" as="geometry" />
+        </mxCell>
+        <mxCell id="9TdOiAuIFfcXswUwsrYk-41" parent="1" style="verticalLabelPosition=bottom;verticalAlign=top;html=1;shape=mxgraph.basic.tick" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="460" y="480" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage7" name="07 Course Detail">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="User Platform - Course Detail" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="AI Basics Training Course" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="115" width="500" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Course Description Beginner AI course with lectures, practice tasks, and downloadable notes." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="175" width="570" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Course Status Not purchased / Unwatched / Watching / Watched Watch time: 0 min / 25 min / 2 hr" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="730" y="175" width="300" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Course Information Trainer: Trainer A Click trainer -&gt; Public Profile Date / Duration / Capacity Price: 80 points" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="325" width="390" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="Refund Rule If watched time is under 30 minutes: Refund button available If 30 minutes or more: Refund disabled" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="555" y="325" width="475" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="Add to Cart" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="235" y="555" width="210" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="Buy Now" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="555" width="210" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="Request Refund" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="725" y="555" width="210" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="Refund button state depends on purchase status and watch duration." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="255" y="645" width="660" height="45" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage8" name="08 Shopping Cart">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - Course Shopping Cart" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="&amp;nbsp;Menu&amp;nbsp;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;&amp;nbsp;Home&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Course Marketplace&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Shopping Cart&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Courses&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Points Wallet&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Shopping Cart" vertex="1">
+          <mxGeometry height="35" width="430" x="290" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Points Balance 320 points" vertex="1">
+          <mxGeometry height="70" width="290" x="760" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Select" vertex="1">
+          <mxGeometry height="46" width="80" x="290" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Course" vertex="1">
+          <mxGeometry height="46" width="260" x="370" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Trainer" vertex="1">
+          <mxGeometry height="46" width="160" x="630" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Price" vertex="1">
+          <mxGeometry height="46" width="120" x="790" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Remove" vertex="1">
+          <mxGeometry height="46" width="120" x="910" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="☑" vertex="1">
+          <mxGeometry height="46" width="80" x="290" y="266" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="AI Basics" vertex="1">
+          <mxGeometry height="46" width="260" x="370" y="266" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Trainer A" vertex="1">
+          <mxGeometry height="46" width="160" x="630" y="266" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="80" vertex="1">
+          <mxGeometry height="46" width="120" x="790" y="266" as="geometry" />
+        </mxCell>
+        <mxCell id="16" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Remove" vertex="1">
+          <mxGeometry height="46" width="120" x="910" y="266" as="geometry" />
+        </mxCell>
+        <mxCell id="17" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="☑" vertex="1">
+          <mxGeometry height="46" width="80" x="290" y="312" as="geometry" />
+        </mxCell>
+        <mxCell id="18" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Web Design Bootcamp" vertex="1">
+          <mxGeometry height="46" width="260" x="370" y="312" as="geometry" />
+        </mxCell>
+        <mxCell id="19" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Trainer B" vertex="1">
+          <mxGeometry height="46" width="160" x="630" y="312" as="geometry" />
+        </mxCell>
+        <mxCell id="20" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="120" vertex="1">
+          <mxGeometry height="46" width="120" x="790" y="312" as="geometry" />
+        </mxCell>
+        <mxCell id="21" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Remove" vertex="1">
+          <mxGeometry height="46" width="120" x="910" y="312" as="geometry" />
+        </mxCell>
+        <mxCell id="22" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="☐" vertex="1">
+          <mxGeometry height="46" width="80" x="290" y="358" as="geometry" />
+        </mxCell>
+        <mxCell id="23" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="JavaScript Starter" vertex="1">
+          <mxGeometry height="46" width="260" x="370" y="358" as="geometry" />
+        </mxCell>
+        <mxCell id="24" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Trainer D" vertex="1">
+          <mxGeometry height="46" width="160" x="630" y="358" as="geometry" />
+        </mxCell>
+        <mxCell id="25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="70" vertex="1">
+          <mxGeometry height="46" width="120" x="790" y="358" as="geometry" />
+        </mxCell>
+        <mxCell id="26" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Remove" vertex="1">
+          <mxGeometry height="46" width="120" x="910" y="358" as="geometry" />
+        </mxCell>
+        <mxCell id="27" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Checkout Summary Selected courses: 2 Total price: 200 points Balance after payment: 120 points" vertex="1">
+          <mxGeometry height="145" width="360" x="290" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="28" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Payment Result Create purchase records for each course Deduct points once Update each trainer income separately" vertex="1">
+          <mxGeometry height="145" width="350" x="700" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="29" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Checkout Selected" vertex="1">
+          <mxGeometry height="50" width="220" x="430" y="625" as="geometry" />
+        </mxCell>
+        <mxCell id="30" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Continue Browsing" vertex="1">
+          <mxGeometry height="50" width="220" x="700" y="625" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage9" name="09 Checkout Success">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="User Platform - Course Checkout Success" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Payment Successful" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="120" width="510" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Order Summary Order ID: ORD-000123 Paid with unified points Total paid: 200 points Remaining balance: 120 points" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="250" y="200" width="670" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Purchased Courses 1. AI Basics - Status: Unwatched 2. Web Design Bootcamp - Status: Unwatched  Each course now appears in My Courses." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="250" y="350" width="670" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Go to My Courses" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="570" width="220" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="Back to Marketplace" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="570" width="220" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage10" name="10 My Courses and Status">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - My Courses" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="Menu&amp;nbsp;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Home&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Courses&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Unwatched&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Watching&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Watched&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Refund Records&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="My Courses" vertex="1">
+          <mxGeometry height="35" width="430" x="290" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Tabs Unwatched | Watching | Watched | Refunded" vertex="1">
+          <mxGeometry height="60" width="760" x="290" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Course" vertex="1">
+          <mxGeometry height="42" width="240" x="290" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Status" vertex="1">
+          <mxGeometry height="42" width="140" x="530" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Watch Time" vertex="1">
+          <mxGeometry height="42" width="120" x="670" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Refund Eligibility" vertex="1">
+          <mxGeometry height="42" width="180" x="790" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Action" vertex="1">
+          <mxGeometry height="42" width="120" x="970" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="AI Basics" vertex="1">
+          <mxGeometry height="42" width="240" x="290" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Unwatched" vertex="1">
+          <mxGeometry height="42" width="140" x="530" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="0 min" vertex="1">
+          <mxGeometry height="42" width="120" x="670" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Eligible" vertex="1">
+          <mxGeometry height="42" width="180" x="790" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="16" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Start" vertex="1">
+          <mxGeometry height="42" width="120" x="970" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="17" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Cybersecurity" vertex="1">
+          <mxGeometry height="42" width="240" x="290" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="18" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Watching" vertex="1">
+          <mxGeometry height="42" width="140" x="530" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="19" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="25 min" vertex="1">
+          <mxGeometry height="42" width="120" x="670" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="20" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Eligible" vertex="1">
+          <mxGeometry height="42" width="180" x="790" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="21" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Refund" vertex="1">
+          <mxGeometry height="42" width="120" x="970" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="22" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Web Design" vertex="1">
+          <mxGeometry height="42" width="240" x="290" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="23" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Watching" vertex="1">
+          <mxGeometry height="42" width="140" x="530" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="24" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="45 min" vertex="1">
+          <mxGeometry height="42" width="120" x="670" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Not eligible" vertex="1">
+          <mxGeometry height="42" width="180" x="790" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="26" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Continue" vertex="1">
+          <mxGeometry height="42" width="120" x="970" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="27" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="JavaScript Starter" vertex="1">
+          <mxGeometry height="42" width="240" x="290" y="458" as="geometry" />
+        </mxCell>
+        <mxCell id="28" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Watched" vertex="1">
+          <mxGeometry height="42" width="140" x="530" y="458" as="geometry" />
+        </mxCell>
+        <mxCell id="29" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="2 hr" vertex="1">
+          <mxGeometry height="42" width="120" x="670" y="458" as="geometry" />
+        </mxCell>
+        <mxCell id="30" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Not eligible" vertex="1">
+          <mxGeometry height="42" width="180" x="790" y="458" as="geometry" />
+        </mxCell>
+        <mxCell id="31" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Review" vertex="1">
+          <mxGeometry height="42" width="120" x="970" y="458" as="geometry" />
+        </mxCell>
+        <mxCell id="32" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Status Rules Unwatched: purchased but never opened Watching: started but not completed Watched: completed or watched enough to count as viewed Refund allowed only if watched time &lt; 30 minutes" vertex="1">
+          <mxGeometry height="110" width="760" x="290" y="520" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage11" name="11 Refund Request">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="User Platform - Course Refund Request" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Refund Request" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="115" width="500" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Course Information Course: Cybersecurity Intro Price: 100 points Watch time: 25 minutes Status: Watching" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="175" width="420" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Refund Eligibility Check Rule: watch time under 30 minutes Result: Eligible Refund amount: 100 points" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="590" y="175" width="440" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Refund Reason Text area: user explains why they want refund" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="350" width="910" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="After submit Refund status: Pending / Approved / Rejected Admin can review refund if manual approval is required" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="500" width="910" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="Submit Refund" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="330" y="620" width="220" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="Cancel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="620" width="220" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage12" name="12 Content Marketplace">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - Content Marketplace" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="&amp;nbsp;Menu&amp;nbsp;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;&amp;nbsp;Home&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Content Marketplace&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;courses Marketplace&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Contents&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Points Wallet&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Profile&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Browse Creator Contents" vertex="1">
+          <mxGeometry height="35" width="500" x="290" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Points Balance 320 points" vertex="1">
+          <mxGeometry height="65" width="290" x="760" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Search / Filter Keyword | Category | Creator | Type | Point Price" vertex="1">
+          <mxGeometry height="65" width="760" x="290" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Content" vertex="1">
+          <mxGeometry height="42" width="250" x="290" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Creator" vertex="1">
+          <mxGeometry height="42" width="160" x="540" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Type" vertex="1">
+          <mxGeometry height="42" width="130" x="700" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Price" vertex="1">
+          <mxGeometry height="42" width="120" x="830" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Action" vertex="1">
+          <mxGeometry height="42" width="120" x="950" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="AI Study Notes" vertex="1">
+          <mxGeometry height="42" width="250" x="290" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Creator A" vertex="1">
+          <mxGeometry height="42" width="160" x="540" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="PDF" vertex="1">
+          <mxGeometry height="42" width="130" x="700" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="16" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="30" vertex="1">
+          <mxGeometry height="42" width="120" x="830" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="17" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="View" vertex="1">
+          <mxGeometry height="42" width="120" x="950" y="342" as="geometry" />
+        </mxCell>
+        <mxCell id="18" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Pixel Art Guide" vertex="1">
+          <mxGeometry height="42" width="250" x="290" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="19" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Creator B" vertex="1">
+          <mxGeometry height="42" width="160" x="540" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="20" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Video" vertex="1">
+          <mxGeometry height="42" width="130" x="700" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="21" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="60" vertex="1">
+          <mxGeometry height="42" width="120" x="830" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="22" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="View" vertex="1">
+          <mxGeometry height="42" width="120" x="950" y="384" as="geometry" />
+        </mxCell>
+        <mxCell id="23" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="JS Practice Pack" vertex="1">
+          <mxGeometry height="42" width="250" x="290" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="24" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Creator C" vertex="1">
+          <mxGeometry height="42" width="160" x="540" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Files" vertex="1">
+          <mxGeometry height="42" width="130" x="700" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="26" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="45" vertex="1">
+          <mxGeometry height="42" width="120" x="830" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="27" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="View" vertex="1">
+          <mxGeometry height="42" width="120" x="950" y="426" as="geometry" />
+        </mxCell>
+        <mxCell id="28" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Game UI Template" vertex="1">
+          <mxGeometry height="42" width="250" x="290" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="29" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Creator D" vertex="1">
+          <mxGeometry height="42" width="160" x="540" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="30" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Asset" vertex="1">
+          <mxGeometry height="42" width="130" x="700" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="31" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="90" vertex="1">
+          <mxGeometry height="42" width="120" x="830" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="32" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="View" vertex="1">
+          <mxGeometry height="42" width="120" x="950" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="33" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Content Card Rule Click creator name/avatar -&gt; Public Author Profile Content purchase uses same Points Wallet Content module stays separate from course module" vertex="1">
+          <mxGeometry height="105" width="760" x="290" y="535" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage13" name="13 Content Detail Purchase">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="User Platform - Content Detail" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="AI Study Notes" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="115" width="500" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Content Description Downloadable PDF notes created for beginner AI learners." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="175" width="570" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Purchase Summary Price: 30 points Balance: 320 points After purchase: 290 points" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="730" y="175" width="300" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Creator Information Creator: Creator A Click creator -&gt; Public Profile Type: PDF Category: AI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="325" width="390" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="Access after purchase Unlock content Download or view permission Create content transaction Update creator income" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="555" y="325" width="475" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="Confirm Purchase" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="555" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="Cancel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="555" width="220" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage14" name="14 Role Application">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="User Platform - Apply for Trainer / Creator" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Role Upgrade Application" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="115" width="570" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Current Roles Member  Available applications: ☐ Trainer ☐ Creator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="175" width="410" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Application Status Trainer: Not applied / Pending / Approved / Rejected Creator: Not applied / Pending / Approved / Rejected" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="580" y="175" width="450" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Trainer Application Form Experience Course category Qualification / portfolio Reason for applying" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="335" width="410" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="Creator Application Form Content category Sample work / portfolio Creator profile Reason for applying" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="580" y="335" width="450" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="Submit Trainer Application" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="250" y="590" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="Submit Creator Application" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="590" width="190" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage15" name="15 Trainer Course Publish Edit">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - Trainer Course Publish/Edit" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="&amp;nbsp;Trainer&amp;nbsp;&amp;nbsp;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Menu&amp;nbsp;&lt;/span&gt;&lt;div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Overview&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Create Course&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Edit Course&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Courses&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Publish / Edit Course" vertex="1">
+          <mxGeometry height="35" width="520" x="290" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Video Tutorial" vertex="1">
+          <mxGeometry height="45" width="185" x="865" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Course Title" vertex="1">
+          <mxGeometry height="50" width="350" x="290" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Point Price" vertex="1">
+          <mxGeometry height="50" width="180" x="670" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Capacity" vertex="1">
+          <mxGeometry height="50" width="180" x="870" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Course Description" vertex="1">
+          <mxGeometry height="90" width="760" x="290" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Course Media / Materials Upload video, PDF, notes, links" vertex="1">
+          <mxGeometry height="120" width="350" x="290" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Course Settings Category Schedule Refund policy info Status: Draft / Published" vertex="1">
+          <mxGeometry height="120" width="350" x="700" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Tutorial Button Behavior Open video guide: how to create a course, set price, publish, and manage enrolments." vertex="1">
+          <mxGeometry height="60" width="760" x="290" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Save Draft" vertex="1">
+          <mxGeometry height="50" width="200" x="410" y="635" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Publish / Update" vertex="1">
+          <mxGeometry height="50" width="200" x="690" y="635" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage16" name="16 Creator Content Publish Edit">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="User Platform - Creator Content Publish/Edit" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="&amp;nbsp;Creator Menu&amp;nbsp;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Overview&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Upload Content&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Edit Content&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;My Contents&amp;nbsp;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Publish / Edit Creative Content" vertex="1">
+          <mxGeometry height="35" width="560" x="290" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Video Tutorial" vertex="1">
+          <mxGeometry height="45" width="185" x="865" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Content Title" vertex="1">
+          <mxGeometry height="50" width="350" x="290" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Point Price" vertex="1">
+          <mxGeometry height="50" width="180" x="670" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Content Type" vertex="1">
+          <mxGeometry height="50" width="180" x="870" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Content Description" vertex="1">
+          <mxGeometry height="90" width="760" x="290" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Upload Content PDF / Video / Image / File / Link" vertex="1">
+          <mxGeometry height="120" width="350" x="290" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Publish Settings Category Preview Visibility Status: Draft / Published" vertex="1">
+          <mxGeometry height="120" width="350" x="700" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Tutorial Button Behavior Open video guide: how to upload content, set price, create preview, and publish." vertex="1">
+          <mxGeometry height="60" width="760" x="290" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Save Draft" vertex="1">
+          <mxGeometry height="50" width="200" x="410" y="635" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" value="Publish / Update" vertex="1">
+          <mxGeometry height="50" width="200" x="690" y="635" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage17" name="17 Video Tutorial Modal">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="170" y="80" width="830" height="610" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Tutorial Video Pop-up / Help Center" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="170" y="80" width="830" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Publishing Tutorial" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="250" y="130" width="650" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Video Player Area How to publish or edit courses / creative contents Step-by-step tutorial" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="260" y="190" width="650" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Tutorial Chapters 1. Fill basic information 2. Upload files or media 3. Set point price 4. Save draft or publish 5. Manage after publishing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="260" y="480" width="650" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Previous" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="355" y="605" width="180" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="Next" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="610" y="605" width="180" height="45" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage18" name="18 Unified Points Wallet">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="User Platform - Unified Points Wallet" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="55" width="1010" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Points Wallet" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="115" width="500" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Current Balance 320 points" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="760" y="100" width="270" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Spending Course cart checkout Single content purchase" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="210" width="280" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Income Trainer course sales Creator content sales" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="445" y="210" width="280" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="Refunds Course refund adds points back Only if rules allow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="750" y="210" width="280" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="Date" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="380" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="Type" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="380" width="180" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="Item" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="380" width="250" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="Amount" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="670" y="380" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="13" value="Balance" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="790" y="380" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="Status" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="910" y="380" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="01 Jun" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="422" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="16" value="Course Cart Payment" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="240" y="422" width="180" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="17" value="2 courses" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="422" width="250" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="18" value="-200" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="670" y="422" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="19" value="120" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="790" y="422" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="20" value="Success" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="910" y="422" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="03 Jun" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="464" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="22" value="Content Purchase" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="240" y="464" width="180" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="AI Study Notes" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="464" width="250" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="24" value="-30" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="670" y="464" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="25" value="90" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="790" y="464" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="26" value="Success" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="910" y="464" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="27" value="05 Jun" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="506" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="28" value="Course Refund" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="240" y="506" width="180" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="29" value="Cybersecurity" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="506" width="250" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="30" value="+100" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="670" y="506" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="31" value="190" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="790" y="506" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="32" value="Approved" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="910" y="506" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="33" value="07 Jun" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="548" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="34" value="Course Income" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="240" y="548" width="180" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="35" value="Web Design" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="548" width="250" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="36" value="+120" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="670" y="548" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="37" value="310" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="790" y="548" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="38" value="Success" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="910" y="548" width="120" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="39" value="Unified points are shared by course purchases, content purchases, trainer income, creator income, and refunds." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="120" y="610" width="910" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage19" name="19 Admin Dashboard">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="Admin Platform - Dashboard" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="&amp;nbsp;Admin Menu&amp;nbsp;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Overview&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Role Applications&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Courses&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Contents&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Admin Overview" vertex="1">
+          <mxGeometry height="35" width="400" x="290" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Pending Role Apps 13" vertex="1">
+          <mxGeometry height="90" width="170" x="290" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Refund Requests 4" vertex="1">
+          <mxGeometry height="90" width="170" x="480" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Active Courses 24" vertex="1">
+          <mxGeometry height="90" width="170" x="670" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Published Contents 68" vertex="1">
+          <mxGeometry height="90" width="170" x="860" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Role Application Review Approve / Reject Trainer applications Approve / Reject Creator applications" vertex="1">
+          <mxGeometry height="150" width="360" x="290" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Refund Management Check watch time Approve / Reject refund Return points if approved" vertex="1">
+          <mxGeometry height="150" width="360" x="690" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Platform Control Manage users, profiles, courses, contents, transactions, reports" vertex="1">
+          <mxGeometry height="120" width="760" x="290" y="520" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="updatedPage20" name="20 Admin Refund Review">
+    <mxGraphModel dx="1278" dy="705" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="680" width="1095" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=16;fontStyle=1;" value="Admin Platform - Refund Review" vertex="1">
+          <mxGeometry height="42" width="1040" x="65" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#222222;fontSize=12;align=left;spacingLeft=12;" value="&amp;nbsp;Admin Menu&amp;nbsp;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;div&gt;&amp;nbsp;Overview&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Role Applications&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Courses&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;Contents&amp;nbsp;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="638" width="190" x="65" y="97" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;" value="Course Refund Requests" vertex="1">
+          <mxGeometry height="35" width="500" x="290" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Filter Status | Course | User | Watch Time | Date" vertex="1">
+          <mxGeometry height="60" width="760" x="290" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="User" vertex="1">
+          <mxGeometry height="42" width="140" x="290" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Course" vertex="1">
+          <mxGeometry height="42" width="210" x="430" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Watch Time" vertex="1">
+          <mxGeometry height="42" width="120" x="640" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Paid" vertex="1">
+          <mxGeometry height="42" width="100" x="760" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Eligibility" vertex="1">
+          <mxGeometry height="42" width="140" x="860" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#222222;fontSize=11;fontStyle=1;" value="Action" vertex="1">
+          <mxGeometry height="42" width="150" x="1000" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Alice" vertex="1">
+          <mxGeometry height="42" width="140" x="290" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Cybersecurity Intro" vertex="1">
+          <mxGeometry height="42" width="210" x="430" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="25 min" vertex="1">
+          <mxGeometry height="42" width="120" x="640" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="16" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="100" vertex="1">
+          <mxGeometry height="42" width="100" x="760" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="17" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Eligible" vertex="1">
+          <mxGeometry height="42" width="140" x="860" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="18" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Approve / Reject" vertex="1">
+          <mxGeometry height="42" width="150" x="1000" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="19" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Ben" vertex="1">
+          <mxGeometry height="42" width="140" x="290" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="20" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Web Design" vertex="1">
+          <mxGeometry height="42" width="210" x="430" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="21" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="45 min" vertex="1">
+          <mxGeometry height="42" width="120" x="640" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="22" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="120" vertex="1">
+          <mxGeometry height="42" width="100" x="760" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="23" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Not eligible" vertex="1">
+          <mxGeometry height="42" width="140" x="860" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="24" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Reject" vertex="1">
+          <mxGeometry height="42" width="150" x="1000" y="374" as="geometry" />
+        </mxCell>
+        <mxCell id="25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Chloe" vertex="1">
+          <mxGeometry height="42" width="140" x="290" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="26" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="AI Basics" vertex="1">
+          <mxGeometry height="42" width="210" x="430" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="27" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="5 min" vertex="1">
+          <mxGeometry height="42" width="120" x="640" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="28" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="80" vertex="1">
+          <mxGeometry height="42" width="100" x="760" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="29" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Eligible" vertex="1">
+          <mxGeometry height="42" width="140" x="860" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="30" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=11;" value="Approve / Reject" vertex="1">
+          <mxGeometry height="42" width="150" x="1000" y="416" as="geometry" />
+        </mxCell>
+        <mxCell id="31" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Selected Request Detail Reason Purchase time Watch log Refund amount" vertex="1">
+          <mxGeometry height="155" width="360" x="290" y="475" as="geometry" />
+        </mxCell>
+        <mxCell id="32" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#222222;fontSize=12;" value="Admin Decision Approve: return points Reject: keep transaction Decision reason required" vertex="1">
+          <mxGeometry height="155" width="360" x="690" y="475" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
