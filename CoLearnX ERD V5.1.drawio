@@ -1,0 +1,798 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mxfile host="app.diagrams.net" agent="Codex" type="device">
+  <diagram id="colearnx-v5-1-sponsor-rules" name="CoLearnX ERD V5.1 Sponsor Rules">
+    <mxGraphModel dx="1800" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="5300" pageHeight="3000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="rel_01" value="1:N role_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E7D32;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="roles" target="user_roles">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_02" value="1:N user_id; 0..N assigned_by" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E7D32;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="user_roles">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1328" y="1145"/>
+              <mxPoint x="1060" y="1145"/>
+              <mxPoint x="1060" y="540"/>
+              <mxPoint x="990" y="540"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_03" value="1:N applicant; 0..N reviewer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E7D32;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="role_applications">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1328" y="1175"/>
+              <mxPoint x="650" y="1175"/>
+              <mxPoint x="650" y="835"/>
+              <mxPoint x="640" y="835"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_04" value="1:N requested_role" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E7D32;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="roles" target="role_applications">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_05" value="0..1:N parent_category" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7A6B1C;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="categories" target="categories">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="270" y="1210"/>
+              <mxPoint x="270" y="1090"/>
+              <mxPoint x="460" y="1090"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_06" value="1:N category_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7A6B1C;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="categories" target="courses">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1010" y="1210"/>
+              <mxPoint x="1010" y="430"/>
+              <mxPoint x="1120" y="430"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_07" value="1:N category_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7A6B1C;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="categories" target="contents">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="980" y="1210"/>
+              <mxPoint x="980" y="1720"/>
+              <mxPoint x="1135" y="1720"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_08" value="1:N tag_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7A6B1C;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="tags" target="course_tags">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="1420"/>
+              <mxPoint x="640" y="1420"/>
+              <mxPoint x="640" y="1070"/>
+              <mxPoint x="670" y="1070"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_09" value="1:N course_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7A6B1C;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="courses" target="course_tags">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1050" y="430"/>
+              <mxPoint x="1050" y="1070"/>
+              <mxPoint x="940" y="1070"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_10" value="1:N tag_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7A6B1C;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="tags" target="content_tags">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_11" value="1:N content_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7A6B1C;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="contents" target="content_tags">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1050" y="1720"/>
+              <mxPoint x="1050" y="1490"/>
+              <mxPoint x="960" y="1490"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_12" value="1:N owner_user_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="courses">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1328" y="1120"/>
+              <mxPoint x="1090" y="1120"/>
+              <mxPoint x="1090" y="600"/>
+              <mxPoint x="1280" y="600"/>
+              <mxPoint x="1280" y="555"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_13" value="1:N course_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="courses" target="course_runs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_14" value="1:N selected course policy" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="refund_policies" target="course_runs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2890" y="1320"/>
+              <mxPoint x="2890" y="580"/>
+              <mxPoint x="1705" y="580"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_15" value="1:N run trainers" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_runs" target="course_run_trainers">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_16" value="1:N trainer_user_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="course_run_trainers">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1628" y="1110"/>
+              <mxPoint x="1905" y="1110"/>
+              <mxPoint x="1905" y="270"/>
+              <mxPoint x="1990" y="270"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_17" value="1:N sessions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_runs" target="course_sessions">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_18" value="1:N delivery components" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_runs" target="course_delivery_options">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1875" y="445"/>
+              <mxPoint x="2330" y="445"/>
+              <mxPoint x="2330" y="720"/>
+              <mxPoint x="2410" y="720"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_19" value="1:N modules" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="courses" target="course_modules">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_20" value="1:N module contents" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_modules" target="course_module_contents">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_21" value="1:N content_version" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7B3FB2;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="content_versions" target="course_module_contents">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1705" y="1645"/>
+              <mxPoint x="1705" y="930"/>
+              <mxPoint x="1655" y="930"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_22" value="1:0..N license proof" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7B3FB2;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="content_licenses" target="course_module_contents">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2200" y="2000"/>
+              <mxPoint x="1900" y="2000"/>
+              <mxPoint x="1900" y="958"/>
+              <mxPoint x="1655" y="958"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_23" value="1:N enrolments" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_runs" target="course_enrolments">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_24" value="1:N learner; 0..N transfer target" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="course_enrolments">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_25" value="1:0..1 paid enrolment" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="order_items" target="course_enrolments">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3710" y="850"/>
+              <mxPoint x="2910" y="850"/>
+              <mxPoint x="2910" y="875"/>
+              <mxPoint x="2380" y="875"/>
+              <mxPoint x="2380" y="762"/>
+              <mxPoint x="2315" y="762"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_26" value="1:N progress" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_enrolments" target="learning_progress">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_27" value="1:N module progress" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_modules" target="learning_progress">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1440" y="750"/>
+              <mxPoint x="1910" y="750"/>
+              <mxPoint x="1910" y="1055"/>
+              <mxPoint x="2040" y="1055"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_28" value="1:N delivery progress" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_enrolments" target="course_access_progress">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2315" y="762"/>
+              <mxPoint x="2395" y="762"/>
+              <mxPoint x="2395" y="890"/>
+              <mxPoint x="2650" y="890"/>
+              <mxPoint x="2650" y="910"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_29" value="1:N tracked access" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_delivery_options" target="course_access_progress">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_30" value="1:0..1 feedback" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2F63C6;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="course_enrolments" target="course_feedback">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2140" y="865"/>
+              <mxPoint x="2140" y="885"/>
+              <mxPoint x="2890" y="885"/>
+              <mxPoint x="2890" y="1220"/>
+              <mxPoint x="2510" y="1220"/>
+              <mxPoint x="2510" y="1392"/>
+              <mxPoint x="2460" y="1392"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_31" value="1:N creator_user_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7B3FB2;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="contents">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1478" y="1266"/>
+              <mxPoint x="1478" y="1565"/>
+              <mxPoint x="1295" y="1565"/>
+              <mxPoint x="1295" y="1605"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_32" value="1:N selected content policy" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="refund_policies" target="contents">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2680" y="1495"/>
+              <mxPoint x="2680" y="1860"/>
+              <mxPoint x="1295" y="1860"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_33" value="1:N versions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7B3FB2;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="contents" target="content_versions">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_34" value="1:N access grants" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7B3FB2;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="content_versions" target="content_access_grants">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_35" value="1:N granted user" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7B3FB2;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="content_access_grants">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1628" y="1190"/>
+              <mxPoint x="1935" y="1190"/>
+              <mxPoint x="1935" y="1642"/>
+              <mxPoint x="2200" y="1642"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_36" value="1:0..1 paid access" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="order_items" target="content_access_grants">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3710" y="885"/>
+              <mxPoint x="3110" y="885"/>
+              <mxPoint x="3110" y="1325"/>
+              <mxPoint x="2580" y="1325"/>
+              <mxPoint x="2580" y="1642"/>
+              <mxPoint x="2550" y="1642"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_37" value="1:0..1 content license" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="order_items" target="content_licenses">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3710" y="920"/>
+              <mxPoint x="3170" y="920"/>
+              <mxPoint x="3170" y="2000"/>
+              <mxPoint x="2570" y="2000"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_38" value="1:N licensed version" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7B3FB2;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="content_versions" target="content_licenses">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_39" value="1:N buyer / creator" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7B3FB2;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="content_licenses">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1628" y="1220"/>
+              <mxPoint x="1885" y="1220"/>
+              <mxPoint x="1885" y="2000"/>
+              <mxPoint x="2200" y="2000"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_40" value="1:N buyer carts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="carts">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1628" y="1100"/>
+              <mxPoint x="1660" y="1100"/>
+              <mxPoint x="1660" y="1205"/>
+              <mxPoint x="3150" y="1205"/>
+              <mxPoint x="3150" y="480"/>
+              <mxPoint x="3280" y="480"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_41" value="1:N cart items" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="carts" target="cart_items">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_42" value="1:0..N course target" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="course_runs" target="cart_items">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1700" y="575"/>
+              <mxPoint x="1700" y="565"/>
+              <mxPoint x="3290" y="565"/>
+              <mxPoint x="3290" y="740"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_43" value="1:0..N content target" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="content_versions" target="cart_items">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1705" y="1835"/>
+              <mxPoint x="3210" y="1835"/>
+              <mxPoint x="3210" y="740"/>
+              <mxPoint x="3290" y="740"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_44" value="1:N buyer orders" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="orders">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1628" y="1130"/>
+              <mxPoint x="1680" y="1130"/>
+              <mxPoint x="1680" y="1225"/>
+              <mxPoint x="3180" y="1225"/>
+              <mxPoint x="3180" y="385"/>
+              <mxPoint x="3910" y="385"/>
+              <mxPoint x="3910" y="410"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_45" value="1:N order items" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="orders" target="order_items">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_46" value="1:0..N course item" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="course_runs" target="order_items">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1735" y="315"/>
+              <mxPoint x="1735" y="145"/>
+              <mxPoint x="3690" y="145"/>
+              <mxPoint x="3690" y="832"/>
+              <mxPoint x="3710" y="832"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_47" value="1:0..N content item" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="content_versions" target="order_items">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1740" y="1835"/>
+              <mxPoint x="3640" y="1835"/>
+              <mxPoint x="3640" y="832"/>
+              <mxPoint x="3710" y="832"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_48" value="1:N seller_user_id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="order_items">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1628" y="1160"/>
+              <mxPoint x="1700" y="1160"/>
+              <mxPoint x="1700" y="1245"/>
+              <mxPoint x="3210" y="1245"/>
+              <mxPoint x="3210" y="1000"/>
+              <mxPoint x="3900" y="1000"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_49" value="1:N applied policy" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="refund_policies" target="order_items">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3165" y="1495"/>
+              <mxPoint x="3165" y="1030"/>
+              <mxPoint x="3900" y="1030"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_50" value="1:N refund requests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="order_items" target="refund_requests">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_51" value="1:N requester; 0..N reviewer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C0392B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="refund_requests">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1628" y="1195"/>
+              <mxPoint x="1720" y="1195"/>
+              <mxPoint x="1720" y="1265"/>
+              <mxPoint x="3180" y="1265"/>
+              <mxPoint x="3180" y="990"/>
+              <mxPoint x="3970" y="990"/>
+              <mxPoint x="3970" y="1125"/>
+              <mxPoint x="4060" y="1125"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_52" value="1:0..N course credentials" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2D7E79;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="courses" target="credentials">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1120" y="430"/>
+              <mxPoint x="1080" y="430"/>
+              <mxPoint x="1080" y="2050"/>
+              <mxPoint x="1195" y="2050"/>
+              <mxPoint x="1195" y="2100"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_53" value="1:0..N module credentials" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2D7E79;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="course_modules" target="credentials">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1120" y="750"/>
+              <mxPoint x="1050" y="750"/>
+              <mxPoint x="1050" y="2070"/>
+              <mxPoint x="1090" y="2070"/>
+              <mxPoint x="1090" y="2100"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_54" value="1:N issued credentials" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2D7E79;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="credentials" target="issued_credentials">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_55" value="1:N recipient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2D7E79;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="issued_credentials">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1328" y="1245"/>
+              <mxPoint x="985" y="1245"/>
+              <mxPoint x="985" y="2350"/>
+              <mxPoint x="1725" y="2350"/>
+              <mxPoint x="1725" y="2285"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_56" value="1:N earned credentials" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2D7E79;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="course_enrolments" target="issued_credentials">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1965" y="762"/>
+              <mxPoint x="1930" y="762"/>
+              <mxPoint x="1930" y="2320"/>
+              <mxPoint x="1725" y="2320"/>
+              <mxPoint x="1725" y="2285"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_57" value="1:N recipient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#B06D0B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="notifications">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1070" y="1140"/>
+              <mxPoint x="1070" y="120"/>
+              <mxPoint x="4550" y="120"/>
+              <mxPoint x="4550" y="630"/>
+              <mxPoint x="4620" y="630"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_58" value="1:N reporter; optional target/reviewer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#B06D0B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="user_reports">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1040" y="1170"/>
+              <mxPoint x="1040" y="150"/>
+              <mxPoint x="4520" y="150"/>
+              <mxPoint x="4520" y="1010"/>
+              <mxPoint x="4640" y="1010"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_59" value="1:0..N target_course" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#B06D0B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="courses" target="user_reports">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1280" y="320"/>
+              <mxPoint x="1280" y="165"/>
+              <mxPoint x="4560" y="165"/>
+              <mxPoint x="4560" y="1010"/>
+              <mxPoint x="4640" y="1010"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_60" value="1:0..N target_content" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#B06D0B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="contents" target="user_reports">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1135" y="1720"/>
+              <mxPoint x="980" y="1720"/>
+              <mxPoint x="980" y="2780"/>
+              <mxPoint x="5070" y="2780"/>
+              <mxPoint x="5070" y="1010"/>
+              <mxPoint x="5020" y="1010"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_61" value="1:N actor_user" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#B06D0B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="admin_action_logs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1010" y="1200"/>
+              <mxPoint x="1010" y="180"/>
+              <mxPoint x="4490" y="180"/>
+              <mxPoint x="4490" y="1335"/>
+              <mxPoint x="4620" y="1335"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_62" value="1:1 point account" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#287A58;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="users" target="point_accounts">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1478" y="1266"/>
+              <mxPoint x="1478" y="1515"/>
+              <mxPoint x="2650" y="1515"/>
+              <mxPoint x="2650" y="1660"/>
+              <mxPoint x="3170" y="1660"/>
+              <mxPoint x="3170" y="1460"/>
+              <mxPoint x="3220" y="1460"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_63" value="1:N purchase / release transactions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#287A58;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="order_items" target="point_transactions">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3900" y="975"/>
+              <mxPoint x="3900" y="1325"/>
+              <mxPoint x="3855" y="1325"/>
+              <mxPoint x="3855" y="1360"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_64" value="1:0..N credit / reversal transactions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#287A58;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="point_topup_orders" target="point_transactions">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3620" y="2368"/>
+              <mxPoint x="3600" y="2368"/>
+              <mxPoint x="3600" y="1500"/>
+              <mxPoint x="3650" y="1500"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_65" value="1:0..1 refund transaction" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#287A58;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="refund_requests" target="point_transactions">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="4060" y="1125"/>
+              <mxPoint x="3610" y="1125"/>
+              <mxPoint x="3610" y="1500"/>
+              <mxPoint x="3650" y="1500"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_66" value="0..1:N reversal chain" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#287A58;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="point_transactions" target="point_transactions">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="4060" y="1500"/>
+              <mxPoint x="4100" y="1500"/>
+              <mxPoint x="4100" y="1685"/>
+              <mxPoint x="3620" y="1685"/>
+              <mxPoint x="3620" y="1530"/>
+              <mxPoint x="3650" y="1530"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_67" value="1:N ledger entries" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#287A58;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="point_transactions" target="point_ledger_entries">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_68" value="1:N account entries" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#287A58;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="point_accounts" target="point_ledger_entries">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3395" y="1360"/>
+              <mxPoint x="3395" y="1310"/>
+              <mxPoint x="4350" y="1310"/>
+              <mxPoint x="4350" y="1360"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_69" value="1:0..N purchase / release hold" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#287A58;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="point_transactions" target="point_holds">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_70" value="1:N seller holds" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#287A58;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="point_accounts" target="point_holds">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3395" y="1560"/>
+              <mxPoint x="3395" y="1892"/>
+              <mxPoint x="3650" y="1892"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_71" value="1:N top-up orders" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#A86613;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="point_accounts" target="point_topup_orders">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3395" y="1560"/>
+              <mxPoint x="3395" y="2240"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_72" value="1:N payment attempts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#A86613;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="point_topup_orders" target="payment_transactions">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_73" value="1:N channel transactions" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#A86613;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="payment_channels" target="payment_transactions">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="4200" y="2075"/>
+              <mxPoint x="4160" y="2075"/>
+              <mxPoint x="4160" y="2385"/>
+              <mxPoint x="4130" y="2385"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel_74" value="1:0..N anomaly refunds" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#A86613;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;dashed=1;dashPattern=7 5;" edge="1" parent="1" source="payment_transactions" target="payment_refunds">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel_75" value="1:N approved anomaly refunds" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#B06D0B;strokeWidth=1.25;opacity=88;endArrow=none;startArrow=none;fontSize=9;fontColor=#1D2939;labelBackgroundColor=#FFFFFF;labelBorderColor=#D0D5DD;align=center;verticalAlign=middle;" edge="1" parent="1" source="admin_action_logs" target="payment_refunds">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="5000" y="1335"/>
+              <mxPoint x="5040" y="1335"/>
+              <mxPoint x="5040" y="2368"/>
+              <mxPoint x="4610" y="2368"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="roles" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;roles&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK role_id&lt;br&gt;role_code UNIQUE&lt;br&gt;role_name&lt;br&gt;description&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#E8F3E5;strokeColor=#6D9A63;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="350" y="445" width="250" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="user_roles" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;user_roles&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK user_role_id&lt;br&gt;FK user_id -&amp;gt; users&lt;br&gt;FK role_id -&amp;gt; roles&lt;br&gt;FK assigned_by_user_id -&amp;gt; users NULL&lt;br&gt;assigned_at&lt;br&gt;UNIQUE(user_id, role_id)&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#E8F3E5;strokeColor=#6D9A63;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="690" y="430" width="300" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="role_applications" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;role_applications&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK application_id&lt;br&gt;FK applicant_user_id -&amp;gt; users&lt;br&gt;FK requested_role_id -&amp;gt; roles&lt;br&gt;application_status&lt;br&gt;supporting_text&lt;br&gt;FK reviewer_user_id -&amp;gt; users NULL&lt;br&gt;review_comment&lt;br&gt;submitted_at&lt;br&gt;reviewed_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#E8F3E5;strokeColor=#6D9A63;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="310" y="725" width="330" height="225" as="geometry"/>
+        </mxCell>
+        <mxCell id="users" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;users&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK user_id&lt;br&gt;full_name&lt;br&gt;email UNIQUE&lt;br&gt;password_hash&lt;br&gt;account_status&lt;br&gt;created_at&lt;br&gt;updated_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#E8F3E5;strokeColor=#6D9A63;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1328" y="1076" width="300" height="190" as="geometry"/>
+        </mxCell>
+        <mxCell id="categories" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;categories&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK category_id&lt;br&gt;FK parent_category_id -&amp;gt; categories NULL&lt;br&gt;category_name&lt;br&gt;category_scope&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF8D9;strokeColor=#C8B35F;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="310" y="1135" width="300" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_tags" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_tags&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK course_tag_id&lt;br&gt;FK course_id -&amp;gt; courses&lt;br&gt;FK tag_id -&amp;gt; tags&lt;br&gt;UNIQUE(course_id, tag_id)&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF8D9;strokeColor=#C8B35F;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="670" y="1005" width="270" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="tags" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;tags&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK tag_id&lt;br&gt;tag_name UNIQUE&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF8D9;strokeColor=#C8B35F;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="230" y="1360" width="250" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="content_tags" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;content_tags&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK content_tag_id&lt;br&gt;FK content_id -&amp;gt; contents&lt;br&gt;FK tag_id -&amp;gt; tags&lt;br&gt;UNIQUE(content_id, tag_id)&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF8D9;strokeColor=#C8B35F;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="690" y="1420" width="270" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="courses" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;courses&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK course_id&lt;br&gt;FK owner_user_id -&amp;gt; users&lt;br&gt;FK category_id -&amp;gt; categories&lt;br&gt;title&lt;br&gt;description&lt;br&gt;course_level&lt;br&gt;publication_status&lt;br&gt;certificate_enabled&lt;br&gt;created_at&lt;br&gt;updated_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="320" width="320" height="235" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_runs" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_runs&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK course_run_id&lt;br&gt;FK course_id -&amp;gt; courses&lt;br&gt;FK refund_policy_id -&amp;gt; refund_policies&lt;br&gt;run_code UNIQUE&lt;br&gt;primary_delivery_type: CLOUD / LOCAL / LIVE&lt;br&gt;recording_status: NONE / PLANNED / AVAILABLE&lt;br&gt;price_points&lt;br&gt;starts_at&lt;br&gt;ends_at&lt;br&gt;timezone&lt;br&gt;capacity&lt;br&gt;run_status&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1535" y="315" width="340" height="260" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_run_trainers" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_run_trainers&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK run_trainer_id&lt;br&gt;FK course_run_id -&amp;gt; course_runs&lt;br&gt;FK trainer_user_id -&amp;gt; users&lt;br&gt;trainer_role&lt;br&gt;UNIQUE(course_run_id, trainer_user_id)&lt;br&gt;RULE user has TRAINER role&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1990" y="190" width="330" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_sessions" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_sessions&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK session_id&lt;br&gt;FK course_run_id -&amp;gt; course_runs&lt;br&gt;starts_at&lt;br&gt;ends_at&lt;br&gt;timezone&lt;br&gt;session_type: LIVE / WORKSHOP / ASSESSMENT&lt;br&gt;external_meeting_url NULL&lt;br&gt;venue NULL&lt;br&gt;session_status&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="2370" y="315" width="330" height="215" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_modules" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_modules&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK module_id&lt;br&gt;FK course_id -&amp;gt; courses&lt;br&gt;module_title&lt;br&gt;module_order&lt;br&gt;learning_outcome&lt;br&gt;assessment_required&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="660" width="320" height="175" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_module_contents" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_module_contents&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK module_content_id&lt;br&gt;FK module_id -&amp;gt; course_modules&lt;br&gt;FK content_version_id -&amp;gt; content_versions&lt;br&gt;FK content_license_id -&amp;gt; content_licenses NULL&lt;br&gt;display_order&lt;br&gt;is_required&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="870" width="355" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_enrolments" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_enrolments&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK enrolment_id&lt;br&gt;FK course_run_id -&amp;gt; course_runs&lt;br&gt;FK learner_user_id -&amp;gt; users&lt;br&gt;FK order_item_id -&amp;gt; order_items NULL UNIQUE&lt;br&gt;enrolment_status&lt;br&gt;FK transfer_to_user_id -&amp;gt; users NULL&lt;br&gt;enrolled_at&lt;br&gt;completed_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1965" y="660" width="350" height="205" as="geometry"/>
+        </mxCell>
+        <mxCell id="learning_progress" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;learning_progress&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK progress_id&lt;br&gt;FK enrolment_id -&amp;gt; course_enrolments&lt;br&gt;FK module_id -&amp;gt; course_modules&lt;br&gt;progress_status&lt;br&gt;progress_percent CHECK 0..100&lt;br&gt;score&lt;br&gt;completed_at&lt;br&gt;UNIQUE(enrolment_id, module_id)&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="2040" y="950" width="350" height="205" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_feedback" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_feedback&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK feedback_id&lt;br&gt;FK enrolment_id -&amp;gt; course_enrolments UNIQUE&lt;br&gt;questionnaire_version&lt;br&gt;trainer_score CHECK 1..5&lt;br&gt;design_score CHECK 1..5&lt;br&gt;practical_value_score CHECK 1..5&lt;br&gt;submitted_at&lt;br&gt;immutable_after_submit&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="2100" y="1285" width="360" height="215" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_delivery_options" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_delivery_options&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK delivery_option_id&lt;br&gt;FK course_run_id -&amp;gt; course_runs&lt;br&gt;delivery_type: CLOUD / LOCAL / LIVE / RECORD&lt;br&gt;is_primary&lt;br&gt;access_mode: STREAM / DOWNLOAD / EXTERNAL_LIVE&lt;br&gt;asset_reference NULL&lt;br&gt;available_from NULL&lt;br&gt;available_until NULL&lt;br&gt;option_status&lt;br&gt;UNIQUE(course_run_id, delivery_type)&lt;br&gt;CHECK one primary CLOUD / LOCAL / LIVE&lt;br&gt;RULE RECORD is optional secondary delivery&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="2410" y="590" width="390" height="265" as="geometry"/>
+        </mxCell>
+        <mxCell id="course_access_progress" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;course_access_progress&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK access_progress_id&lt;br&gt;FK enrolment_id -&amp;gt; course_enrolments&lt;br&gt;FK delivery_option_id -&amp;gt; course_delivery_options&lt;br&gt;watched_seconds&lt;br&gt;total_seconds&lt;br&gt;watch_percent CHECK 0..100&lt;br&gt;first_started_at NULL&lt;br&gt;last_watched_at NULL&lt;br&gt;download_completed_at NULL&lt;br&gt;live_attendance_status NULL&lt;br&gt;updated_at&lt;br&gt;UNIQUE(enrolment_id, delivery_option_id)&lt;br&gt;RULE refund engine reads a stored snapshot&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF1FF;strokeColor=#6F91D5;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="2440" y="910" width="420" height="270" as="geometry"/>
+        </mxCell>
+        <mxCell id="contents" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;contents&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK content_id&lt;br&gt;FK creator_user_id -&amp;gt; users&lt;br&gt;FK category_id -&amp;gt; categories&lt;br&gt;FK refund_policy_id -&amp;gt; refund_policies&lt;br&gt;title&lt;br&gt;content_type&lt;br&gt;price_points&lt;br&gt;publication_status&lt;br&gt;created_at&lt;br&gt;updated_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#F3EAFE;strokeColor=#9A7BC6;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1135" y="1605" width="320" height="230" as="geometry"/>
+        </mxCell>
+        <mxCell id="content_versions" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;content_versions&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK content_version_id&lt;br&gt;FK content_id -&amp;gt; contents&lt;br&gt;version_no&lt;br&gt;storage_url&lt;br&gt;version_status&lt;br&gt;published_at&lt;br&gt;UNIQUE(content_id, version_no)&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#F3EAFE;strokeColor=#9A7BC6;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1535" y="1645" width="340" height="190" as="geometry"/>
+        </mxCell>
+        <mxCell id="content_access_grants" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;content_access_grants&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK access_grant_id&lt;br&gt;FK content_version_id -&amp;gt; content_versions&lt;br&gt;FK user_id -&amp;gt; users&lt;br&gt;FK order_item_id -&amp;gt; order_items NULL UNIQUE&lt;br&gt;grant_reason&lt;br&gt;granted_at&lt;br&gt;first_accessed_at NULL&lt;br&gt;expires_at NULL&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#F3EAFE;strokeColor=#9A7BC6;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="2200" y="1530" width="350" height="225" as="geometry"/>
+        </mxCell>
+        <mxCell id="content_licenses" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;content_licenses&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK content_license_id&lt;br&gt;FK order_item_id -&amp;gt; order_items UNIQUE&lt;br&gt;FK content_version_id -&amp;gt; content_versions&lt;br&gt;FK buyer_user_id -&amp;gt; users&lt;br&gt;FK creator_user_id -&amp;gt; users&lt;br&gt;license_code UNIQUE&lt;br&gt;license_terms_json&lt;br&gt;valid_until NULL&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#F3EAFE;strokeColor=#9A7BC6;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="2200" y="1890" width="370" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="credentials" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;credentials&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK credential_id&lt;br&gt;credential_type: COURSE_CERT / MICRO_CREDENTIAL&lt;br&gt;FK course_id -&amp;gt; courses NULL&lt;br&gt;FK module_id -&amp;gt; course_modules NULL&lt;br&gt;credential_title&lt;br&gt;criteria_json&lt;br&gt;issuer_name&lt;br&gt;CHECK exactly one target&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF7F6;strokeColor=#55A6A0;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="2100" width="350" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="issued_credentials" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;issued_credentials&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK issued_credential_id&lt;br&gt;FK credential_id -&amp;gt; credentials&lt;br&gt;FK user_id -&amp;gt; users&lt;br&gt;FK enrolment_id -&amp;gt; course_enrolments&lt;br&gt;credential_no UNIQUE&lt;br&gt;batch_no&lt;br&gt;blockchain_hash&lt;br&gt;credential_status&lt;br&gt;issued_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#EAF7F6;strokeColor=#55A6A0;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="1535" y="2070" width="380" height="215" as="geometry"/>
+        </mxCell>
+        <mxCell id="refund_policies" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;refund_policies&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK refund_policy_id&lt;br&gt;policy_code UNIQUE&lt;br&gt;target_type: COURSE / CONTENT&lt;br&gt;primary_delivery_type NULL&lt;br&gt;purchase_window_hours NULL&lt;br&gt;minimum_hours_before_start NULL&lt;br&gt;maximum_watch_percent NULL&lt;br&gt;deny_after_download&lt;br&gt;first_access_blocks_refund&lt;br&gt;policy_status&lt;br&gt;effective_from&lt;br&gt;effective_to NULL&lt;br&gt;CHECK rule fields match target and type&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FDEDEC;strokeColor=#C96C67;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="2740" y="1360" width="410" height="270" as="geometry"/>
+        </mxCell>
+        <mxCell id="carts" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;carts&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK cart_id&lt;br&gt;FK buyer_user_id -&amp;gt; users&lt;br&gt;cart_status&lt;br&gt;created_at&lt;br&gt;updated_at&lt;br&gt;RULE one ACTIVE cart per buyer&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FDEDEC;strokeColor=#C96C67;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="3280" y="410" width="300" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="cart_items" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;cart_items&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK cart_item_id&lt;br&gt;FK cart_id -&amp;gt; carts&lt;br&gt;item_type: COURSE / CONTENT&lt;br&gt;FK course_run_id -&amp;gt; course_runs NULL&lt;br&gt;FK content_version_id -&amp;gt; content_versions NULL&lt;br&gt;points_snapshot&lt;br&gt;CHECK exactly one target&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FDEDEC;strokeColor=#C96C67;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="3290" y="635" width="350" height="210" as="geometry"/>
+        </mxCell>
+        <mxCell id="orders" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;orders&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK order_id&lt;br&gt;order_no UNIQUE&lt;br&gt;FK buyer_user_id -&amp;gt; users&lt;br&gt;total_points&lt;br&gt;order_status&lt;br&gt;created_at&lt;br&gt;paid_at&lt;br&gt;updated_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FDEDEC;strokeColor=#C96C67;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="3750" y="410" width="320" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="order_items" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;order_items&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK order_item_id&lt;br&gt;FK order_id -&amp;gt; orders&lt;br&gt;item_type: COURSE / CONTENT&lt;br&gt;FK course_run_id -&amp;gt; course_runs NULL&lt;br&gt;FK content_version_id -&amp;gt; content_versions NULL&lt;br&gt;FK seller_user_id -&amp;gt; users&lt;br&gt;FK refund_policy_id -&amp;gt; refund_policies&lt;br&gt;item_title_snapshot&lt;br&gt;points_amount&lt;br&gt;fulfilment_status&lt;br&gt;refund_deadline_at NULL&lt;br&gt;refund_policy_snapshot_json&lt;br&gt;CHECK exactly one target&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FDEDEC;strokeColor=#C96C67;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="3710" y="690" width="380" height="285" as="geometry"/>
+        </mxCell>
+        <mxCell id="refund_requests" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;refund_requests&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK refund_request_id&lt;br&gt;FK order_item_id -&amp;gt; order_items&lt;br&gt;FK requested_by_user_id -&amp;gt; users&lt;br&gt;requested_points&lt;br&gt;approved_points&lt;br&gt;refund_reason&lt;br&gt;refund_status&lt;br&gt;eligibility_code&lt;br&gt;watch_percent_snapshot NULL&lt;br&gt;download_completed_at_snapshot NULL&lt;br&gt;first_accessed_at_snapshot NULL&lt;br&gt;decision_note&lt;br&gt;requested_at&lt;br&gt;FK reviewed_by_user_id -&amp;gt; users NULL&lt;br&gt;reviewed_at&lt;br&gt;RULE one active request per item&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FDEDEC;strokeColor=#C96C67;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="4060" y="1010" width="380" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="point_accounts" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;point_accounts&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK point_account_id&lt;br&gt;FK user_id -&amp;gt; users UNIQUE&lt;br&gt;available_balance&lt;br&gt;frozen_balance&lt;br&gt;account_status&lt;br&gt;created_at&lt;br&gt;updated_at&lt;br&gt;CHECK balances &amp;gt;= 0&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#E7F6EF;strokeColor=#5FA583;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="3220" y="1360" width="350" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="point_transactions" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;point_transactions&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK point_transaction_id&lt;br&gt;transaction_type: TOPUP / PURCHASE / REFUND&lt;br&gt;transaction_type: HOLD_RELEASE / ADMIN_ADJUSTMENT&lt;br&gt;FK order_item_id -&amp;gt; order_items NULL&lt;br&gt;FK topup_order_id -&amp;gt; point_topup_orders NULL&lt;br&gt;FK refund_request_id -&amp;gt; refund_requests NULL&lt;br&gt;FK reversal_of_transaction_id -&amp;gt; point_transactions NULL&lt;br&gt;transaction_status&lt;br&gt;idempotency_key UNIQUE&lt;br&gt;reason&lt;br&gt;created_at&lt;br&gt;CHECK source matches transaction_type&lt;br&gt;RULE purchase/refund deltas sum to zero&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#E7F6EF;strokeColor=#5FA583;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="3650" y="1360" width="410" height="285" as="geometry"/>
+        </mxCell>
+        <mxCell id="point_ledger_entries" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;point_ledger_entries&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK ledger_entry_id&lt;br&gt;FK point_transaction_id -&amp;gt; point_transactions&lt;br&gt;FK point_account_id -&amp;gt; point_accounts&lt;br&gt;entry_role: BUYER / SELLER / ADMIN&lt;br&gt;available_delta&lt;br&gt;frozen_delta&lt;br&gt;available_balance_after&lt;br&gt;frozen_balance_after&lt;br&gt;created_at&lt;br&gt;UNIQUE(point_transaction_id, point_account_id, entry_role)&lt;br&gt;immutable ledger row&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#E7F6EF;strokeColor=#5FA583;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="4150" y="1360" width="400" height="265" as="geometry"/>
+        </mxCell>
+        <mxCell id="point_holds" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;point_holds&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK point_hold_id&lt;br&gt;FK seller_account_id -&amp;gt; point_accounts&lt;br&gt;FK purchase_transaction_id -&amp;gt; point_transactions UNIQUE&lt;br&gt;FK release_transaction_id -&amp;gt; point_transactions NULL UNIQUE&lt;br&gt;points_amount&lt;br&gt;release_at NULL&lt;br&gt;release_trigger: DEADLINE / WATCH_THRESHOLD&lt;br&gt;release_trigger: FIRST_ACCESS / IMMEDIATE&lt;br&gt;hold_status: HELD / RELEASED / CANCELLED&lt;br&gt;released_at&lt;br&gt;cancelled_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#E7F6EF;strokeColor=#5FA583;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="3650" y="1770" width="410" height="245" as="geometry"/>
+        </mxCell>
+        <mxCell id="point_topup_orders" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;point_topup_orders&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK topup_order_id&lt;br&gt;topup_no UNIQUE&lt;br&gt;FK point_account_id -&amp;gt; point_accounts&lt;br&gt;points_amount&lt;br&gt;fiat_amount DECIMAL(12,2)&lt;br&gt;currency_code CHAR(3)&lt;br&gt;topup_status: CREATED / PAYMENT_PENDING&lt;br&gt;topup_status: PAID_PENDING_CREDIT / COMPLETED&lt;br&gt;topup_status: FAILED / REFUNDED&lt;br&gt;created_at&lt;br&gt;paid_at&lt;br&gt;credited_at&lt;br&gt;RULE points never expire&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF3D8;strokeColor=#C9943E;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="3220" y="2240" width="400" height="255" as="geometry"/>
+        </mxCell>
+        <mxCell id="payment_transactions" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;payment_transactions&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK payment_transaction_id&lt;br&gt;FK topup_order_id -&amp;gt; point_topup_orders&lt;br&gt;FK payment_channel_id -&amp;gt; payment_channels&lt;br&gt;provider_transaction_id UNIQUE NULL&lt;br&gt;amount DECIMAL(12,2)&lt;br&gt;currency_code CHAR(3)&lt;br&gt;payment_status: PENDING / SUCCEEDED / FAILED&lt;br&gt;idempotency_key UNIQUE&lt;br&gt;failure_code NULL&lt;br&gt;requested_at&lt;br&gt;paid_at NULL&lt;br&gt;RULE one successful attempt per topup&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF3D8;strokeColor=#C9943E;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="3700" y="2240" width="430" height="290" as="geometry"/>
+        </mxCell>
+        <mxCell id="payment_channels" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;payment_channels&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK payment_channel_id&lt;br&gt;channel_code UNIQUE&lt;br&gt;channel_type: CARD / EWALLET / BANK_TRANSFER&lt;br&gt;provider_code&lt;br&gt;display_name&lt;br&gt;is_enabled&lt;br&gt;created_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF3D8;strokeColor=#C9943E;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="4200" y="1980" width="350" height="190" as="geometry"/>
+        </mxCell>
+        <mxCell id="payment_refunds" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;payment_refunds&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK payment_refund_id&lt;br&gt;FK payment_transaction_id -&amp;gt; payment_transactions&lt;br&gt;FK admin_action_log_id -&amp;gt; admin_action_logs&lt;br&gt;provider_refund_id UNIQUE NULL&lt;br&gt;amount DECIMAL(12,2)&lt;br&gt;currency_code CHAR(3)&lt;br&gt;refund_reason&lt;br&gt;refund_status: PENDING / SUCCEEDED / FAILED&lt;br&gt;created_at&lt;br&gt;completed_at NULL&lt;br&gt;RULE admin-only payment anomaly&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF3D8;strokeColor=#C9943E;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="4200" y="2240" width="410" height="255" as="geometry"/>
+        </mxCell>
+        <mxCell id="notifications" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;notifications&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK notification_id&lt;br&gt;FK user_id -&amp;gt; users&lt;br&gt;notification_type&lt;br&gt;title&lt;br&gt;message&lt;br&gt;is_read&lt;br&gt;read_at NULL&lt;br&gt;created_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF2D9;strokeColor=#D49A35;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="4620" y="545" width="320" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="user_reports" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;user_reports&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK report_id&lt;br&gt;FK reporter_user_id -&amp;gt; users&lt;br&gt;FK target_user_id -&amp;gt; users NULL&lt;br&gt;FK target_course_id -&amp;gt; courses NULL&lt;br&gt;FK target_content_id -&amp;gt; contents NULL&lt;br&gt;reason&lt;br&gt;report_status&lt;br&gt;FK reviewer_user_id -&amp;gt; users NULL&lt;br&gt;reviewed_at NULL&lt;br&gt;CHECK exactly one target&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF2D9;strokeColor=#D49A35;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="4640" y="890" width="380" height="245" as="geometry"/>
+        </mxCell>
+        <mxCell id="admin_action_logs" value="&lt;div style='text-align:center;font-weight:bold;font-size:13px'&gt;admin_action_logs&lt;/div&gt;&lt;hr style='border:0;border-top:1px solid #98A2B3;margin:5px 0'&gt;PK log_id&lt;br&gt;FK actor_user_id -&amp;gt; users&lt;br&gt;action_type&lt;br&gt;target_table&lt;br&gt;target_record_id&lt;br&gt;request_id&lt;br&gt;details_json&lt;br&gt;actor_ip&lt;br&gt;created_at&lt;br&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=8;fontSize=10;fontColor=#1D2939;fillColor=#FFF2D9;strokeColor=#D49A35;strokeWidth=1.6;" vertex="1" parent="1">
+          <mxGeometry x="4620" y="1230" width="380" height="210" as="geometry"/>
+        </mxCell>
+        <mxCell id="title" value="CoLearnX Database ERD V5.1 - Sponsor-aligned Delivery and Closed-loop Points&lt;br&gt;Cloud / Local / Live / Record delivery, evidence-based refunds, permanent internal points, seller holds, point top-ups, and anomaly-only fiat refunds." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=21;fontColor=#1D2939;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="35" width="3300" height="72" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend" value="Solid = required FK. Dashed = optional/conditional FK or reversal. Labels name the exact FK role; repeated roles between the same tables are combined only when unambiguous." style="text;html=1;strokeColor=#D0D5DD;fillColor=#F8FAFC;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=12;fontColor=#344054;fontStyle=0;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="3590" y="55" width="1120" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_account" value="Account / Role" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#2E7D32;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="310" y="390" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_ref" value="Reference Data" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#7A6B1C;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="310" y="1095" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_course" value="Course Delivery" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#2F63C6;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="280" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_delivery" value="Delivery Components / Access Tracking" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#2F63C6;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="2410" y="545" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_user" value="Member Hub" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#2E7D32;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1328" y="1035" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_content" value="Content / License" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#7B3FB2;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1135" y="1565" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_credential" value="Credentials" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#2D7E79;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="2060" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_policy" value="Refund Policies" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#C0392B;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="2740" y="1320" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_commerce" value="Cart / Orders / Refund Requests" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#C0392B;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="3280" y="370" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_points" value="Closed-loop Points / Holds" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#287A58;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="3220" y="1320" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_payment" value="Point Top-up / External Payment" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#A86613;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="3220" y="2195" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="g_admin" value="Admin / Reports" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=14;fontColor=#B06D0B;fontStyle=1;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="4620" y="505" width="430" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="business_rules_note" value="Sponsor-confirmed delivery and refund rules (02 Jul 2026)&lt;br&gt;- CLOUD / RECORD: refund only within 72 hours of purchase and while watch progress is at most 10%.&lt;br&gt;- LIVE: refund only when requested at least 72 hours before the start; an optional RECORD does not replace the LIVE rule.&lt;br&gt;- LOCAL: non-refundable; a completed download is retained as fulfilment evidence.&lt;br&gt;- Direct CONTENT purchase: refund within 24 hours only before first access.&lt;br&gt;- Points are permanent, non-withdrawable, and usable only inside Course / Content purchases.&lt;br&gt;- The seller receives 100% of item points. Holds release by deadline, watch threshold, first access, or an immediate non-refundable rule.&lt;br&gt;- Course / Content refunds reverse points. Fiat refunds are admin-only for duplicate charges or payment / crediting anomalies." style="text;html=1;strokeColor=#98A2B3;fillColor=#F8FAFC;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=12;fontColor=#344054;fontStyle=0;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="2420" width="2950" height="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="audit_note" value="42 tables / 75 bound relationship lines / one draw.io page" style="text;html=1;strokeColor=#D0D5DD;fillColor=#F8FAFC;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=12;fontColor=#344054;fontStyle=0;spacing=6;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="4640" y="2600" width="520" height="55" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
