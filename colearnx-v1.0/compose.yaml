@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-colearnx}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-colearnx_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD in .env}
+      COLEARNX_APP_PASSWORD: ${COLEARNX_APP_PASSWORD:?Set COLEARNX_APP_PASSWORD in .env}
+      COLEARNX_MIGRATOR_PASSWORD: ${COLEARNX_MIGRATOR_PASSWORD:?Set COLEARNX_MIGRATOR_PASSWORD in .env}
+      COLEARNX_READONLY_PASSWORD: ${COLEARNX_READONLY_PASSWORD:?Set COLEARNX_READONLY_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - colearnx_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  colearnx_pgdata:
