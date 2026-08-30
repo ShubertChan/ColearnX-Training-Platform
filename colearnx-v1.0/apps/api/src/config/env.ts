@@ -11,6 +11,7 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   DATABASE_SSL: booleanFromString,
   DB_POOL_MAX: z.coerce.number().int().positive().max(50).default(10),
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
   ACCESS_TOKEN_SECRET: z.string().min(32),
   REFRESH_TOKEN_SECRET: z.string().min(32),
   CSRF_SECRET: z.string().min(32),

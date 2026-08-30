@@ -9,7 +9,9 @@ Authenticated routes require `Authorization: Bearer <access-token>`. The refresh
 | Method | Path | Purpose |
 | --- | --- | --- |
 | POST | `/auth/register` | Register with `displayName`, `email`, `password`, `passwordConfirmation`, `acceptedTerms: true`, `ageAcknowledged: true`. |
-| POST | `/auth/login`, `/auth/refresh`, `/auth/logout` | Cookie-backed refresh-session lifecycle. |
+| POST | `/auth/login` | Creates an HTTP-only refresh cookie and returns an access token plus CSRF token. |
+| GET | `/auth/csrf` | Returns the CSRF token associated with the current refresh cookie, if present. |
+| POST | `/auth/refresh`, `/auth/logout` | Cookie-backed refresh-session lifecycle; requires `X-CSRF-Token` when a refresh cookie is present. |
 | GET/PATCH | `/me` | Read/update profile. |
 | GET | `/courses`, `/courses/:id`, `/content`, `/content/:id` | Published marketplace listing/detail. |
 
@@ -57,4 +59,4 @@ All routes below also require the `admin` role.
 
 `POST /api/v1/payments/stripe/webhook` is intentionally outside the authenticated router. It receives the raw body, verifies `Stripe-Signature` with `STRIPE_WEBHOOK_SECRET`, rejects live events, and processes only test-mode `checkout.session.completed`. Configure it through the Stripe CLI in local development; never call it from the browser.
 
-The React client uses this API directly: access tokens are kept in browser session storage, the Vite development server proxies `/api` to port 3001, and the top-up UI submits only a server-issued package ID. Stripe Checkout returns to `/#/wallet` with a payment transaction ID; the wallet polls the authenticated status endpoint and refreshes its ledger-backed balance after webhook confirmation. Marketplace listings, orders, refunds, role applications, creator submissions and administrator queues are API-backed. The cart is an in-memory pre-checkout selection only; it is not a source of truth for prices, enrolment, points, orders, roles or entitlement. Secure file delivery, hosted-video progress, public profiles, Google OAuth and password-reset email remain disabled until their dedicated back-end integrations are implemented.
+The React client uses this API directly: access tokens and CSRF tokens are kept in browser session storage, while the refresh token is an HTTP-only cookie. On a new tab or an expired access token, the client gets `/auth/csrf` and then calls `/auth/refresh` with `X-CSRF-Token`. The Vite development server proxies `/api` to port 3001, and the top-up UI submits only a server-issued package ID. Stripe Checkout returns to `/#/wallet` with a payment transaction ID; the wallet polls the authenticated status endpoint and refreshes its ledger-backed balance after webhook confirmation. Marketplace listings, orders, refunds, role applications, creator submissions and administrator queues are API-backed. The cart is an in-memory pre-checkout selection only; it is not a source of truth for prices, enrolment, points, orders, roles or entitlement. Secure file delivery, hosted-video progress, public profiles, Google OAuth and password-reset email remain disabled until their dedicated back-end integrations are implemented.

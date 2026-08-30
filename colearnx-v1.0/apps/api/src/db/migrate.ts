@@ -3,13 +3,15 @@ import { readFile, readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
-import { env } from '../config/env.js';
+import { loadMigrationEnv } from '../config/migration-env.js';
 
 const rootDirectory = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const migrationsDirectory = join(rootDirectory, 'db', 'migrations');
-const migrationDatabaseUrl = process.env.MIGRATION_DATABASE_URL;
-if (!migrationDatabaseUrl) throw new Error('MIGRATION_DATABASE_URL is required for migrations; do not run schema changes with the API role.');
-const pool = new Pool({ connectionString: migrationDatabaseUrl, ssl: env.DATABASE_SSL ? { rejectUnauthorized: true } : undefined });
+const migrationEnv = loadMigrationEnv();
+const pool = new Pool({
+  connectionString: migrationEnv.MIGRATION_DATABASE_URL,
+  ssl: migrationEnv.DATABASE_SSL ? { rejectUnauthorized: true } : undefined,
+});
 
 async function main() {
   await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (

@@ -21,7 +21,6 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { createTopUpCheckoutSession, getTopUpStatus } from "../api/payments";
 import { usePlatform } from "../context/PlatformContext";
-import { getRefundInfo } from "../utils/courseState";
 import {
   Badge,
   Button,
@@ -647,7 +646,7 @@ export function AdminDashboardPage() {
 }
 
 export function AdminRefundPage() {
-  const { refundRequests, courses, decideRefund } = usePlatform();
+  const { refundRequests, decideRefund } = usePlatform();
   const [selectedId, setSelectedId] = useState(refundRequests[0]?.id || null);
   const [decisionReason, setDecisionReason] = useState("");
   const selected =
@@ -659,30 +658,11 @@ export function AdminRefundPage() {
         <p>New member requests will appear here.</p>
       </Card>
     );
-  const selectedCourse = courses.find(
-    (course) => course.id === selected.courseId,
-  );
-  const currentInfo =
-    selected.status === "Pending" &&
-    selected.userId === "demo-member" &&
-    selectedCourse
-      ? getRefundInfo(selectedCourse)
-      : null;
-  const canApprove = currentInfo
-    ? currentInfo.eligible
-    : selected.eligibility === "Eligible";
+  const canApprove = selected.eligibility === "Eligible";
   const decide = (status) => {
     if (decisionReason.trim().length < 5) return;
     if (decideRefund(selected.id, status, decisionReason.trim()))
       setDecisionReason("");
-  };
-  const eligibilityFor = (request) => {
-    if (request.status !== "Pending" || request.userId !== "demo-member")
-      return request.eligibility;
-    const course = courses.find((item) => item.id === request.courseId);
-    return course && getRefundInfo(course).eligible
-      ? "Eligible"
-      : "Not eligible";
   };
   return (
     <div className="content-grid admin-refund-layout">
@@ -710,7 +690,7 @@ export function AdminRefundPage() {
             </thead>
             <tbody>
               {refundRequests.map((request) => {
-                const currentEligibility = eligibilityFor(request);
+                const currentEligibility = request.eligibility;
                 return (
                 <tr
                   key={request.id}
@@ -788,9 +768,7 @@ export function AdminRefundPage() {
           <div>
             <dt>Current policy check</dt>
             <dd>
-              {currentInfo?.summary ||
-                selected.eligibilityAtDecision ||
-                selected.basis}
+              {selected.eligibilityAtDecision || selected.basis}
             </dd>
           </div>
           <div>
@@ -842,7 +820,7 @@ export function AdminUsersPage() {
   return (
     <div className="stack">
       <Card>
-        <span className="eyebrow">Prototype account</span>
+        <span className="eyebrow">Account overview</span>
         <h3>{profile.name}</h3>
         <div className="badge-row">
           {approvedRoles.map((role) => (
@@ -903,7 +881,7 @@ export function AdminCatalogPage() {
                 <td>{item.category}</td>
                 <td>{item.price} points</td>
                 <td><Badge tone={item.isPublished === false ? "warning" : "success"}>{item.isPublished === false ? "Hidden / Draft" : "Published"}</Badge></td>
-                <td>{item.purchased ? "Owned by demo member" : "Available"}</td>
+                <td>{item.purchased ? "Purchased" : "Available"}</td>
               </tr>
             ))}
           </tbody>

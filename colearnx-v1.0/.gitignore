@@ -5,6 +5,7 @@ node_modules/
 .env.*
 !.env.example
 !.env.compose.example
+!.env.staging.example
 coverage/
 apps/api/dist/
 /dist/

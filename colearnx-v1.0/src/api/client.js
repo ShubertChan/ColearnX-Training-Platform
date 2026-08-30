@@ -1,8 +1,11 @@
 import axios from "axios";
 
 const accessTokenKey = "colearnx-api-access-token";
+const csrfTokenKey = "colearnx-api-csrf-token";
 let accessToken =
   typeof window === "undefined" ? "" : window.sessionStorage.getItem(accessTokenKey) || "";
+let csrfToken =
+  typeof window === "undefined" ? "" : window.sessionStorage.getItem(csrfTokenKey) || "";
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api/v1",
@@ -23,8 +26,20 @@ export function setAccessToken(token) {
 
 export const hasAccessToken = () => Boolean(accessToken);
 
+export function setCsrfToken(token) {
+  csrfToken = token || "";
+  if (typeof window === "undefined") return;
+  if (csrfToken) window.sessionStorage.setItem(csrfTokenKey, csrfToken);
+  else window.sessionStorage.removeItem(csrfTokenKey);
+}
+
+export const hasCsrfToken = () => Boolean(csrfToken);
+
 apiClient.interceptors.request.use((config) => {
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+  if (csrfToken && !["get", "head", "options"].includes(String(config.method || "get").toLowerCase())) {
+    config.headers["X-CSRF-Token"] = csrfToken;
+  }
   return config;
 });
 

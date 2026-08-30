@@ -1,4 +1,5 @@
 import argon2 from 'argon2';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
@@ -21,7 +22,7 @@ const registrationSchema = credentialsSchema.extend({
 });
 const accessTokenLifetime = '15m';
 const refreshLifetimeMs = 1000 * 60 * 60 * 24 * 14;
-const refreshCookieName = env.NODE_ENV === 'production' ? '__Host-colearnx-refresh' : 'colearnx_refresh';
+const refreshCookieName = 'colearnx_refresh';
 
 function signAccessToken(actor: Actor) {
   return jwt.sign({ sub: actor.id, email: actor.email, roles: actor.roles }, env.ACCESS_TOKEN_SECRET, { expiresIn: accessTokenLifetime });
@@ -36,13 +37,37 @@ async function loadActor(userId: string): Promise<Actor | null> {
 }
 
 function refreshCookieOptions() {
-  return { httpOnly: true, secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging', sameSite: 'lax' as const, domain: env.COOKIE_DOMAIN || undefined, path: '/api/v1/auth', maxAge: refreshLifetimeMs };
+  const secure = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: secure ? 'none' as const : 'lax' as const,
+    domain: env.COOKIE_DOMAIN || undefined,
+    path: '/api/v1/auth',
+    maxAge: refreshLifetimeMs,
+  };
+}
+
+function createCsrfToken(refreshToken: string) {
+  return createHmac('sha256', env.CSRF_SECRET).update(refreshToken).digest('base64url');
+}
+
+function assertCsrfToken(req: Request, refreshToken: string) {
+  const supplied = req.get('x-csrf-token');
+  const expected = createCsrfToken(refreshToken);
+  if (!supplied) throw new ApiError(403, 'CSRF_TOKEN_MISSING', 'A CSRF token is required.');
+  const suppliedBytes = Buffer.from(supplied);
+  const expectedBytes = Buffer.from(expected);
+  if (suppliedBytes.length !== expectedBytes.length || !timingSafeEqual(suppliedBytes, expectedBytes)) {
+    throw new ApiError(403, 'CSRF_TOKEN_INVALID', 'The CSRF token is invalid.');
+  }
 }
 
 async function createRefreshSession(actor: Actor, req: Request, res: Response) {
   const token = createOpaqueToken();
   await query(`INSERT INTO refresh_sessions (user_id, token_hash, expires_at, user_agent, ip_hash) VALUES ($1, $2, $3, $4, $5)`, [actor.id, sha256(token), new Date(Date.now() + refreshLifetimeMs), req.get('user-agent')?.slice(0, 500) ?? null, sha256(req.ip || 'unknown')]);
   res.cookie(refreshCookieName, token, refreshCookieOptions());
+  return token;
 }
 
 const originIsAllowed = (req: Request) => !req.get('origin') || req.get('origin') === env.APP_ORIGIN;
@@ -57,20 +82,13 @@ export async function register(req: Request, res: Response) {
     await client.query(`INSERT INTO profiles (user_id, display_name) VALUES ($1, $2)`, [userId, input.displayName]);
     await client.query('INSERT INTO point_accounts (user_id) VALUES ($1)', [userId]);
     await client.query(`INSERT INTO user_roles (user_id, role_id) SELECT $1, role_id FROM roles WHERE role_code = 'member'`, [userId]);
-    const bootstrapAdminEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
-    const isBootstrapAdmin = Boolean(bootstrapAdminEmail && input.email.toLowerCase() === bootstrapAdminEmail);
-    if (isBootstrapAdmin) {
-      await client.query(`INSERT INTO user_roles (user_id, role_id)
-        SELECT $1, role_id FROM roles WHERE role_code = 'admin'
-        ON CONFLICT (user_id, role_id) WHERE revoked_at IS NULL DO NOTHING`, [userId]);
-    }
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json)
       VALUES ($1, 'auth.register', 'users', $2, jsonb_build_object('roles', $3::jsonb))`,
-    [userId, userId, JSON.stringify(isBootstrapAdmin ? ['member', 'admin'] : ['member'])]);
-    return { id: userId, email: user.rows[0].email, status: user.rows[0].status, roles: isBootstrapAdmin ? ['member', 'admin'] : ['member'] } satisfies Actor;
+    [userId, userId, JSON.stringify(['member'])]);
+    return { id: userId, email: user.rows[0].email, status: user.rows[0].status, roles: ['member'] } satisfies Actor;
   });
-  await createRefreshSession(actor, req, res);
-  return ok(res, { user: actor, accessToken: signAccessToken(actor) }, 201);
+  const refreshToken = await createRefreshSession(actor, req, res);
+  return ok(res, { user: actor, accessToken: signAccessToken(actor), csrfToken: createCsrfToken(refreshToken) }, 201);
 }
 
 export async function login(req: Request, res: Response) {
@@ -79,14 +97,21 @@ export async function login(req: Request, res: Response) {
   const valid = user.rowCount ? await argon2.verify(user.rows[0].password_hash, input.password) : false;
   const actor = valid ? await loadActor(user.rows[0].id) : null;
   if (!valid || !actor || actor.status !== 'active') throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
-  await createRefreshSession(actor, req, res);
-  return ok(res, { user: actor, accessToken: signAccessToken(actor) });
+  const refreshToken = await createRefreshSession(actor, req, res);
+  return ok(res, { user: actor, accessToken: signAccessToken(actor), csrfToken: createCsrfToken(refreshToken) });
+}
+
+export async function csrf(req: Request, res: Response) {
+  if (!originIsAllowed(req)) throw new ApiError(403, 'ORIGIN_NOT_ALLOWED', 'The request origin is not allowed.');
+  const token = req.cookies?.[refreshCookieName] as string | undefined;
+  return ok(res, { csrfToken: token ? createCsrfToken(token) : null });
 }
 
 export async function refresh(req: Request, res: Response) {
   if (!originIsAllowed(req)) throw new ApiError(403, 'ORIGIN_NOT_ALLOWED', 'The request origin is not allowed.');
   const token = req.cookies?.[refreshCookieName] as string | undefined;
   if (!token) throw new ApiError(401, 'REFRESH_TOKEN_MISSING', 'Refresh session is missing.');
+  assertCsrfToken(req, token);
   const session = await query<{ id: string; user_id: string; revoked_at: Date | null; expires_at: Date }>('SELECT session_id AS id, user_id, revoked_at, expires_at FROM refresh_sessions WHERE token_hash = $1', [sha256(token)]);
   if (!session.rowCount) throw new ApiError(401, 'REFRESH_TOKEN_INVALID', 'Refresh session is invalid.');
   const current = session.rows[0];
@@ -103,13 +128,16 @@ export async function refresh(req: Request, res: Response) {
     await client.query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2, replaced_by_session_id = $3 WHERE session_id = $1', [current.id, 'rotated', next.rows[0].id]);
   });
   res.cookie(refreshCookieName, newToken, refreshCookieOptions());
-  return ok(res, { user: actor, accessToken: signAccessToken(actor) });
+  return ok(res, { user: actor, accessToken: signAccessToken(actor), csrfToken: createCsrfToken(newToken) });
 }
 
 export async function logout(req: Request, res: Response) {
   if (!originIsAllowed(req)) throw new ApiError(403, 'ORIGIN_NOT_ALLOWED', 'The request origin is not allowed.');
   const token = req.cookies?.[refreshCookieName] as string | undefined;
-  if (token) await query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2 WHERE token_hash = $1 AND revoked_at IS NULL', [sha256(token), 'logout']);
+  if (token) {
+    assertCsrfToken(req, token);
+    await query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2 WHERE token_hash = $1 AND revoked_at IS NULL', [sha256(token), 'logout']);
+  }
   res.clearCookie(refreshCookieName, refreshCookieOptions());
   return ok(res, { loggedOut: true });
 }
