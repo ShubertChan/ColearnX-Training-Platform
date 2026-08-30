@@ -8,6 +8,10 @@ export const registerAccount = (input) =>
 export const loginAccount = (input) =>
   apiClient.post("/auth/login", input).then(unwrap);
 
+export const getCsrfToken = () => apiClient.get("/auth/csrf").then(unwrap);
+
+export const refreshAccount = () => apiClient.post("/auth/refresh").then(unwrap);
+
 export const logoutAccount = () => apiClient.post("/auth/logout").then(unwrap);
 
 export const getCurrentUser = () => apiClient.get("/me").then(unwrap);

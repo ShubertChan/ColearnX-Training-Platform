@@ -1,12 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   getCurrentUser,
+  getCsrfToken,
   loginAccount,
   logoutAccount,
+  refreshAccount,
   registerAccount,
   updateCurrentUser,
 } from "../api/auth";
-import { hasAccessToken, setAccessToken } from "../api/client";
+import { hasAccessToken, hasCsrfToken, setAccessToken, setCsrfToken } from "../api/client";
 import {
   createContent,
   createCourse,
@@ -213,7 +215,7 @@ export function PlatformProvider({ children }) {
   const [refundRequests, setRefundRequests] = useState([]);
   const [publishedItems, setPublishedItems] = useState([]);
   const [trainerCertifications, setTrainerCertifications] = useState([]);
-  const [accountLoading, setAccountLoading] = useState(hasAccessToken());
+  const [accountLoading, setAccountLoading] = useState(true);
   const [toast, setToast] = useState("");
 
   const notify = useCallback((message) => {
@@ -338,17 +340,29 @@ export function PlatformProvider({ children }) {
   }, [refreshAdminQueues, refreshCatalog, refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet]);
 
   const restoreSession = useCallback(async () => {
-    if (!hasAccessToken()) {
-      setAccountLoading(false);
-      return false;
-    }
     try {
-      const user = await getCurrentUser();
-      const roles = applyServerIdentity(user);
+      if (hasAccessToken()) {
+        try {
+          const user = await getCurrentUser();
+          const roles = applyServerIdentity(user);
+          await refreshAccountData(roles);
+          return true;
+        } catch {
+          setAccessToken("");
+        }
+      }
+      const csrf = await getCsrfToken();
+      if (!csrf.csrfToken) return false;
+      setCsrfToken(csrf.csrfToken);
+      const refreshed = await refreshAccount();
+      setAccessToken(refreshed.accessToken);
+      setCsrfToken(refreshed.csrfToken);
+      const roles = applyServerIdentity(refreshed.user);
       await refreshAccountData(roles);
       return true;
     } catch {
       setAccessToken("");
+      setCsrfToken("");
       setAuthenticated(false);
       return false;
     } finally {
@@ -368,6 +382,7 @@ export function PlatformProvider({ children }) {
   const signIn = async ({ email, password }) => {
     const result = await loginAccount({ email, password });
     setAccessToken(result.accessToken);
+    setCsrfToken(result.csrfToken);
     const roles = applyServerIdentity(await getCurrentUser());
     await refreshAccountData(roles);
     return true;
@@ -376,6 +391,7 @@ export function PlatformProvider({ children }) {
   const registerMember = async ({ name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged }) => {
     const result = await registerAccount({ displayName: name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged });
     setAccessToken(result.accessToken);
+    setCsrfToken(result.csrfToken);
     const roles = applyServerIdentity(await getCurrentUser());
     await refreshAccountData(roles);
     return true;
@@ -383,11 +399,16 @@ export function PlatformProvider({ children }) {
 
   const signOut = async () => {
     try {
+      if (!hasCsrfToken()) {
+        const csrf = await getCsrfToken();
+        setCsrfToken(csrf.csrfToken);
+      }
       await logoutAccount();
     } catch {
       // Clearing this device's session is still safe when the server is unavailable.
     }
     setAccessToken("");
+    setCsrfToken("");
     setAuthenticated(false);
     setRoleState("Member");
     setApprovedRoles(["Member"]);

@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !.env.compose.example
+!.env.staging.example
 
 # Dependencies and generated output
 node_modules/

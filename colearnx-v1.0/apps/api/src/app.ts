@@ -9,7 +9,7 @@ import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
 import { query } from './db/database.js';
 import { errorHandler, notFound, ok } from './lib/http.js';
-import { authenticate, login, logout, me, refresh, register, requireRole, updateMe } from './auth/auth.js';
+import { authenticate, csrf, login, logout, me, refresh, register, requireRole, updateMe } from './auth/auth.js';
 import { createCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
 import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse } from './catalog/catalog.js';
@@ -26,7 +26,7 @@ const mutationLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHead
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', 1);
+  app.set('trust proxy', env.TRUST_PROXY);
   app.use(pinoHttp({ logger, genReqId: (req, res) => {
     const supplied = req.headers['x-request-id'];
     const requestId = typeof supplied === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(supplied)
@@ -51,6 +51,7 @@ export function createApp() {
   });
 
   const api = express.Router();
+  api.get('/auth/csrf', csrf);
   api.post('/auth/register', authLimiter, register);
   api.post('/auth/login', authLimiter, login);
   api.post('/auth/refresh', authLimiter, refresh);

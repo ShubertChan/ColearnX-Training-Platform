@@ -18,6 +18,8 @@ Then check `http://localhost:3001/health/ready`. Frontend-only development remai
 
 Read [the data model](docs/DATA_MODEL.md), [API contract](docs/API.md) and [local/Stripe runbook](docs/LOCAL_RUNBOOK.md) before connecting the browser client. The backend does not accept client-supplied point amounts or prices for top-ups.
 
+For the deployed staging topology (Cloudflare Pages + Render Express API + Neon PostgreSQL), follow the [Render + Neon staging runbook](docs/STAGING_RENDER_NEON.md). It keeps production-style secrets out of the repository and does not require Docker, Cloudflare Workers, or Hyperdrive.
+
 The current web client uses the API as the source of truth for identity, roles, profile edits, wallet balances, ledger history, top-up packages, catalogue listings, points checkout, orders, refund requests, role applications, creator drafts/submissions and administrator review queues. The cart is only an in-memory selection before checkout; it is not an order or entitlement record.
 
 ## Current platform limitations
