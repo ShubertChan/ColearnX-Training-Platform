@@ -20,6 +20,7 @@ export async function sendVerificationEmail({ to, code, expiresInMinutes }: Veri
     response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
+        'User-Agent': 'colearnx-api/1.0',
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
