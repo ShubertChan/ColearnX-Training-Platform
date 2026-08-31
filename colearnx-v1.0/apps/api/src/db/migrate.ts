@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { loadMigrationEnv } from '../config/migration-env.js';
+import { matchesMigrationChecksum, migrationChecksum } from './migration-checksum.js';
 
 const rootDirectory = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const migrationsDirectory = join(rootDirectory, 'db', 'migrations');
@@ -22,10 +22,12 @@ async function main() {
   const files = (await readdir(migrationsDirectory)).filter((file) => file.endsWith('.sql')).sort();
   for (const filename of files) {
     const sql = await readFile(join(migrationsDirectory, filename), 'utf8');
-    const checksum = createHash('sha256').update(sql).digest('hex');
+    const checksum = migrationChecksum(sql);
     const prior = await pool.query<{ checksum: string }>('SELECT checksum FROM schema_migrations WHERE filename = $1', [filename]);
     if (prior.rowCount) {
-      if (prior.rows[0].checksum !== checksum) throw new Error(`Migration checksum changed: ${filename}. Create a forward migration instead.`);
+      if (!matchesMigrationChecksum(prior.rows[0].checksum, sql)) {
+        throw new Error(`Migration checksum changed: ${filename}. Create a forward migration instead.`);
+      }
       continue;
     }
     const client = await pool.connect();

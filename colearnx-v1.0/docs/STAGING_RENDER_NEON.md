@@ -18,7 +18,26 @@ Start: npm --prefix apps/api start
 Health check: /health/ready
 ```
 
-Set the variable names from `apps/api/.env.staging.example` in Render. Do not upload that file or send values through GitHub, chat, screenshots, or pull requests.
+Set these variables directly in Render's secure Environment editor. Never commit or upload a real `.env` file, and never send values through GitHub, chat, screenshots, or pull requests:
+
+```text
+NODE_ENV=staging
+APP_ORIGIN=https://colearnx-staging.pages.dev
+API_ORIGIN=https://colearnx-api-staging.onrender.com
+DATABASE_URL=<restricted colearnx_app Neon connection string>
+DATABASE_SSL=true
+DB_POOL_MAX=5
+TRUST_PROXY=1
+ACCESS_TOKEN_SECRET=<unique random secret, at least 32 characters>
+REFRESH_TOKEN_SECRET=<different unique random secret, at least 32 characters>
+CSRF_SECRET=<different unique random secret, at least 32 characters>
+COOKIE_DOMAIN=
+ENABLE_LOCAL_DELIVERY=false
+ENABLE_HOSTED_VIDEO=false
+LOG_LEVEL=info
+```
+
+`PORT` is injected by Render and must not be set. `BOOTSTRAP_ADMIN_EMAIL` is temporary and is set only while running the one-time seed. Keep the `STRIPE_*` variables blank for the initial smoke test; add Stripe **test** keys and the webhook secret only in the Render Environment editor when separately validating payments.
 
 The long-running service must use only `DATABASE_URL` for the restricted `colearnx_app` role. Set `DATABASE_SSL=true`, `DB_POOL_MAX=5`, and `TRUST_PROXY=1`. Render provides the actual `PORT` at runtime. `APP_ORIGIN` must exactly match the Pages URL and `API_ORIGIN` must exactly match the public Render URL.
 
