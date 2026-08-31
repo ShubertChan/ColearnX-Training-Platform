@@ -5,13 +5,45 @@ import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { env } from '../config/env.js';
 import { query, withTransaction } from '../db/database.js';
+import { sendVerificationEmail } from '../email/resend.js';
 import { createOpaqueToken, sha256 } from '../lib/crypto.js';
 import { ApiError, ok } from '../lib/http.js';
 import { parse } from '../lib/validation.js';
+import {
+  createVerificationCode,
+  hashVerificationCode,
+  verificationCodeLength,
+  verificationCodeMatches,
+  verificationWindow,
+} from './email-verification.js';
 
-export type Actor = { id: string; email: string; roles: string[]; status: string };
+export type Actor = {
+  id: string;
+  email: string;
+  roles: string[];
+  status: string;
+  emailVerifiedAt: Date | null;
+  emailVerificationRequiredAt: Date | null;
+};
 
-const credentialsSchema = z.object({ email: z.string().trim().email().max(320), password: z.string().min(8).max(256) });
+type VerificationUser = {
+  id: string;
+  email: string;
+  status: string;
+  email_verified_at: Date | null;
+  email_verification_required_at: Date | null;
+};
+
+type PendingChallenge = {
+  userId: string;
+  email: string;
+  code: string;
+  expiresAt: Date;
+  resendAvailableAt: Date;
+};
+
+const emailSchema = z.string().trim().email().max(320);
+const credentialsSchema = z.object({ email: emailSchema, password: z.string().min(8).max(256) });
 const registrationSchema = credentialsSchema.extend({
   displayName: z.string().trim().min(1).max(120),
   passwordConfirmation: z.string().min(8).max(256),
@@ -20,6 +52,11 @@ const registrationSchema = credentialsSchema.extend({
 }).refine((input) => input.password === input.passwordConfirmation, {
   message: 'Passwords do not match.', path: ['passwordConfirmation'],
 });
+const verificationSchema = z.object({
+  email: emailSchema,
+  code: z.string().trim().regex(new RegExp(`^\\d{${verificationCodeLength}}$`), 'Enter the complete verification code.'),
+});
+const resendVerificationSchema = z.object({ email: emailSchema });
 const accessTokenLifetime = '15m';
 const refreshLifetimeMs = 1000 * 60 * 60 * 24 * 14;
 const refreshCookieName = 'colearnx_refresh';
@@ -30,10 +67,15 @@ function signAccessToken(actor: Actor) {
 
 async function loadActor(userId: string): Promise<Actor | null> {
   const result = await query<Actor>(`SELECT u.user_id AS id, u.email::text AS email, u.account_status AS status,
+    u.email_verified_at AS "emailVerifiedAt", u.email_verification_required_at AS "emailVerificationRequiredAt",
     COALESCE(array_agg(r.role_code) FILTER (WHERE ur.revoked_at IS NULL), '{}') AS roles
     FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.user_id AND ur.revoked_at IS NULL
     LEFT JOIN roles r ON r.role_id = ur.role_id WHERE u.user_id = $1 GROUP BY u.user_id`, [userId]);
   return result.rows[0] ?? null;
+}
+
+function actorNeedsEmailVerification(actor: Actor) {
+  return Boolean(actor.emailVerificationRequiredAt && !actor.emailVerifiedAt);
 }
 
 function refreshCookieOptions() {
@@ -70,25 +112,140 @@ async function createRefreshSession(actor: Actor, req: Request, res: Response) {
   return token;
 }
 
+function createChallenge(userId: string, email: string): PendingChallenge {
+  const code = createVerificationCode();
+  const { expiresAt, resendAvailableAt } = verificationWindow(
+    new Date(),
+    env.EMAIL_VERIFICATION_CODE_TTL_MINUTES,
+    env.EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS,
+  );
+  return { userId, email, code, expiresAt, resendAvailableAt };
+}
+
+async function sendPendingChallenge(challenge: PendingChallenge) {
+  try {
+    await sendVerificationEmail({
+      to: challenge.email,
+      code: challenge.code,
+      expiresInMinutes: env.EMAIL_VERIFICATION_CODE_TTL_MINUTES,
+    });
+  } catch {
+    // Do not strand an account when the provider is temporarily unavailable:
+    // a retry can immediately use the resend endpoint.
+    await query(`UPDATE email_verification_challenges
+      SET resend_available_at = now(), updated_at = now()
+      WHERE user_id = $1`, [challenge.userId]);
+    throw new ApiError(503, 'EMAIL_DELIVERY_UNAVAILABLE', 'We could not send the verification email. Please try again.');
+  }
+}
+
 const originIsAllowed = (req: Request) => !req.get('origin') || req.get('origin') === env.APP_ORIGIN;
 
 export async function register(req: Request, res: Response) {
   const input = parse(registrationSchema, req.body);
-  const actor = await withTransaction(async (client) => {
+  const pendingChallenge = await withTransaction(async (client) => {
     const existing = await client.query('SELECT 1 FROM users WHERE lower(email::text) = lower($1)', [input.email]);
     if (existing.rowCount) throw new ApiError(409, 'EMAIL_ALREADY_REGISTERED', 'Unable to create this account.');
-    const user = await client.query<{ id: string; email: string; status: string }>(`INSERT INTO users (full_name, email, password_hash) VALUES ($1, $2, $3) RETURNING user_id AS id, email::text AS email, account_status AS status`, [input.displayName, input.email, await argon2.hash(input.password, { type: argon2.argon2id })]);
+    const user = await client.query<VerificationUser>(`INSERT INTO users
+      (full_name, email, password_hash, email_verification_required_at)
+      VALUES ($1, $2, $3, now())
+      RETURNING user_id AS id, email::text AS email, account_status AS status,
+        email_verified_at, email_verification_required_at`,
+    [input.displayName, input.email, await argon2.hash(input.password, { type: argon2.argon2id })]);
     const userId = user.rows[0].id;
+    const challenge = createChallenge(userId, user.rows[0].email);
+    await client.query(`INSERT INTO email_verification_challenges
+      (user_id, code_hash, expires_at, resend_available_at)
+      VALUES ($1, $2, $3, $4)`,
+    [userId, hashVerificationCode(challenge.code, env.EMAIL_VERIFICATION_CODE_PEPPER), challenge.expiresAt, challenge.resendAvailableAt]);
     await client.query(`INSERT INTO profiles (user_id, display_name) VALUES ($1, $2)`, [userId, input.displayName]);
     await client.query('INSERT INTO point_accounts (user_id) VALUES ($1)', [userId]);
     await client.query(`INSERT INTO user_roles (user_id, role_id) SELECT $1, role_id FROM roles WHERE role_code = 'member'`, [userId]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json)
-      VALUES ($1, 'auth.register', 'users', $2, jsonb_build_object('roles', $3::jsonb))`,
+      VALUES ($1, 'auth.register', 'users', $2, jsonb_build_object('roles', $3::jsonb, 'emailVerificationRequired', true))`,
     [userId, userId, JSON.stringify(['member'])]);
-    return { id: userId, email: user.rows[0].email, status: user.rows[0].status, roles: ['member'] } satisfies Actor;
+    return challenge;
   });
-  const refreshToken = await createRefreshSession(actor, req, res);
-  return ok(res, { user: actor, accessToken: signAccessToken(actor), csrfToken: createCsrfToken(refreshToken) }, 201);
+
+  await sendPendingChallenge(pendingChallenge);
+  return ok(res, {
+    email: pendingChallenge.email,
+    verificationRequired: true,
+    expiresAt: pendingChallenge.expiresAt.toISOString(),
+    resendAvailableAt: pendingChallenge.resendAvailableAt.toISOString(),
+  }, 202);
+}
+
+export async function verifyEmail(req: Request, res: Response) {
+  const input = parse(verificationSchema, req.body);
+  const outcome = await withTransaction(async (client) => {
+    const users = await client.query<VerificationUser>(`SELECT user_id AS id, email::text AS email, account_status AS status,
+      email_verified_at, email_verification_required_at
+      FROM users WHERE lower(email::text) = lower($1) FOR UPDATE`, [input.email]);
+    const user = users.rows[0];
+    if (!user || user.status !== 'active' || !user.email_verification_required_at || user.email_verified_at) {
+      return { kind: 'invalid' as const };
+    }
+    const challenges = await client.query<{ code_hash: string; expires_at: Date; failed_attempts: number }>(
+      'SELECT code_hash, expires_at, failed_attempts FROM email_verification_challenges WHERE user_id = $1 FOR UPDATE',
+      [user.id],
+    );
+    const challenge = challenges.rows[0];
+    if (!challenge) return { kind: 'invalid' as const };
+    if (challenge.expires_at <= new Date()) return { kind: 'expired' as const };
+    if (challenge.failed_attempts >= env.EMAIL_VERIFICATION_MAX_ATTEMPTS) return { kind: 'locked' as const };
+    if (!verificationCodeMatches(input.code, challenge.code_hash, env.EMAIL_VERIFICATION_CODE_PEPPER)) {
+      const attempts = await client.query<{ failed_attempts: number }>(`UPDATE email_verification_challenges
+        SET failed_attempts = failed_attempts + 1, updated_at = now()
+        WHERE user_id = $1 RETURNING failed_attempts`, [user.id]);
+      return { kind: attempts.rows[0].failed_attempts >= env.EMAIL_VERIFICATION_MAX_ATTEMPTS ? 'locked' as const : 'invalid' as const };
+    }
+    await client.query('UPDATE users SET email_verified_at = now(), updated_at = now() WHERE user_id = $1', [user.id]);
+    await client.query('DELETE FROM email_verification_challenges WHERE user_id = $1', [user.id]);
+    await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json)
+      VALUES ($1, 'auth.email_verified', 'users', $2, jsonb_build_object('method', 'email_code'))`, [user.id, user.id]);
+    return { kind: 'verified' as const };
+  });
+
+  if (outcome.kind === 'expired') throw new ApiError(400, 'EMAIL_VERIFICATION_CODE_EXPIRED', 'This verification code has expired. Request a new email.');
+  if (outcome.kind === 'locked') throw new ApiError(429, 'EMAIL_VERIFICATION_CODE_LOCKED', 'Too many incorrect codes. Request a new email.');
+  if (outcome.kind !== 'verified') throw new ApiError(400, 'EMAIL_VERIFICATION_INVALID', 'The verification code is incorrect or unavailable.');
+  return ok(res, { verified: true });
+}
+
+export async function resendEmailVerification(req: Request, res: Response) {
+  const input = parse(resendVerificationSchema, req.body);
+  const pendingChallenge = await withTransaction(async (client) => {
+    const users = await client.query<VerificationUser>(`SELECT user_id AS id, email::text AS email, account_status AS status,
+      email_verified_at, email_verification_required_at
+      FROM users WHERE lower(email::text) = lower($1) FOR UPDATE`, [input.email]);
+    const user = users.rows[0];
+    if (!user || user.status !== 'active' || !user.email_verification_required_at || user.email_verified_at) return null;
+    const current = await client.query<{ resend_available_at: Date }>(
+      'SELECT resend_available_at FROM email_verification_challenges WHERE user_id = $1 FOR UPDATE',
+      [user.id],
+    );
+    if (current.rows[0] && current.rows[0].resend_available_at > new Date()) return null;
+    const challenge = createChallenge(user.id, user.email);
+    await client.query(`INSERT INTO email_verification_challenges
+      (user_id, code_hash, expires_at, resend_available_at, failed_attempts)
+      VALUES ($1, $2, $3, $4, 0)
+      ON CONFLICT (user_id) DO UPDATE SET
+        code_hash = EXCLUDED.code_hash,
+        expires_at = EXCLUDED.expires_at,
+        resend_available_at = EXCLUDED.resend_available_at,
+        failed_attempts = 0,
+        updated_at = now()`,
+    [user.id, hashVerificationCode(challenge.code, env.EMAIL_VERIFICATION_CODE_PEPPER), challenge.expiresAt, challenge.resendAvailableAt]);
+    await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json)
+      VALUES ($1, 'auth.email_verification_resent', 'users', $2, '{}'::jsonb)`, [user.id, user.id]);
+    return challenge;
+  });
+
+  if (pendingChallenge) await sendPendingChallenge(pendingChallenge);
+  // This response intentionally does not disclose whether an address belongs
+  // to a pending account, is already verified, or is subject to cooldown.
+  return ok(res, { accepted: true }, 202);
 }
 
 export async function login(req: Request, res: Response) {
@@ -97,6 +254,7 @@ export async function login(req: Request, res: Response) {
   const valid = user.rowCount ? await argon2.verify(user.rows[0].password_hash, input.password) : false;
   const actor = valid ? await loadActor(user.rows[0].id) : null;
   if (!valid || !actor || actor.status !== 'active') throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
+  if (actorNeedsEmailVerification(actor)) throw new ApiError(403, 'EMAIL_VERIFICATION_REQUIRED', 'Verify your email address before signing in.');
   const refreshToken = await createRefreshSession(actor, req, res);
   return ok(res, { user: actor, accessToken: signAccessToken(actor), csrfToken: createCsrfToken(refreshToken) });
 }
@@ -121,7 +279,7 @@ export async function refresh(req: Request, res: Response) {
   }
   if (current.expires_at <= new Date()) throw new ApiError(401, 'REFRESH_TOKEN_EXPIRED', 'Refresh session has expired.');
   const actor = await loadActor(current.user_id);
-  if (!actor || actor.status !== 'active') throw new ApiError(401, 'ACCOUNT_UNAVAILABLE', 'Account is unavailable.');
+  if (!actor || actor.status !== 'active' || actorNeedsEmailVerification(actor)) throw new ApiError(401, 'ACCOUNT_UNAVAILABLE', 'Account is unavailable.');
   const newToken = createOpaqueToken();
   await withTransaction(async (client) => {
     const next = await client.query<{ id: string }>(`INSERT INTO refresh_sessions (user_id, token_hash, expires_at, user_agent, ip_hash) VALUES ($1, $2, $3, $4, $5) RETURNING session_id AS id`, [actor.id, sha256(newToken), new Date(Date.now() + refreshLifetimeMs), req.get('user-agent')?.slice(0, 500) ?? null, sha256(req.ip || 'unknown')]);
@@ -149,7 +307,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     const payload = jwt.verify(header.slice(7), env.ACCESS_TOKEN_SECRET);
     if (typeof payload === 'string' || !payload.sub) throw new ApiError(401, 'TOKEN_INVALID', 'Authentication token is invalid.');
     const actor = await loadActor(payload.sub);
-    if (!actor || actor.status !== 'active') throw new ApiError(401, 'ACCOUNT_UNAVAILABLE', 'Account is unavailable.');
+    if (!actor || actor.status !== 'active' || actorNeedsEmailVerification(actor)) throw new ApiError(401, 'ACCOUNT_UNAVAILABLE', 'Account is unavailable.');
     res.locals.actor = actor;
     next();
   } catch (error) {

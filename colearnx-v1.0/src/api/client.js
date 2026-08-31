@@ -49,6 +49,8 @@ apiClient.interceptors.response.use(
     const message =
       error.response?.data?.error?.message ||
       "The service is temporarily unavailable. Please try again.";
-    return Promise.reject(new Error(message));
+    const apiError = new Error(message);
+    apiError.code = error.response?.data?.error?.code || "NETWORK_ERROR";
+    return Promise.reject(apiError);
   },
 );

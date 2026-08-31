@@ -8,7 +8,9 @@ Authenticated routes require `Authorization: Bearer <access-token>`. The refresh
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/auth/register` | Register with `displayName`, `email`, `password`, `passwordConfirmation`, `acceptedTerms: true`, `ageAcknowledged: true`. |
+| POST | `/auth/register` | Creates an unverified account and emails an eight-digit code; returns no login session. |
+| POST | `/auth/verify-email` | Body `{ "email", "code" }`; verifies the current one-time email code. |
+| POST | `/auth/resend-verification` | Body `{ "email" }`; requests a new email code without disclosing account state. |
 | POST | `/auth/login` | Creates an HTTP-only refresh cookie and returns an access token plus CSRF token. |
 | GET | `/auth/csrf` | Returns the CSRF token associated with the current refresh cookie, if present. |
 | POST | `/auth/refresh`, `/auth/logout` | Cookie-backed refresh-session lifecycle; requires `X-CSRF-Token` when a refresh cookie is present. |

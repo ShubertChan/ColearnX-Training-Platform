@@ -5,6 +5,12 @@ const unwrap = (response) => response.data.data;
 export const registerAccount = (input) =>
   apiClient.post("/auth/register", input).then(unwrap);
 
+export const verifyEmailAddress = (input) =>
+  apiClient.post("/auth/verify-email", input).then(unwrap);
+
+export const resendVerificationEmail = (input) =>
+  apiClient.post("/auth/resend-verification", input).then(unwrap);
+
 export const loginAccount = (input) =>
   apiClient.post("/auth/login", input).then(unwrap);
 

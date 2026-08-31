@@ -35,6 +35,13 @@ COOKIE_DOMAIN=
 ENABLE_LOCAL_DELIVERY=false
 ENABLE_HOSTED_VIDEO=false
 LOG_LEVEL=info
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=<Resend API key>
+EMAIL_FROM=CoLearnX <no-reply@your-verified-domain.example>
+EMAIL_VERIFICATION_CODE_PEPPER=<separate random value of at least 32 characters>
+EMAIL_VERIFICATION_CODE_TTL_MINUTES=10
+EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS=60
+EMAIL_VERIFICATION_MAX_ATTEMPTS=5
 ```
 
 `PORT` is injected by Render and must not be set. `BOOTSTRAP_ADMIN_EMAIL` is temporary and is set only while running the one-time seed. Keep the `STRIPE_*` variables blank for the initial smoke test; add Stripe **test** keys and the webhook secret only in the Render Environment editor when separately validating payments.
