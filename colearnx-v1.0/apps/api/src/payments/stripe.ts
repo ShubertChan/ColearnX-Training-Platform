@@ -10,14 +10,12 @@ import { ApiError, ok } from '../lib/http.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 import { loadSystemPointAccount, postPointTransaction } from '../points/ledger.js';
 import type { Actor } from '../auth/auth.js';
+import { requireStripeSandboxSecret, stripeCheckoutError, stripeFailureLogFields } from './stripe-support.js';
 
 const checkoutSchema = z.object({ topUpPackageId: uuid });
 
 function stripeClient() {
-  if (!env.STRIPE_SECRET_KEY || !env.STRIPE_SECRET_KEY.startsWith('sk_test_')) {
-    throw new ApiError(503, 'STRIPE_NOT_CONFIGURED', 'Stripe test mode is not configured.');
-  }
-  return new Stripe(env.STRIPE_SECRET_KEY);
+  return new Stripe(requireStripeSandboxSecret(env.STRIPE_SECRET_KEY));
 }
 
 type PaymentRow = {
@@ -68,6 +66,9 @@ export async function createCheckoutSession(req: Request, res: Response) {
   const key = parse(idempotencyKey, req.get('idempotency-key'));
   const fingerprint = sha256(JSON.stringify(input));
   const scope = 'wallet.topup.checkout';
+  // Fail before creating local orders when the sandbox is not configured.
+  // Keeping this outside the Stripe API catch preserves STRIPE_NOT_CONFIGURED as a 503.
+  const stripe = stripeClient();
   const prepared = await withTransaction(async (client) => {
     const cached = await claimIdempotency(client, actor.id, scope, key, fingerprint);
     if (cached) return { cached };
@@ -115,7 +116,7 @@ export async function createCheckoutSession(req: Request, res: Response) {
   if ('cached' in prepared) return ok(res, prepared.cached);
   let session: Stripe.Checkout.Session;
   try {
-    session = await stripeClient().checkout.sessions.create({
+    session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_email: actor.email,
       line_items: [{ price_data: { currency: prepared.currency, product_data: { name: prepared.displayName }, unit_amount: prepared.amountMinor }, quantity: 1 }],
@@ -123,7 +124,12 @@ export async function createCheckoutSession(req: Request, res: Response) {
       cancel_url: `${env.APP_ORIGIN}/#/wallet?topUp=cancelled`,
       metadata: { paymentTransactionId: prepared.paymentTransactionId, topUpOrderId: prepared.topUpOrderId, userId: actor.id },
     }, { idempotencyKey: `colearnx_${prepared.paymentTransactionId}` });
-  } catch {
+  } catch (error) {
+    res.locals.log?.error({
+      requestId: res.locals.requestId,
+      stripe: stripeFailureLogFields(error),
+      paymentTransactionId: prepared.paymentTransactionId,
+    }, 'Stripe checkout session creation failed');
     await withTransaction(async (client) => {
       await client.query(`UPDATE payment_transactions SET payment_status = 'failed', failure_code = 'stripe_checkout_creation_failed'
         WHERE payment_transaction_id = $1`, [prepared.paymentTransactionId]);
@@ -131,7 +137,7 @@ export async function createCheckoutSession(req: Request, res: Response) {
       await client.query(`DELETE FROM idempotency_records
         WHERE actor_user_id = $1 AND operation_scope = $2 AND idempotency_key = $3 AND request_fingerprint = $4`, [actor.id, scope, key, fingerprint]);
     });
-    throw new ApiError(502, 'STRIPE_CHECKOUT_CREATION_FAILED', 'Unable to create the Stripe checkout session.');
+    throw stripeCheckoutError(error);
   }
   if (!session.url) throw new ApiError(502, 'STRIPE_CHECKOUT_URL_MISSING', 'Stripe did not return a checkout URL.');
   const response: CheckoutResponse = { paymentTransactionId: prepared.paymentTransactionId, topUpOrderId: prepared.topUpOrderId, checkoutUrl: session.url, status: 'pending' };
@@ -159,9 +165,11 @@ export async function stripeWebhook(req: Request, res: Response) {
   if (!env.STRIPE_WEBHOOK_SECRET) throw new ApiError(503, 'STRIPE_WEBHOOK_NOT_CONFIGURED', 'Stripe webhook verification is not configured.');
   const signature = req.get('stripe-signature');
   if (!signature) throw new ApiError(400, 'STRIPE_SIGNATURE_MISSING', 'Stripe signature is missing.');
+  // Configuration failures are operational 503s, not invalid webhook signatures.
+  const stripe = stripeClient();
   let event: Stripe.Event;
   try {
-    event = stripeClient().webhooks.constructEvent(req.body as Buffer, signature, env.STRIPE_WEBHOOK_SECRET);
+    event = stripe.webhooks.constructEvent(req.body as Buffer, signature, env.STRIPE_WEBHOOK_SECRET);
   } catch {
     throw new ApiError(400, 'STRIPE_SIGNATURE_INVALID', 'Stripe signature verification failed.');
   }
