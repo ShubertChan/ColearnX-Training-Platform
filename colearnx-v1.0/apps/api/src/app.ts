@@ -9,7 +9,7 @@ import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
 import { query } from './db/database.js';
 import { errorHandler, notFound, ok } from './lib/http.js';
-import { authenticate, csrf, login, logout, me, refresh, register, requireRole, updateMe } from './auth/auth.js';
+import { authenticate, csrf, login, logout, me, refresh, register, resendEmailVerification, requireRole, updateMe, verifyEmail } from './auth/auth.js';
 import { createCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
 import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse } from './catalog/catalog.js';
@@ -19,8 +19,9 @@ import { createRoleApplication, createTrainerCertification, decideRoleApplicatio
 import { adjustPoints, cancelLiveCourseRun, completeLiveCourseRun, createTopUpPackage, retireTopUpPackage, setRevenueSharePolicy } from './admin/operations.js';
 import { changeUserRole, deleteUser, getUser, listUsers, reinstateUser, suspendUser } from './admin/users.js';
 
-const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie'] });
+const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'res.headers.set-cookie'] });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many authentication attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
+const verificationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many verification attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
 const mutationLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
 
 export function createApp() {
@@ -53,6 +54,8 @@ export function createApp() {
   const api = express.Router();
   api.get('/auth/csrf', csrf);
   api.post('/auth/register', authLimiter, register);
+  api.post('/auth/verify-email', verificationLimiter, verifyEmail);
+  api.post('/auth/resend-verification', verificationLimiter, resendEmailVerification);
   api.post('/auth/login', authLimiter, login);
   api.post('/auth/refresh', authLimiter, refresh);
   api.post('/auth/logout', logout);

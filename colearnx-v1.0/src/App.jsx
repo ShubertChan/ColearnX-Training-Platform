@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import { usePlatform } from "./context/PlatformContext";
 import { AuthPage, ForgotPasswordPage } from "./pages/AuthPages";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { HomePage, ProfilePage, PublicProfilePage } from "./pages/AccountPlatformPages";
 import {
   ContentDetailPage,
@@ -57,6 +58,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<AuthPage />} />
       <Route path="/register" element={<AuthPage mode="register" />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route
         path="/home"

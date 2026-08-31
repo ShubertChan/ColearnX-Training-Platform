@@ -51,7 +51,7 @@ export function AuthPage({ mode = "login" }) {
     setSubmitting(true);
     try {
       if (register) {
-        await registerMember({
+        const pending = await registerMember({
           name: name.trim(),
           email: email.trim(),
           password,
@@ -59,11 +59,18 @@ export function AuthPage({ mode = "login" }) {
           acceptedTerms,
           ageAcknowledged,
         });
+        navigate(`/verify-email?email=${encodeURIComponent(pending.email)}`, {
+          state: { email: pending.email, resendAvailableAt: pending.resendAvailableAt },
+        });
       } else {
         await signIn({ email: email.trim(), password });
+        navigate("/home");
       }
-      navigate("/home");
     } catch (authError) {
+      if (!register && authError.code === "EMAIL_VERIFICATION_REQUIRED") {
+        navigate(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+        return;
+      }
       setError(authError.message);
     } finally {
       setSubmitting(false);

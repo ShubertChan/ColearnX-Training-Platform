@@ -36,3 +36,9 @@ The migration uses UUID public identifiers, UTC `timestamptz`, `bigint` for poin
 ## Migration policy
 
 Run migrations with `colearnx_owner` through `MIGRATION_DATABASE_URL`, never through the API account. The running API uses `colearnx_app`; it has no UPDATE/DELETE grant on audit or ledger records. Future destructive changes must be forward migrations using expand → backfill → contract.
+
+## Email verification
+
+`004_email_verification.sql` adds nullable verification timestamps to `users` and one pending `email_verification_challenges` row per new account. The challenge contains only a keyed code hash, expiry, retry-after timestamp and failed-attempt count. The runtime role receives DML only on that challenge table; the reporting and legacy migrator roles receive no access.
+
+Existing users leave both timestamps null and remain eligible to sign in. New registrations set `email_verification_required_at`; they gain access only after `email_verified_at` is written in the same transaction that deletes their one-time challenge.

@@ -21,6 +21,13 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
   STRIPE_CURRENCY: z.string().regex(/^[a-z]{3}$/).default('sgd'),
   STRIPE_MODE: z.enum(['test', 'live']).default('test'),
+  EMAIL_PROVIDER: z.enum(['disabled', 'resend']).default('disabled'),
+  RESEND_API_KEY: z.string().trim().optional().default(''),
+  EMAIL_FROM: z.string().trim().max(320).optional().default(''),
+  EMAIL_VERIFICATION_CODE_PEPPER: z.string().optional().default(''),
+  EMAIL_VERIFICATION_CODE_TTL_MINUTES: z.coerce.number().int().min(5).max(30).default(10),
+  EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(3600).default(60),
+  EMAIL_VERIFICATION_MAX_ATTEMPTS: z.coerce.number().int().min(3).max(10).default(5),
   ENABLE_LOCAL_DELIVERY: booleanFromString,
   ENABLE_HOSTED_VIDEO: booleanFromString,
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -36,6 +43,16 @@ if (parsed.data.STRIPE_MODE === 'test' && parsed.data.STRIPE_SECRET_KEY.startsWi
 }
 if (parsed.data.NODE_ENV === 'production' && parsed.data.STRIPE_SECRET_KEY.startsWith('sk_test_')) {
   throw new Error('Production must not use a Stripe test secret key.');
+}
+if (parsed.data.NODE_ENV !== 'development' && parsed.data.EMAIL_PROVIDER === 'disabled') {
+  throw new Error('Staging and production require EMAIL_PROVIDER=resend for email verification.');
+}
+if (parsed.data.EMAIL_PROVIDER === 'resend') {
+  if (!parsed.data.RESEND_API_KEY) throw new Error('RESEND_API_KEY is required when EMAIL_PROVIDER=resend.');
+  if (!parsed.data.EMAIL_FROM) throw new Error('EMAIL_FROM is required when EMAIL_PROVIDER=resend.');
+  if (parsed.data.EMAIL_VERIFICATION_CODE_PEPPER.length < 32) {
+    throw new Error('EMAIL_VERIFICATION_CODE_PEPPER must be at least 32 characters when EMAIL_PROVIDER=resend.');
+  }
 }
 
 export const env = parsed.data;

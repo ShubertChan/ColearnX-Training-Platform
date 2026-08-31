@@ -6,7 +6,9 @@ import {
   logoutAccount,
   refreshAccount,
   registerAccount,
+  resendVerificationEmail,
   updateCurrentUser,
+  verifyEmailAddress,
 } from "../api/auth";
 import { hasAccessToken, hasCsrfToken, setAccessToken, setCsrfToken } from "../api/client";
 import {
@@ -422,12 +424,12 @@ export function PlatformProvider({ children }) {
 
   const registerMember = async ({ name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged }) => {
     const result = await registerAccount({ displayName: name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged });
-    setAccessToken(result.accessToken);
-    setCsrfToken(result.csrfToken);
-    const roles = applyServerIdentity(await getCurrentUser());
-    await refreshAccountData(roles);
-    return true;
+    return result;
   };
+
+  const verifyRegistrationEmail = async (input) => verifyEmailAddress(input);
+
+  const resendRegistrationEmail = async (input) => resendVerificationEmail(input);
 
   const signOut = async () => {
     try {
@@ -636,6 +638,8 @@ export function PlatformProvider({ children }) {
     notify,
     signIn,
     registerMember,
+    verifyRegistrationEmail,
+    resendRegistrationEmail,
     signOut,
     refreshWallet,
     refreshCatalog,
