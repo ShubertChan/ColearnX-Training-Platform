@@ -55,6 +55,12 @@ VITE_PAYMENT_PROVIDER=stripe
 
 `VITE_*` values are embedded at Vite build time. Editing a variable without rebuilding does not change the already published site.
 
+Keep `VITE_PAYMENTS_API_ENABLED=false` until the Render API has a Stripe test
+secret and matching webhook signing secret. While it is false, the wallet keeps
+balances and transaction history available but disables the top-up entry. Once
+the API integration is ready, set the value to `true` and rebuild/redeploy
+Pages to expose the sandbox checkout.
+
 ## Neon migration and seed
 
 PostgreSQL 16 is supported by the current schema and migrations. `001_initial_schema.sql` and `002_commerce_hardening.sql` are immutable once recorded in `schema_migrations`; all later changes must be new, forward-only migration files.

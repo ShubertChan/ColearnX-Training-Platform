@@ -35,4 +35,8 @@ npm test
 npm run api:test
 ```
 
-Keep `VITE_PAYMENTS_API_ENABLED` off until the frontend owner adopts the documented authentication and package-ID top-up API. The existing demo payment request is intentionally not accepted by the backend.
+`VITE_PAYMENTS_API_ENABLED` is an explicit deployment gate. Leave it `false`
+until the Stripe test key and webhook secret are configured in the API
+environment; the wallet then disables the top-up entry and explains why. Set
+it to `true` and rebuild the Vite client to enable the authenticated,
+package-ID-based Stripe sandbox checkout.

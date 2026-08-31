@@ -2092,6 +2092,27 @@ tbody tr[role="button"]:focus-visible {
   text-align: left;
   font-size: 11px;
 }
+.feature-status {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 15px 0;
+  padding: 12px;
+  border: 1px solid #ead8a6;
+  border-radius: 10px;
+  color: #735b1f;
+  background: #fffaf0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.feature-status > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.feature-status div {
+  display: grid;
+  gap: 2px;
+}
 .spin {
   animation: spin 0.9s linear infinite;
 }

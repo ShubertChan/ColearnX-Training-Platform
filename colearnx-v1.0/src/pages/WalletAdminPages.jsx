@@ -21,6 +21,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { createTopUpCheckoutSession, getTopUpStatus } from "../api/payments";
 import { usePlatform } from "../context/PlatformContext";
+import { paymentsApiEnabled } from "../config/features";
 import {
   Badge,
   Button,
@@ -39,6 +40,8 @@ export function WalletPage() {
   const [paymentNotice, setPaymentNotice] = useState("");
 
   useEffect(() => {
+    if (!paymentsApiEnabled) return undefined;
+
     const query = new URLSearchParams(location.search);
     const paymentTransactionId = query.get("paymentTransactionId");
     if (!paymentTransactionId) return undefined;
@@ -87,7 +90,12 @@ export function WalletPage() {
             income, creator income and approved refunds.
           </p>
           <div className="button-row">
-            <Button onClick={() => setTopup(true)}>Add points</Button>
+            <Button
+              disabled={!paymentsApiEnabled}
+              onClick={() => setTopup(true)}
+            >
+              {paymentsApiEnabled ? "Add points" : "Top-up unavailable"}
+            </Button>
             <Button variant="glass" onClick={() => navigate("/transactions")}>
               View transaction history
             </Button>
@@ -133,8 +141,21 @@ export function WalletPage() {
         </div>
         <TransactionTable transactions={transactions.slice(0, 4)} />
       </Card>
+      {!paymentsApiEnabled && (
+        <div className="feature-status" role="status">
+          <AlertCircle size={18} />
+          <div>
+            <b>Sandbox top-ups are not enabled for this deployment.</b>
+            <span>
+              Wallet balances and transaction history remain available. An
+              administrator must enable the Stripe sandbox integration before
+              test payments can be created.
+            </span>
+          </div>
+        </div>
+      )}
       {paymentNotice && <div className="success-note" role="status">{paymentNotice}</div>}
-      {topup && (
+      {paymentsApiEnabled && topup && (
         <TopUpModal
           onClose={() => setTopup(false)}
           packages={topUpPackages}
