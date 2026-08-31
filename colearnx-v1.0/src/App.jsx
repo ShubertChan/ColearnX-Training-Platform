@@ -27,6 +27,7 @@ import {
   AdminDashboardPage,
   AdminCatalogPage,
   AdminRefundPage,
+  AdminRoleApplicationsPage,
 } from "./pages/AdminPlatformPages";
 import { AdminUserDetailPage, AdminUsersPage } from "./pages/AdminUserManagementPages";
 
@@ -221,6 +222,16 @@ export default function App() {
           <Workspace>
             <Protected roles={["Admin"]}>
               <AdminDashboardPage />
+            </Protected>
+          </Workspace>
+        }
+      />
+      <Route
+        path="/admin/applications"
+        element={
+          <Workspace>
+            <Protected roles={["Admin"]}>
+              <AdminRoleApplicationsPage />
             </Protected>
           </Workspace>
         }

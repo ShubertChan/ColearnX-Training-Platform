@@ -20,6 +20,7 @@ const decisionInput = z.object({
 });
 const listInput = z.object({
   status: z.enum(['pending', 'approved', 'rejected']).optional(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
@@ -80,12 +81,13 @@ export async function myRoleApplications(req: Request, res: Response) {
 
 export async function listRoleApplications(req: Request, res: Response) {
   const input = parse(listInput, req.query);
+  const offset = (input.page - 1) * input.limit;
   const result = await query(`SELECT ra.application_id, ra.applicant_user_id, u.full_name AS applicant_name, r.role_code,
     ra.application_status, ra.supporting_text, ra.submitted_at, ra.reviewed_at, ra.review_comment
     FROM role_applications ra JOIN roles r ON r.role_id = ra.requested_role_id
     JOIN users u ON u.user_id = ra.applicant_user_id
     WHERE ($1::text IS NULL OR ra.application_status = $1)
-    ORDER BY ra.submitted_at ASC, ra.application_id ASC LIMIT $2`, [input.status ?? null, input.limit]);
+    ORDER BY ra.submitted_at ASC, ra.application_id ASC LIMIT $2 OFFSET $3`, [input.status ?? null, input.limit, offset]);
   return ok(res, result.rows.map(applicationResponse));
 }
 
@@ -94,13 +96,16 @@ export async function decideRoleApplication(req: Request, res: Response) {
   const applicationId = parse(uuid, req.params.id);
   const input = parse(decisionInput, req.body);
   const response = await withTransaction(async (client) => {
-    const application = await client.query<{ applicant_user_id: string; requested_role_id: string; role_code: string; application_status: string }>(`SELECT
-      ra.applicant_user_id, ra.requested_role_id, r.role_code, ra.application_status
+    const application = await client.query<{ applicant_user_id: string; requested_role_id: string; role_code: string; application_status: string; account_status: string }>(`SELECT
+      ra.applicant_user_id, ra.requested_role_id, r.role_code, ra.application_status, u.account_status
       FROM role_applications ra JOIN roles r ON r.role_id = ra.requested_role_id
-      WHERE ra.application_id = $1 FOR UPDATE OF ra`, [applicationId]);
+      JOIN users u ON u.user_id = ra.applicant_user_id
+      WHERE ra.application_id = $1 FOR UPDATE OF ra, u`, [applicationId]);
     if (!application.rowCount) throw new ApiError(404, 'ROLE_APPLICATION_NOT_FOUND', 'Role application was not found.');
     const current = application.rows[0];
     if (current.application_status !== 'pending') throw new ApiError(409, 'ROLE_APPLICATION_ALREADY_DECIDED', 'This role application has already been decided.');
+    if (current.applicant_user_id === admin.id) throw new ApiError(409, 'SELF_ROLE_DECISION_FORBIDDEN', 'Administrators cannot decide their own role application.');
+    if (input.decision === 'approved' && current.account_status !== 'active') throw new ApiError(409, 'APPLICANT_ACCOUNT_INACTIVE', 'Only an active account can receive a role.');
     await client.query(`UPDATE role_applications SET application_status = $2, reviewer_user_id = $3,
       reviewed_at = now(), review_comment = $4 WHERE application_id = $1`, [applicationId, input.decision, admin.id, input.reason]);
     if (input.decision === 'approved') {
@@ -143,12 +148,13 @@ export async function myTrainerCertifications(req: Request, res: Response) {
 
 export async function listTrainerCertifications(req: Request, res: Response) {
   const input = parse(listInput, req.query);
+  const offset = (input.page - 1) * input.limit;
   const result = await query(`SELECT tc.trainer_certification_id, tc.trainer_user_id, u.full_name AS trainer_name,
     tc.certification_name, tc.certification_reference, tc.evidence_url, tc.certification_status,
     tc.submitted_at, tc.reviewed_at, tc.review_comment
     FROM trainer_certifications tc JOIN users u ON u.user_id = tc.trainer_user_id
     WHERE ($1::text IS NULL OR tc.certification_status = $1)
-    ORDER BY tc.submitted_at ASC, tc.trainer_certification_id ASC LIMIT $2`, [input.status ?? null, input.limit]);
+    ORDER BY tc.submitted_at ASC, tc.trainer_certification_id ASC LIMIT $2 OFFSET $3`, [input.status ?? null, input.limit, offset]);
   return ok(res, result.rows.map(certificationResponse));
 }
 

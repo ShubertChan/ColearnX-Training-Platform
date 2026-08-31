@@ -1665,6 +1665,121 @@ blockquote footer {
 .application-review h4 {
   margin: 0;
 }
+.role-application-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+}
+.role-application-toolbar label {
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+.role-application-toolbar select {
+  min-height: 42px;
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--ink);
+  background: #fff;
+}
+.role-application-toolbar small {
+  max-width: 430px;
+  color: var(--muted);
+  text-align: right;
+}
+.admin-application-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(0, 1.45fr);
+  gap: 18px;
+  align-items: start;
+}
+.admin-application-list-card,
+.admin-application-layout > .stack {
+  min-width: 0;
+}
+.role-application-list {
+  display: grid;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.role-application-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 11px;
+  width: 100%;
+  align-items: center;
+  padding: 13px 6px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease-out, box-shadow 160ms ease-out;
+}
+.role-application-row:hover {
+  background: #f6f8fc;
+}
+.role-application-row.selected {
+  background: #f0f3ff;
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.role-application-row:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.role-application-row b,
+.role-application-row small,
+.role-application-row em {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.role-application-row small,
+.role-application-row em {
+  color: var(--muted);
+}
+.role-application-row em {
+  margin-top: 3px;
+  font-size: 10px;
+  font-style: normal;
+}
+.applicant-profile-list dd {
+  max-width: 70%;
+  overflow-wrap: anywhere;
+}
+.profile-review-actions {
+  margin-top: 14px;
+}
+.role-application-detail-list > div {
+  align-items: flex-start;
+  flex-direction: column;
+}
+.role-application-detail-list dd {
+  width: 100%;
+  color: var(--ink);
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.role-application-detail-list a {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--brand);
+}
+.application-copy {
+  margin: 0;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .module-editor {
   margin-top: 15px;
   padding: 14px;
@@ -2562,6 +2677,7 @@ tbody tr[role="button"]:focus-visible {
   .cart-layout,
   .refund-layout,
   .admin-refund-layout,
+  .admin-application-layout,
   .editor-layout {
     grid-template-columns: 1fr;
   }
@@ -2681,6 +2797,31 @@ tbody tr[role="button"]:focus-visible {
   .history-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+  .role-application-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .role-application-toolbar label {
+    min-width: 0;
+  }
+  .role-application-toolbar small {
+    text-align: left;
+  }
+  .role-application-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .role-application-row > .badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .applicant-profile-list > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .applicant-profile-list dd {
+    max-width: none;
+    text-align: left;
   }
   .status-tabs {
     align-items: stretch;

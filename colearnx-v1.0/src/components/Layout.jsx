@@ -47,6 +47,7 @@ const roleNavigation = {
   ],
   Admin: [
     ["/admin", "Admin Dashboard", LayoutDashboard],
+    ["/admin/applications", "Role Applications", BadgeCheck],
     ["/admin/refunds", "Refund Review", ClipboardCheck],
     ["/admin/users", "Users & Roles", UserCheck],
     ["/admin/catalog", "Catalog Control", BookOpen],
@@ -96,6 +97,10 @@ const titleMap = {
   ],
   "/published": ["Published Items", "Manage your courses and creator content"],
   "/admin": ["Admin Dashboard", "Review platform activity and pending actions"],
+  "/admin/applications": [
+    "Role Applications",
+    "Review applicant profiles, evidence and access requests",
+  ],
   "/admin/refunds": [
     "Refund Review",
     "Apply the platform refund policy consistently",
@@ -183,6 +188,7 @@ export default function Layout({ children }) {
             <NavLink
               key={`${role}-${to}`}
               to={to}
+              end={to === "/admin"}
               className={({ isActive }) => (isActive ? "active" : "")}
             >
               <Icon size={19} />
