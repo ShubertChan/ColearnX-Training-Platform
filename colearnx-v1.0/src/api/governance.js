@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient } from "./client.js";
 
 const unwrap = (response) => response.data.data;
 
@@ -14,8 +14,24 @@ export const getMyTrainerCertifications = () =>
 export const createTrainerCertification = (input) =>
   apiClient.post("/trainer-certifications", input).then(unwrap);
 
-export const getAdminRoleApplications = () =>
-  apiClient.get("/admin/role-applications?limit=100").then(unwrap);
+export const getAdminRoleApplications = async ({ status, limit = 100 } = {}) => {
+  const applications = [];
+  const seen = new Set();
+  for (let page = 1; page <= 10_000; page += 1) {
+    const params = new URLSearchParams({ limit: String(limit), page: String(page) });
+    if (status) params.set("status", status);
+    const batch = await apiClient.get(`/admin/role-applications?${params.toString()}`).then(unwrap);
+    let added = 0;
+    batch.forEach((application) => {
+      if (seen.has(application.id)) return;
+      seen.add(application.id);
+      applications.push(application);
+      added += 1;
+    });
+    if (batch.length < limit || added === 0) break;
+  }
+  return applications;
+};
 
 export const decideRoleApplication = (applicationId, input) =>
   apiClient

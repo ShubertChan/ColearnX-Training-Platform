@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCurrentUser,
   getCsrfToken,
@@ -38,6 +38,7 @@ import {
   getWallet,
   getWalletTransactions,
 } from "../api/wallet";
+import { normalizePortfolioUrl, parseRoleApplicationSupportingText } from "../utils/roleApplication";
 
 const PlatformContext = createContext(null);
 
@@ -148,19 +149,24 @@ const mapOrder = (order) => ({
   })),
 });
 
-const mapRoleApplication = (application) => ({
-  id: application.id,
-  type: roleLabel(application.requestedRole),
-  userId: application.applicant?.id || null,
-  user: application.applicant?.displayName || "Your account",
-  category: "",
-  portfolio: "",
-  experience: "",
-  reason: application.supportingText || "",
-  status: titleCase(application.status),
-  submittedAt: application.submittedAt,
-  decisionReason: application.reviewComment || "",
-});
+const mapRoleApplication = (application) => {
+  const details = parseRoleApplicationSupportingText(application.supportingText);
+  return {
+    id: application.id,
+    type: roleLabel(application.requestedRole),
+    userId: application.applicant?.id || null,
+    user: application.applicant?.displayName || "Your account",
+    category: details.category,
+    portfolio: details.portfolio,
+    portfolioUrl: normalizePortfolioUrl(details.portfolio),
+    experience: details.experience,
+    reason: details.reason,
+    supportingText: details.raw,
+    status: titleCase(application.status),
+    submittedAt: application.submittedAt,
+    decisionReason: application.reviewComment || "",
+  };
+};
 
 const mapRefundRequest = (request) => ({
   id: request.id,
@@ -217,6 +223,7 @@ export function PlatformProvider({ children }) {
   const [trainerCertifications, setTrainerCertifications] = useState([]);
   const [accountLoading, setAccountLoading] = useState(true);
   const [toast, setToast] = useState("");
+  const adminRoleRequestRevision = useRef(0);
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -294,11 +301,36 @@ export function PlatformProvider({ children }) {
     return certifications;
   }, []);
 
+  const refreshAdminRoleApplications = useCallback(async (status = "pending") => {
+    const requestRevision = adminRoleRequestRevision.current + 1;
+    adminRoleRequestRevision.current = requestRevision;
+    const roles = await getAdminRoleApplications({ status: status || undefined });
+    if (requestRevision === adminRoleRequestRevision.current) {
+      setRoleApplications(roles.map(mapRoleApplication));
+    }
+    return roles;
+  }, []);
+
   const refreshAdminQueues = useCallback(async () => {
-    const [roles, refunds] = await Promise.all([getAdminRoleApplications(), getAdminRefundRequests()]);
-    setRoleApplications(roles.map(mapRoleApplication));
-    setRefundRequests(refunds.map(mapRefundRequest));
-    return { roles, refunds };
+    const roleRequestRevision = adminRoleRequestRevision.current + 1;
+    adminRoleRequestRevision.current = roleRequestRevision;
+    const [rolesResult, refundsResult] = await Promise.allSettled([
+      getAdminRoleApplications({ status: "pending" }),
+      getAdminRefundRequests(),
+    ]);
+    if (rolesResult.status === "fulfilled" && roleRequestRevision === adminRoleRequestRevision.current) {
+      setRoleApplications(rolesResult.value.map(mapRoleApplication));
+    }
+    if (refundsResult.status === "fulfilled") setRefundRequests(refundsResult.value.map(mapRefundRequest));
+    if (rolesResult.status === "rejected" && refundsResult.status === "rejected") throw rolesResult.reason;
+    return {
+      roles: rolesResult.status === "fulfilled" ? rolesResult.value : [],
+      refunds: refundsResult.status === "fulfilled" ? refundsResult.value : [],
+      errors: {
+        roles: rolesResult.status === "rejected" ? rolesResult.reason : null,
+        refunds: refundsResult.status === "rejected" ? refundsResult.reason : null,
+      },
+    };
   }, []);
 
   const applyServerIdentity = useCallback((user) => {
@@ -508,7 +540,9 @@ export function PlatformProvider({ children }) {
 
   const decideRoleApplication = async (applicationId, status, decisionReason) => {
     await decideRoleApplicationApi(applicationId, { decision: String(status).toLowerCase(), reason: decisionReason });
-    await refreshAdminQueues();
+    setRoleApplications((current) => current.map((application) => application.id === applicationId
+      ? { ...application, status: titleCase(status), decisionReason }
+      : application));
     notify(`Role application ${String(status).toLowerCase()}.`);
     return true;
   };
@@ -609,6 +643,7 @@ export function PlatformProvider({ children }) {
     refreshMyApplications,
     refreshMyListings,
     refreshMyTrainerCertifications,
+    refreshAdminRoleApplications,
     refreshAdminQueues,
     addToCart,
     removeFromCart,
@@ -627,7 +662,7 @@ export function PlatformProvider({ children }) {
     deletePublishedItem,
   }), [
     accountLoading, approvedRoles, applications, authenticated, balance, cart, contents, courses,
-    notify, orders, profile, publishedItems, refundRequests, refreshAdminQueues, refreshCatalog,
+    notify, orders, profile, publishedItems, refundRequests, refreshAdminQueues, refreshAdminRoleApplications, refreshCatalog,
     refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet, role, roleApplications, serverWallet,
     toast, topUpPackages, trainerCertifications, transactions,
   ]);

@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
+  ArrowRight,
   BookOpen,
   CheckCircle2,
   ClipboardCheck,
+  ExternalLink,
   FileText,
   ShieldCheck,
   Users,
@@ -13,6 +16,7 @@ import {
   decideContentSubmission,
   decideCourseSubmission,
   deleteAdminUser,
+  getAdminUser,
   getContentSubmissions,
   getCourseSubmissions,
   getAdminUsers,
@@ -35,12 +39,176 @@ function DecisionButtons({ onDecision, busy, approveValue = "approved" }) {
 
 export function AdminDashboardPage() {
   const { roleApplications, refundRequests, refreshAdminQueues } = usePlatform();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const refresh = async () => { setLoading(true); try { await refreshAdminQueues(); } finally { setLoading(false); } };
+  const [queueError, setQueueError] = useState("");
+  const refresh = async () => {
+    setLoading(true);
+    setQueueError("");
+    try {
+      const result = await refreshAdminQueues();
+      if (result.errors?.roles) setQueueError(`Role applications could not be refreshed: ${result.errors.roles.message}`);
+    } catch (loadError) {
+      setQueueError(`Administrator queues could not be refreshed: ${loadError.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => { refresh(); }, []);
-  const pendingRoles = roleApplications.filter((item) => item.status === "Pending").length;
+  const pendingRoleApplications = roleApplications.filter((item) => item.status === "Pending");
+  const pendingRoles = pendingRoleApplications.length;
   const pendingRefunds = refundRequests.filter((item) => item.status === "Pending").length;
-  return <><section className="hero-banner"><div><span className="eyebrow light">Administrator workspace</span><h2>Review platform queues</h2><p>Every decision below is sent to the server and audited; no administrator action changes only this browser.</p><Button onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh queues"}</Button></div><ShieldCheck size={54} /></section><div className="metric-grid three"><Metric label="Pending role applications" value={pendingRoles} detail="Server-side approval queue" icon={Users} /><Metric label="Pending refunds" value={pendingRefunds} detail="Policy-evaluated requests" icon={ClipboardCheck} /><Metric label="Catalogue reviews" value="Open catalogue page" detail="Submitted courses and content" icon={BookOpen} /></div></>;
+  return <><section className="hero-banner"><div><span className="eyebrow light">Administrator workspace</span><h2>Review platform queues</h2><p>Every decision below is sent to the server and audited; no administrator action changes only this browser.</p><div className="button-row"><Button onClick={() => navigate("/admin/applications")}>Review applications <ArrowRight size={16} /></Button><Button variant="glass" onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh queues"}</Button></div></div><ShieldCheck size={54} /></section>{queueError && <p className="form-error" role="alert">{queueError}</p>}<div className="metric-grid three"><Metric label="Pending role applications" value={pendingRoles} detail="Open Role Applications to review each applicant" icon={Users} /><Metric label="Pending refunds" value={pendingRefunds} detail="Policy-evaluated requests" icon={ClipboardCheck} /><Metric label="Catalogue reviews" value="Open catalogue page" detail="Submitted courses and content" icon={BookOpen} /></div><Card><div className="card-heading"><div><span className="eyebrow">Role governance</span><h3>Pending applicants</h3><p>See who is waiting for Creator or Trainer access before opening the full review.</p></div><Button variant="secondary" onClick={() => navigate("/admin/applications")}>Open review queue <ArrowRight size={15} /></Button></div>{pendingRoleApplications.length ? <div className="queue-list">{pendingRoleApplications.slice(0, 4).map((application) => <div key={application.id}><span className="admin-user-avatar">{displayValue(application.user).slice(0, 1).toUpperCase()}</span><div><b>{displayValue(application.user)}</b><small>{application.type} application</small><span className="queue-detail">Submitted {application.submittedAt ? new Date(application.submittedAt).toLocaleString() : "date unavailable"}</span></div><Badge tone="warning">Pending</Badge></div>)}</div> : <p className="empty-copy">No role applications are waiting for review.</p>}</Card></>;
+}
+
+const accountStatusTone = (status) => status === "active" ? "success" : status === "suspended" ? "warning" : "danger";
+const applicationStatusTone = (status) => status === "Approved" ? "success" : status === "Rejected" ? "danger" : "warning";
+const displayValue = (value) => String(value || "").trim() || "Not supplied";
+
+export function AdminRoleApplicationsPage() {
+  const { roleApplications, decideRoleApplication, refreshAdminRoleApplications } = usePlatform();
+  const navigate = useNavigate();
+  const [statusFilter, setStatusFilter] = useState("Pending");
+  const [selectedId, setSelectedId] = useState("");
+  const [applicant, setApplicant] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileRevision, setProfileRevision] = useState(0);
+  const [busy, setBusy] = useState("");
+  const [decisionReason, setDecisionReason] = useState("");
+  const [error, setError] = useState("");
+  const [profileError, setProfileError] = useState("");
+  const refreshRevision = useRef(0);
+
+  const filteredApplications = useMemo(() => statusFilter === "All"
+    ? roleApplications
+    : roleApplications.filter((item) => item.status === statusFilter), [roleApplications, statusFilter]);
+  const selectedApplication = filteredApplications.find((item) => item.id === selectedId) || null;
+  const requestedStatus = statusFilter === "All" ? "" : statusFilter.toLowerCase();
+  const profileMatchesSelection = applicant?.id === selectedApplication?.userId;
+  const displayedApplicant = profileMatchesSelection ? applicant : null;
+  const profileUnavailable = profileLoading || !profileMatchesSelection || Boolean(profileError);
+  const inactiveApplicant = displayedApplicant && displayedApplicant.status !== "active";
+  const profileValue = (value) => profileError ? "Unavailable" : profileMatchesSelection ? displayValue(value) : "Loading…";
+
+  const refresh = async () => {
+    const requestRevision = refreshRevision.current + 1;
+    refreshRevision.current = requestRevision;
+    setLoading(true);
+    setError("");
+    try { await refreshAdminRoleApplications(requestedStatus); }
+    catch (loadError) {
+      if (requestRevision === refreshRevision.current) setError(loadError.message);
+    } finally {
+      if (requestRevision === refreshRevision.current) setLoading(false);
+    }
+  };
+
+  useEffect(() => { refresh(); }, [statusFilter, refreshAdminRoleApplications]);
+
+  useEffect(() => {
+    if (!filteredApplications.length) {
+      if (selectedId) {
+        setSelectedId("");
+        setDecisionReason("");
+      }
+      return;
+    }
+    if (!selectedId || !filteredApplications.some((application) => application.id === selectedId)) {
+      setSelectedId(filteredApplications[0].id);
+      setDecisionReason("");
+    }
+  }, [filteredApplications, selectedId]);
+
+  useEffect(() => {
+    let current = true;
+    setApplicant(null);
+    setProfileError("");
+    if (!selectedApplication?.userId) {
+      setProfileLoading(false);
+      return () => { current = false; };
+    }
+    setProfileLoading(true);
+    getAdminUser(selectedApplication.userId)
+      .then((user) => { if (current) setApplicant(user); })
+      .catch((loadError) => { if (current) setProfileError(loadError.message); })
+      .finally(() => { if (current) setProfileLoading(false); });
+    return () => { current = false; };
+  }, [selectedApplication?.userId, profileRevision]);
+
+  const selectApplication = (id) => {
+    setSelectedId(id);
+    setDecisionReason("");
+    setError("");
+  };
+
+  const decide = async (decision) => {
+    if (busy || !selectedApplication || profileUnavailable || decisionReason.trim().length < 3) return;
+    if (decision === "Approved" && inactiveApplicant) return;
+    setBusy(selectedApplication.id);
+    setError("");
+    try {
+      await decideRoleApplication(selectedApplication.id, decision, decisionReason.trim());
+      setDecisionReason("");
+      setSelectedId("");
+      setProfileRevision((value) => value + 1);
+      try { await refreshAdminRoleApplications(requestedStatus); }
+      catch { setError("The decision was saved, but the application queue could not be refreshed. Refresh the page before making another decision."); }
+    } catch (decisionError) {
+      setError(decisionError.message);
+    } finally {
+      setBusy("");
+    }
+  };
+
+  return <div className="stack">
+    <Card>
+      <div className="card-heading">
+        <div><span className="eyebrow">Role governance</span><h2>Applicant review queue</h2><p>Review the applicant identity and submitted evidence before granting Creator or Trainer access.</p></div>
+        <div className="button-row"><Badge tone={statusFilter === "Pending" ? "warning" : "neutral"}>{filteredApplications.length} {statusFilter.toLowerCase()}</Badge><Button variant="secondary" onClick={refresh} disabled={loading || Boolean(busy)}>{loading ? "Refreshing…" : "Refresh"}</Button></div>
+      </div>
+      <div className="role-application-toolbar">
+        <label><span>Status</span><select aria-label="Filter role applications" value={statusFilter} disabled={loading || Boolean(busy)} onChange={(event) => { setStatusFilter(event.target.value); setSelectedId(""); setDecisionReason(""); }}><option>Pending</option><option>Approved</option><option>Rejected</option><option>All</option></select></label>
+        <small>Decision comments are recorded and visible to the applicant.</small>
+      </div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </Card>
+
+    <div className="admin-application-layout">
+      <Card className="admin-application-list-card">
+        <div className="card-heading"><div><span className="eyebrow">Applications</span><h3>{statusFilter} requests</h3></div><Badge>{filteredApplications.length}</Badge></div>
+        {loading ? <p className="empty-copy">Loading applications…</p> : filteredApplications.length ? <div className="role-application-list">{filteredApplications.map((application) => <button type="button" disabled={Boolean(busy)} key={application.id} className={`role-application-row ${selectedApplication?.id === application.id ? "selected" : ""}`} aria-pressed={selectedApplication?.id === application.id} onClick={() => selectApplication(application.id)}><span className="admin-user-avatar">{displayValue(application.user).slice(0, 1).toUpperCase()}</span><span><b>{displayValue(application.user)}</b><small>{application.type} application</small><em>Submitted {application.submittedAt ? new Date(application.submittedAt).toLocaleString() : "date unavailable"}</em></span><Badge tone={applicationStatusTone(application.status)}>{application.status}</Badge></button>)}</div> : <EmptyState icon={Users} title={`No ${statusFilter.toLowerCase()} applications`} description="New Creator and Trainer applications will appear here after submission." />}
+      </Card>
+
+      {selectedApplication ? <div className="stack">
+        <Card>
+          <div className="card-heading"><div><span className="eyebrow">Applicant identity</span><h3>{displayValue(selectedApplication.user)}</h3><p>{profileError ? "Profile unavailable" : profileLoading || !profileMatchesSelection ? "Loading the audited account profile…" : displayValue(displayedApplicant?.email)}</p></div>{displayedApplicant && <Badge tone={accountStatusTone(displayedApplicant.status)}>{titleCase(displayedApplicant.status)}</Badge>}</div>
+          {profileError && <p className="form-error" role="alert">Profile could not be loaded: {profileError}</p>}
+          <dl className="detail-list applicant-profile-list">
+            <div><dt>Full name</dt><dd>{displayValue(displayedApplicant?.profile?.fullName || selectedApplication.user)}</dd></div>
+            <div><dt>Email</dt><dd>{profileValue(displayedApplicant?.email)}</dd></div>
+            <div><dt>Current roles</dt><dd>{profileError ? "Unavailable" : displayedApplicant?.roles?.length ? displayedApplicant.roles.map(titleCase).join(", ") : profileMatchesSelection ? "Member" : "Loading…"}</dd></div>
+            <div><dt>Phone</dt><dd>{profileValue(displayedApplicant?.profile?.phone)}</dd></div>
+            <div><dt>Location</dt><dd>{profileValue(displayedApplicant?.profile?.location)}</dd></div>
+            <div><dt>Bio</dt><dd>{profileValue(displayedApplicant?.profile?.bio)}</dd></div>
+          </dl>
+          {selectedApplication.userId && <div className="button-row profile-review-actions"><Button variant="secondary" size="sm" disabled={Boolean(busy)} onClick={() => navigate(`/admin/users/${selectedApplication.userId}`)}>Open full account <ArrowRight size={15} /></Button></div>}
+        </Card>
+
+        <Card>
+          <div className="card-heading"><div><span className="eyebrow">Submitted application</span><h3>{selectedApplication.type} access</h3><p>Submitted {selectedApplication.submittedAt ? new Date(selectedApplication.submittedAt).toLocaleString() : "date unavailable"}</p></div><Badge tone={applicationStatusTone(selectedApplication.status)}>{selectedApplication.status}</Badge></div>
+          <dl className="detail-list role-application-detail-list">
+            <div><dt>Subject category</dt><dd>{displayValue(selectedApplication.category)}</dd></div>
+            <div><dt>Relevant experience</dt><dd>{displayValue(selectedApplication.experience)}</dd></div>
+            <div><dt>Portfolio</dt><dd>{selectedApplication.portfolioUrl ? <a href={selectedApplication.portfolioUrl} target="_blank" rel="noreferrer">{selectedApplication.portfolio}<ExternalLink size={13} /></a> : displayValue(selectedApplication.portfolio)}</dd></div>
+            <div><dt>Why they are applying</dt><dd>{displayValue(selectedApplication.reason)}</dd></div>
+          </dl>
+          {inactiveApplicant && <div className="warning-box compact"><ShieldCheck size={16} /><div><b>Approval unavailable</b><p>This account is {displayedApplicant.status}. It may be rejected, but a role cannot be granted until the account is active.</p></div></div>}
+          {selectedApplication.status === "Pending" ? <div className="application-review"><FormField label="Decision reason" hint="Required, at least 3 characters. The applicant can see this comment."><textarea disabled={profileUnavailable || Boolean(busy)} aria-label={`Decision reason for ${selectedApplication.user} ${selectedApplication.type} application`} value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} placeholder="Record the evidence reviewed and why access should be granted or declined" /></FormField><div className="button-row"><Button disabled={profileUnavailable || Boolean(inactiveApplicant) || Boolean(busy) || decisionReason.trim().length < 3} onClick={() => decide("Approved")}><CheckCircle2 size={15} /> {busy === selectedApplication.id ? "Saving…" : "Approve application"}</Button><Button variant="danger" disabled={profileUnavailable || Boolean(busy) || decisionReason.trim().length < 3} onClick={() => decide("Rejected")}><XCircle size={15} /> Reject application</Button></div></div> : <div className="application-review"><span className="eyebrow">Decision comment</span><p className="application-copy">{displayValue(selectedApplication.decisionReason)}</p></div>}
+        </Card>
+      </div> : <EmptyState icon={Users} title="Select an application" description="Choose an application from the queue to review the applicant and supporting information." />}
+    </div>
+  </div>;
 }
 
 export function AdminRefundPage() {
