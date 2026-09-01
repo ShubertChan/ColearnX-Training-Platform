@@ -33,6 +33,12 @@ The migration uses UUID public identifiers, UTC `timestamptz`, `bigint` for poin
 - `stripe_payment_events.stripe_event_id`, payment-provider identifiers, and operation-scoped idempotency records provide replay protection.
 - Checkout uses an active revenue-share policy snapshot. The approved initial seed policy is 30% platform / 70% trainer for courses and 30% platform / 70% creator for content; later admin policy changes apply only to later orders.
 
+## Private object-storage metadata
+
+`005_object_storage.sql` adds `storage_assets`; it stores R2 metadata only—never file bytes, signed URLs, access keys or secrets. Each row has a server-generated unique `(bucket_name, object_key)`, a content-version/owner relationship, declared and R2-verified size/MIME values, ETag, lifecycle timestamps and constrained status (`pending`, `uploaded`, `ready`, `quarantined`, `orphaned`, `delete_pending`, `deleted`). `content_versions.storage_asset_id` is a nullable composite foreign key back to its own asset, so legacy `storage_url` rows remain readable without conversion.
+
+The runtime `colearnx_app` role gets only `SELECT`, `INSERT`, and column-level status/verification `UPDATE` access to `storage_assets`; it cannot change an asset owner, declared values, bucket/key, schema, or delete metadata. The controlled Neon Owner direct/unpooled connection alone applies the migration. A submitted/published content version must reference an owned `ready` asset.
+
 ## Migration policy
 
 Run migrations with `colearnx_owner` through `MIGRATION_DATABASE_URL`, never through the API account. The running API uses `colearnx_app`; it has no UPDATE/DELETE grant on audit or ledger records. Future destructive changes must be forward migrations using expand → backfill → contract.

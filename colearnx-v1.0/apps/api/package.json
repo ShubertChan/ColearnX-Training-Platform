@@ -13,9 +13,12 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/**/*.test.ts",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+"storage:reconcile": "tsx src/storage/reconcile.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1123.0",
+    "@aws-sdk/s3-request-presigner": "^3.1123.0",
     "argon2": "^0.45.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

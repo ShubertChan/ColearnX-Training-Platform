@@ -8,7 +8,7 @@ import { parse, uuid } from '../lib/validation.js';
 
 const listQuery = z.object({ q: z.string().trim().max(120).optional(), category: z.string().trim().max(80).optional(), cursor: z.string().datetime().optional(), limit: z.coerce.number().int().min(1).max(100).default(20) });
 const courseInput = z.object({ title: z.string().trim().min(1).max(200), description: z.string().trim().max(5000).default(''), categoryId: uuid.optional(), pricePoints: z.coerce.number().int().nonnegative(), capacity: z.coerce.number().int().positive().nullable().optional(), startsAt: z.string().datetime().nullable().optional(), endsAt: z.string().datetime().nullable().optional(), timezone: z.string().trim().max(80).optional(), deliveryModes: z.array(z.enum(['cloud', 'local', 'live', 'record'])).min(1).max(4) });
-const contentInput = z.object({ title: z.string().trim().min(1).max(200), categoryId: uuid.optional(), contentType: z.string().trim().min(1).max(80).default('digital'), pricePoints: z.coerce.number().int().nonnegative(), storageUrl: z.string().url().max(2000).optional() });
+const contentInput = z.object({ title: z.string().trim().min(1).max(200), categoryId: uuid.optional(), contentType: z.string().trim().min(1).max(80).default('digital'), pricePoints: z.coerce.number().int().nonnegative() }).strict();
 const moderationDecisionInput = z.object({ decision: z.enum(['published', 'rejected']), reason: z.string().trim().min(3).max(2_000) });
 const moderationListQuery = z.object({ limit: z.coerce.number().int().min(1).max(100).default(50) });
 
@@ -88,7 +88,7 @@ export async function createContent(req: Request, res: Response) {
   if (!actor.roles.includes('creator')) throw new ApiError(403, 'CREATOR_ROLE_REQUIRED', 'An approved creator role is required.');
   const result = await withTransaction(async (client) => {
     const content = await client.query<{ content_id: string }>(`INSERT INTO contents (creator_user_id, category_id, content_type, title, price_points) VALUES ($1, $2, $3, $4, $5) RETURNING content_id`, [actor.id, input.categoryId ?? null, input.contentType, input.title, input.pricePoints]);
-    const version = await client.query<{ content_version_id: string }>(`INSERT INTO content_versions (content_id, version_no, storage_url) VALUES ($1, 1, $2) RETURNING content_version_id`, [content.rows[0].content_id, input.storageUrl ?? null]);
+    const version = await client.query<{ content_version_id: string }>(`INSERT INTO content_versions (content_id, version_no) VALUES ($1, 1) RETURNING content_version_id`, [content.rows[0].content_id]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, request_id) VALUES ($1, 'content.create', 'contents', $2, $3)`, [actor.id, content.rows[0].content_id, res.locals.requestId]);
     return { id: content.rows[0].content_id, contentVersionId: version.rows[0].content_version_id, status: 'draft' };
   });
@@ -112,12 +112,16 @@ export async function submitContent(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const contentId = parse(uuid, req.params.id);
   const result = await withTransaction(async (client) => {
-    const content = await client.query<{ content_version_id: string }>(`SELECT cv.content_version_id
+    const content = await client.query<{ content_version_id: string; storage_asset_id: string | null }>(`SELECT cv.content_version_id, cv.storage_asset_id
       FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id
       WHERE c.content_id = $1 AND c.creator_user_id = $2 AND c.publication_status = 'draft'
         AND cv.version_status = 'draft' AND cv.version_no = 1
       FOR UPDATE OF c, cv`, [contentId, actor.id]);
     if (!content.rowCount) throw new ApiError(409, 'CONTENT_NOT_SUBMITTABLE', 'Only an owned draft content item may be submitted.');
+    const asset = content.rows[0].storage_asset_id ? await client.query(`SELECT 1 FROM storage_assets
+      WHERE storage_asset_id = $1 AND content_version_id = $2 AND owner_user_id = $3 AND asset_status = 'ready'`,
+    [content.rows[0].storage_asset_id, content.rows[0].content_version_id, actor.id]) : { rowCount: 0 };
+    if (!asset.rowCount) throw new ApiError(409, 'CONTENT_FILE_NOT_READY', 'A verified content file is required before submission.');
     await client.query(`UPDATE contents SET publication_status = 'submitted', updated_at = now() WHERE content_id = $1`, [contentId]);
     await client.query(`UPDATE content_versions SET version_status = 'submitted' WHERE content_version_id = $1`, [content.rows[0].content_version_id]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, request_id)
@@ -139,8 +143,9 @@ export async function listMyListings(req: Request, res: Response) {
       GROUP BY cr.course_run_id, c.course_id
       ORDER BY c.updated_at DESC, cr.course_run_id DESC`, [actor.id]),
     query(`SELECT c.content_id, cv.content_version_id, c.title, c.content_type, c.price_points,
-      c.publication_status, cv.version_status, cv.storage_url, c.updated_at
+      c.publication_status, cv.version_status, cv.storage_url, cv.storage_asset_id, sa.asset_status, c.updated_at
       FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id
+      LEFT JOIN storage_assets sa ON sa.storage_asset_id = cv.storage_asset_id
       WHERE c.creator_user_id = $1
       ORDER BY c.updated_at DESC, cv.version_no DESC`, [actor.id]),
   ]);
@@ -153,7 +158,8 @@ export async function listMyListings(req: Request, res: Response) {
   const contents = contentResult.rows.map((row) => ({
     kind: 'content', id: row.content_id, contentVersionId: row.content_version_id, title: row.title,
     contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status,
-    versionStatus: row.version_status, storageUrlPresent: Boolean(row.storage_url), updatedAt: row.updated_at,
+    versionStatus: row.version_status, storageUrlPresent: Boolean(row.storage_url || row.storage_asset_id),
+    fileStatus: row.asset_status ?? (row.storage_url ? 'legacy' : 'missing'), updatedAt: row.updated_at,
   }));
   return ok(res, [...courses, ...contents].sort((left, right) =>
     new Date(String(right.updatedAt)).getTime() - new Date(String(left.updatedAt)).getTime(),
@@ -209,14 +215,15 @@ export async function decideCourseSubmission(req: Request, res: Response) {
 export async function listContentSubmissions(req: Request, res: Response) {
   const input = parse(moderationListQuery, req.query);
   const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.content_type, c.price_points,
-    c.creator_user_id, u.full_name AS owner_name, cv.storage_url, cv.version_status
+    c.creator_user_id, u.full_name AS owner_name, cv.storage_url, cv.storage_asset_id, sa.asset_status, cv.version_status
     FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id JOIN users u ON u.user_id = c.creator_user_id
+    LEFT JOIN storage_assets sa ON sa.storage_asset_id = cv.storage_asset_id
     WHERE c.publication_status = 'submitted' AND cv.version_status = 'submitted'
     ORDER BY c.updated_at ASC, cv.content_version_id ASC LIMIT $1`, [input.limit]);
   return ok(res, result.rows.map((row) => ({
     id: row.content_version_id, contentId: row.content_id, title: row.title, contentType: row.content_type,
     pricePoints: Number(row.price_points), owner: { id: row.creator_user_id, displayName: row.owner_name },
-    storageUrlPresent: Boolean(row.storage_url), moderationStatus: row.version_status,
+    storageUrlPresent: Boolean(row.storage_url || row.storage_asset_id), fileStatus: row.asset_status ?? (row.storage_url ? 'legacy' : 'missing'), moderationStatus: row.version_status,
   })));
 }
 
@@ -225,12 +232,16 @@ export async function decideContentSubmission(req: Request, res: Response) {
   const contentVersionId = parse(uuid, req.params.id);
   const input = parse(moderationDecisionInput, req.body);
   const result = await withTransaction(async (client) => {
-    const content = await client.query<{ content_id: string }>(`SELECT c.content_id FROM content_versions cv
+    const content = await client.query<{ content_id: string; storage_asset_id: string | null; creator_user_id: string }>(`SELECT c.content_id, cv.storage_asset_id, c.creator_user_id FROM content_versions cv
       JOIN contents c ON c.content_id = cv.content_id
       WHERE cv.content_version_id = $1 AND cv.version_status = 'submitted' AND c.publication_status = 'submitted'
       FOR UPDATE OF cv, c`, [contentVersionId]);
     if (!content.rowCount) throw new ApiError(409, 'CONTENT_NOT_REVIEWABLE', 'Only submitted content may be reviewed.');
     if (input.decision === 'published') {
+      const asset = content.rows[0].storage_asset_id ? await client.query(`SELECT 1 FROM storage_assets
+        WHERE storage_asset_id = $1 AND content_version_id = $2 AND owner_user_id = $3 AND asset_status = 'ready'`,
+      [content.rows[0].storage_asset_id, contentVersionId, content.rows[0].creator_user_id]) : { rowCount: 0 };
+      if (!asset.rowCount) throw new ApiError(409, 'CONTENT_FILE_NOT_READY', 'A verified content file is required before publication.');
       await client.query(`UPDATE contents SET publication_status = 'published', updated_at = now() WHERE content_id = $1`, [content.rows[0].content_id]);
       await client.query(`UPDATE content_versions SET version_status = 'published', published_at = now() WHERE content_version_id = $1`, [contentVersionId]);
     } else {
