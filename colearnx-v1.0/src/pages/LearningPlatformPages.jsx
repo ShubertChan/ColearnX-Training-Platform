@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BookOpen,
   CheckCircle2,
+  Download,
   FileArchive,
   GraduationCap,
   ReceiptText,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { usePlatform } from "../context/PlatformContext";
+import { requestContentDownloadUrl } from "../api/uploads";
 import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
 
 const deliveryLabel = (modes = []) =>
@@ -88,11 +90,67 @@ export function OrderHistoryPage() {
   return <Card><div className="card-heading"><div><span className="eyebrow">Order history</span><h2>Server-issued receipts</h2></div><Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button></div><div className="responsive-table"><table><thead><tr><th>Order</th><th>Items</th><th>Total</th><th>Status</th><th /></tr></thead><tbody>{orders.map((order) => <tr key={order.id}><td><b>{order.orderNo}</b><span className="table-subtitle">{order.paidAt ? new Date(order.paidAt).toLocaleString() : "—"}</span></td><td>{order.items.length}</td><td>{order.total} points</td><td><Badge tone="success">{order.status}</Badge></td><td><Link className="button secondary sm" to={`/checkout-success/${order.id}`}>View</Link></td></tr>)}</tbody></table></div></Card>;
 }
 
+function ContentDownloadButton({ contentVersionId }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const requestDownload = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await requestContentDownloadUrl(contentVersionId);
+      const link = document.createElement("a");
+      link.href = result.downloadUrl;
+      link.download = result.filename || "colearnx-content";
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      if (result.demoObjectUrl) window.setTimeout(() => URL.revokeObjectURL(result.downloadUrl), 1000);
+    } catch (downloadError) {
+      setError(downloadError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="learning-actions">
+      <Button type="button" variant="secondary" size="sm" onClick={requestDownload} disabled={busy}>
+        <Download size={15} /> {busy ? "Requesting…" : "Download"}
+      </Button>
+      {error && <small className="form-error" role="alert">{error}</small>}
+    </div>
+  );
+}
+
 export function PurchasesPage() {
   const { orders } = usePlatform();
-  const items = useMemo(() => orders.flatMap((order) => order.items.map((item) => ({ ...item, order }))).filter((item) => item.fulfilmentStatus !== "refunded"), [orders]);
+  const items = useMemo(
+    () => orders
+      .flatMap((order) => order.items.map((item) => ({ ...item, order })))
+      .filter((item) => item.fulfilmentStatus !== "refunded"),
+    [orders],
+  );
   if (!items.length) return <EmptyState icon={BookOpen} title="No purchases yet" description="Your purchased courses and resources will appear here after server-side checkout." action={<Link className="button primary" to="/courses">Explore courses</Link>} />;
-  return <div className="stack">{items.map((item) => <Card key={item.id} className="learning-row"><span className="list-icon">{item.kind === "course" ? <GraduationCap size={18} /> : <FileArchive size={18} />}</span><div><b>{item.title}</b><small>{item.kind === "course" ? deliveryLabel(item.deliveryModes) : "Digital content"} · {item.price} points</small><p className="learning-policy">Secure player and file delivery are not configured yet; this record remains available as your proof of purchase.</p></div><Link className="button secondary sm" to={`/checkout-success/${item.order.id}`}>View receipt</Link></Card>)}</div>;
+  return (
+    <div className="stack">
+      {items.map((item) => (
+        <Card key={item.id} className="learning-row">
+          <span className="list-icon">{item.kind === "course" ? <GraduationCap size={18} /> : <FileArchive size={18} />}</span>
+          <div>
+            <b>{item.title}</b>
+            <small>{item.kind === "course" ? deliveryLabel(item.deliveryModes) : "Digital content"} · {item.price} points</small>
+            <p className="learning-policy">
+              {item.kind === "content"
+                ? "Request a short-lived, server-authorized download link. The R2 bucket and object key remain private."
+                : "Course delivery access is determined from the server-side order snapshot."}
+            </p>
+          </div>
+          {item.kind === "content" ? <ContentDownloadButton contentVersionId={item.productId} /> : null}
+          <Link className="button secondary sm" to={`/checkout-success/${item.order.id}`}>View receipt</Link>
+        </Card>
+      ))}
+    </div>
+  );
 }
 
 export function RefundPage() {

@@ -2889,3 +2889,21 @@ tbody tr[role="button"]:focus-visible {
     gap: 8px;
   }
 }
+/* Private R2 upload controls. */
+.private-uploader { display: grid; gap: 12px; margin-bottom: 18px; }
+.upload-zone.private { margin-bottom: 0; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, opacity 160ms ease; }
+.upload-zone.private.disabled { cursor: not-allowed; opacity: 0.62; }
+.upload-demo-note { padding: 10px 12px; border: 1px solid #f0d79a; border-radius: 10px; color: #6b531b; background: #fffaf0; font-size: 11px; line-height: 1.5; }
+.upload-status { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: 11px; background: #fff; }
+.upload-status > div { display: grid; gap: 3px; }
+.upload-status p, .upload-status small { margin: 0; color: var(--muted); line-height: 1.45; }
+.upload-status-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; border-radius: 9px; color: var(--brand); background: #eef2ff; }
+.upload-status-icon.uploaded { color: var(--success); background: #edf9f1; }
+.upload-status-icon.error { color: var(--danger); background: #fff1f1; }
+.upload-progress { height: 9px; overflow: hidden; border-radius: 999px; background: #e7eaf2; }
+.upload-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), #7858e8); transition: width 120ms linear; }
+.upload-actions { margin: 0; }
+.upload-gate-note, .draft-reference { color: var(--muted); overflow-wrap: anywhere; }
+.editor-summary .draft-reference, .editor-summary .form-error { display: block; margin-top: 9px; text-align: left; }
+.learning-actions { display: grid; justify-items: start; gap: 6px; }
+.learning-actions .form-error { margin: 0; font-size: 11px; }
