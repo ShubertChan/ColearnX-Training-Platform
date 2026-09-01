@@ -29,6 +29,24 @@ Use the Stripe CLI to relay events to `http://localhost:3001/api/v1/payments/str
 
 No live Stripe key is accepted by this MVP. `STRIPE_MODE=test` rejects `sk_live_` credentials and webhook events with `livemode: true`.
 
+## Private Cloudflare R2 files
+
+The API defaults to `OBJECT_STORAGE_PROVIDER=disabled`, so ordinary local database work does not contact R2. To exercise direct upload/download locally, create a **private** R2 development bucket and a bucket-scoped API token with only object read/write/delete permissions, then set these values in `apps/api/.env` (never commit them):
+
+```dotenv
+OBJECT_STORAGE_PROVIDER=r2
+R2_ACCOUNT_ID=<Cloudflare account ID>
+R2_ACCESS_KEY_ID=<R2 API token access-key ID>
+R2_SECRET_ACCESS_KEY=<R2 API token secret>
+R2_BUCKET_NAME=<private development bucket>
+R2_REGION=auto
+R2_SIGNED_UPLOAD_TTL_SECONDS=600
+R2_SIGNED_DOWNLOAD_TTL_SECONDS=300
+CONTENT_UPLOAD_MAX_BYTES=104857600
+```
+
+Configure that bucket's CORS rule to allow the exact local web origin (normally `http://localhost:5173`), methods `PUT`, `GET`, and `HEAD`, and request header `Content-Type`. Do not make the bucket public. Run `npm run db:migrate` before testing: `005_object_storage.sql` adds metadata only and does not alter legacy file URLs or user/order data. A controlled cleanup run is available through `npm --prefix apps/api run storage:reconcile`; it only removes expired or explicitly `delete_pending` objects that are not linked as a current content file.
+
 ## Configuration still required before Stripe testing
 
 1. The actual Stripe test credentials and webhook relay must be configured locally.
@@ -39,6 +57,6 @@ The approved seed configuration creates S$5/10/20/50 top-up packages at a 1:1 SG
 
 ## Current boundaries
 
-- The backend is verified against local Docker PostgreSQL. It does not enable production payment, email delivery, object storage, signed download URLs, virus scanning or hosted-video progress callbacks.
+- The backend is verified against local Docker PostgreSQL. R2 storage stays disabled until a private bucket, its CORS rule and local secret variables are configured; file metadata and signed URL behavior must then be smoke-tested separately. Production payment, virus scanning and hosted-video progress callbacks remain disabled.
 - The React UI is a separate localStorage prototype. Its legacy payment request is not a production-compatible backend client yet.
 - Password-reset email delivery and production monitoring/backup retention need their external provider decisions before they can be completed securely.

@@ -28,6 +28,15 @@ const schema = z.object({
   EMAIL_VERIFICATION_CODE_TTL_MINUTES: z.coerce.number().int().min(5).max(30).default(10),
   EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(3600).default(60),
   EMAIL_VERIFICATION_MAX_ATTEMPTS: z.coerce.number().int().min(3).max(10).default(5),
+  OBJECT_STORAGE_PROVIDER: z.enum(['disabled', 'r2']).default('disabled'),
+  R2_ACCOUNT_ID: z.string().trim().optional().default(''),
+  R2_ACCESS_KEY_ID: z.string().trim().optional().default(''),
+  R2_SECRET_ACCESS_KEY: z.string().trim().optional().default(''),
+  R2_BUCKET_NAME: z.string().trim().max(255).optional().default(''),
+  R2_REGION: z.string().trim().min(1).max(32).default('auto'),
+  R2_SIGNED_UPLOAD_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(600),
+  R2_SIGNED_DOWNLOAD_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(300),
+  CONTENT_UPLOAD_MAX_BYTES: z.coerce.number().int().min(1).max(104857600).default(104857600),
   ENABLE_LOCAL_DELIVERY: booleanFromString,
   ENABLE_HOSTED_VIDEO: booleanFromString,
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -55,4 +64,10 @@ if (parsed.data.EMAIL_PROVIDER === 'resend') {
   }
 }
 
+if (parsed.data.OBJECT_STORAGE_PROVIDER === 'r2') {
+  if (!parsed.data.R2_ACCOUNT_ID) throw new Error('R2_ACCOUNT_ID is required when OBJECT_STORAGE_PROVIDER=r2.');
+  if (!parsed.data.R2_ACCESS_KEY_ID) throw new Error('R2_ACCESS_KEY_ID is required when OBJECT_STORAGE_PROVIDER=r2.');
+  if (!parsed.data.R2_SECRET_ACCESS_KEY) throw new Error('R2_SECRET_ACCESS_KEY is required when OBJECT_STORAGE_PROVIDER=r2.');
+  if (!parsed.data.R2_BUCKET_NAME) throw new Error('R2_BUCKET_NAME is required when OBJECT_STORAGE_PROVIDER=r2.');
+}
 export const env = parsed.data;

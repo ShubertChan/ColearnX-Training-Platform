@@ -25,7 +25,7 @@ The current web client uses the API as the source of truth for identity, roles, 
 ## Current platform limitations
 
 - Cloud purchases are refundable only within 72 hours and at or below 10% recorded progress; Live, Local and Record rules are enforced by the API from the purchase-time snapshot.
-- Private object storage, confirmed Local-download evidence, hosted-video progress capture, public creator profiles, Google OAuth and password-reset email are not yet configured. The web client does not claim these actions succeeded and does not expose a simulated player, download or reset confirmation.
+- Private R2 object storage is implemented in the backend as a deployment-gated, single-file flow. It requires the `005_object_storage.sql` migration, R2 secrets and bucket CORS before use; the current web client still needs the separate upload/download UI integration. Confirmed Local-download evidence, hosted-video progress capture, public creator profiles, Google OAuth and password-reset email remain out of scope.
 - Course and content submissions remain unpublished until an administrator approves them. Content metadata can be submitted, but paid-file delivery must wait for the private storage adapter.
 
 ## Test
