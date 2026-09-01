@@ -86,6 +86,7 @@ const mapCourse = (course) => ({
 
 const mapContent = (content) => ({
   id: content.id,
+  contentVersionId: content.id,
   contentId: content.contentId,
   title: content.title,
   description: "No public description has been provided.",
@@ -585,7 +586,6 @@ export function PlatformProvider({ children }) {
           title: input.title,
           contentType: input.format || "digital",
           pricePoints: Number(input.price),
-          storageUrl: input.externalUrl || undefined,
         };
     const created = isCourse ? await createCourse(payload) : await createContent(payload);
     const submitted = input.status === "Published"

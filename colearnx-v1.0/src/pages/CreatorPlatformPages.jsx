@@ -8,6 +8,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { usePlatform } from "../context/PlatformContext";
+import { createContent, submitContent } from "../api/catalog";
+import PrivateAssetUploader from "../components/uploads/PrivateAssetUploader";
 import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
 
 const roleCopy = {
@@ -205,7 +207,7 @@ function DeliverySelector({ value, onChange }) {
   );
 }
 
-function ListingEditor({ kind }) {
+function CourseListingEditor() {
   const { savePublishedItem, refreshMyListings } = usePlatform();
   const [form, setForm] = useState({
     title: "",
@@ -214,8 +216,7 @@ function ListingEditor({ kind }) {
     capacity: "",
     startsAt: "",
     endsAt: "",
-    deliveryModes: kind === "course" ? ["cloud"] : [],
-    format: "digital",
+    deliveryModes: ["cloud"],
   });
   const [submitForReview, setSubmitForReview] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -227,7 +228,7 @@ function ListingEditor({ kind }) {
     try {
       await savePublishedItem({
         ...form,
-        kind,
+        kind: "course",
         status: submitForReview ? "Published" : "Draft",
         startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
         endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
@@ -240,55 +241,121 @@ function ListingEditor({ kind }) {
       setBusy(false);
     }
   };
-  const label = kind === "course" ? "Course" : "Content";
   return (
     <form className="content-grid editor-layout" onSubmit={save}>
       <Card className="stack">
-        <div><span className="eyebrow">{label} details</span><h2>Create a server-side draft</h2></div>
-        <FormField label={`${label} title`}>
-          <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-        </FormField>
-        {kind === "course" && (
-          <FormField label="Description"><textarea required value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FormField>
-        )}
-        <FormField label="Price in points">
-          <input required min="0" type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} />
-        </FormField>
-        {kind === "course" ? (
-          <>
-            <DeliverySelector value={form.deliveryModes} onChange={(deliveryModes) => setForm({ ...form, deliveryModes })} />
-            <FormField label="Capacity (optional)"><input min="1" type="number" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} /></FormField>
-            <div className="form-grid two">
-              <FormField label="Start time (optional)"><input type="datetime-local" value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} /></FormField>
-              <FormField label="End time (optional)"><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })} /></FormField>
-            </div>
-          </>
-        ) : (
-          <>
-            <FormField label="Content type"><input required value={form.format} onChange={(event) => setForm({ ...form, format: event.target.value })} /></FormField>
-            <p className="policy-note">Private file upload is not configured yet. This form creates catalogue metadata only and does not claim that a paid file is available.</p>
-          </>
-        )}
-        <label className="check-label">
-          <input type="checkbox" checked={submitForReview} onChange={(event) => setSubmitForReview(event.target.checked)} />
-          Submit for administrator review after creating the draft
-        </label>
+        <div><span className="eyebrow">Course details</span><h2>Create a server-side draft</h2></div>
+        <FormField label="Course title"><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></FormField>
+        <FormField label="Description"><textarea required value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FormField>
+        <FormField label="Price in points"><input required min="0" type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
+        <DeliverySelector value={form.deliveryModes} onChange={(deliveryModes) => setForm({ ...form, deliveryModes })} />
+        <FormField label="Capacity (optional)"><input min="1" type="number" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} /></FormField>
+        <div className="form-grid two">
+          <FormField label="Start time (optional)"><input type="datetime-local" value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} /></FormField>
+          <FormField label="End time (optional)"><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })} /></FormField>
+        </div>
+        <label className="check-label"><input type="checkbox" checked={submitForReview} onChange={(event) => setSubmitForReview(event.target.checked)} />Submit for administrator review after creating the draft</label>
         {error && <p className="form-error">{error}</p>}
-        <Button disabled={busy || (kind === "course" && !form.deliveryModes.length)} type="submit">
-          <Send size={16} /> {busy ? "Saving…" : submitForReview ? "Create and submit" : "Create draft"}
-        </Button>
+        <Button type="submit" disabled={busy || !form.deliveryModes.length}><Send size={16} /> {busy ? "Saving…" : submitForReview ? "Create and submit" : "Create draft"}</Button>
+      </Card>
+      <Card className="editor-summary"><span className="eyebrow">Publication workflow</span><h3>Server-enforced review</h3><p>A draft is stored in PostgreSQL. Submission does not publish it; an administrator must approve it before it appears in the marketplace.</p></Card>
+    </form>
+  );
+}
+
+function ContentListingEditor() {
+  const { refreshMyListings, notify } = usePlatform();
+  const [form, setForm] = useState({ title: "", price: "", contentType: "digital" });
+  const [draft, setDraft] = useState(null);
+  const [asset, setAsset] = useState(null);
+  const [uploadStatus, setUploadStatus] = useState("idle");
+  const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const assetReady = asset?.status === "ready";
+
+  const createDraft = async (event) => {
+    event.preventDefault();
+    if (draft) return;
+    if (!form.title.trim() || form.price === "" || Number(form.price) < 0) {
+      setError("Enter a title and a valid non-negative point price before creating the draft.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const created = await createContent({
+        title: form.title.trim(),
+        contentType: form.contentType.trim() || "digital",
+        pricePoints: Number(form.price),
+      });
+      setDraft(created);
+      await refreshMyListings();
+      notify("Content draft created. Upload and verify the private file before submission.");
+    } catch (createError) {
+      setError(createError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitForReview = async () => {
+    if (!draft?.id || !assetReady || submitted) return;
+    setBusy(true);
+    setError("");
+    try {
+      await submitContent(draft.id);
+      setSubmitted(true);
+      await refreshMyListings();
+      notify("Content submitted for administrator review.");
+    } catch (submissionError) {
+      setError(submissionError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="content-grid editor-layout" onSubmit={createDraft}>
+      <Card className="stack">
+        <div><span className="eyebrow">Content details</span><h2>Create a private content draft</h2></div>
+        <FormField label="Content title"><input required disabled={Boolean(draft)} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></FormField>
+        <FormField label="Price in points"><input required min="0" disabled={Boolean(draft)} type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
+        <FormField label="Content type"><input required disabled={Boolean(draft)} value={form.contentType} onChange={(event) => setForm({ ...form, contentType: event.target.value })} /></FormField>
+        {!draft && <p className="policy-note">Create the server-side draft first. The file is then uploaded directly to private R2 storage and verified by the API; no browser-supplied storage URL is accepted.</p>}
+        {draft && (
+          <>
+            <PrivateAssetUploader
+              contentVersionId={draft.contentVersionId}
+              existingAsset={asset}
+              onAssetChange={setAsset}
+              onStatusChange={setUploadStatus}
+              disabled={submitted || busy}
+            />
+            <p className="policy-note">Only a verified private file can be submitted. The API validates the actual object size and MIME type before review.</p>
+          </>
+        )}
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {!draft ? (
+          <Button type="submit" disabled={busy}><Send size={16} /> {busy ? "Creating draft…" : "Create content draft"}</Button>
+        ) : (
+          <Button type="button" onClick={submitForReview} disabled={busy || submitted || !assetReady || ["preparing", "uploading", "verifying"].includes(uploadStatus)}>
+            <Send size={16} /> {submitted ? "Submitted for administrator review" : busy ? "Submitting…" : "Submit for administrator review"}
+          </Button>
+        )}
       </Card>
       <Card className="editor-summary">
-        <span className="eyebrow">Publication workflow</span>
-        <h3>Server-enforced review</h3>
-        <p>A draft is stored in PostgreSQL. Submission does not publish it; an administrator must approve it before it appears in the marketplace.</p>
+        <span className="eyebrow">Private-file workflow</span>
+        <h3>{submitted ? "Submitted for review" : draft ? assetReady ? "Verified file ready" : "Awaiting private file" : "Draft required"}</h3>
+        <p>Files are not stored in PostgreSQL and their R2 object keys are never exposed to the browser. Upload authorisation and buyer download links are short-lived.</p>
+        {draft?.contentVersionId && <small className="draft-reference">Draft version: {draft.contentVersionId}</small>}
       </Card>
     </form>
   );
 }
 
-export const CourseEditorPage = () => <ListingEditor kind="course" />;
-export const ContentEditorPage = () => <ListingEditor kind="content" />;
+export const CourseEditorPage = () => <CourseListingEditor />;
+export const ContentEditorPage = () => <ContentListingEditor />;
 
 export function PublishedPage() {
   const { publishedItems, refreshMyListings, role } = usePlatform();
