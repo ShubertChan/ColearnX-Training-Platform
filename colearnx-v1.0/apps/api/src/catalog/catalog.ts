@@ -143,7 +143,9 @@ export async function listMyListings(req: Request, res: Response) {
       GROUP BY cr.course_run_id, c.course_id
       ORDER BY c.updated_at DESC, cr.course_run_id DESC`, [actor.id]),
     query(`SELECT c.content_id, cv.content_version_id, c.title, c.content_type, c.price_points,
-      c.publication_status, cv.version_status, cv.storage_url, cv.storage_asset_id, sa.asset_status, c.updated_at
+      c.publication_status, cv.version_status, cv.storage_url, cv.storage_asset_id, sa.storage_asset_id AS asset_id,
+      sa.original_filename, sa.declared_content_type, sa.verified_content_type, sa.declared_byte_size,
+      sa.verified_byte_size, sa.asset_status, sa.uploaded_at, c.updated_at
       FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id
       LEFT JOIN storage_assets sa ON sa.storage_asset_id = cv.storage_asset_id
       WHERE c.creator_user_id = $1
@@ -160,6 +162,14 @@ export async function listMyListings(req: Request, res: Response) {
     contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status,
     versionStatus: row.version_status, storageUrlPresent: Boolean(row.storage_url || row.storage_asset_id),
     fileStatus: row.asset_status ?? (row.storage_url ? 'legacy' : 'missing'), updatedAt: row.updated_at,
+    asset: row.asset_id ? {
+      assetId: row.asset_id,
+      filename: row.original_filename,
+      mediaType: row.verified_content_type ?? row.declared_content_type,
+      sizeBytes: Number(row.verified_byte_size ?? row.declared_byte_size),
+      status: row.asset_status,
+      uploadedAt: row.uploaded_at,
+    } : null,
   }));
   return ok(res, [...courses, ...contents].sort((left, right) =>
     new Date(String(right.updatedAt)).getTime() - new Date(String(left.updatedAt)).getTime(),

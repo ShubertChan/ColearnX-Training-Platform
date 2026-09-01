@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BadgeCheck,
   BookOpen,
@@ -8,6 +8,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { usePlatform } from "../context/PlatformContext";
+import { Link, useSearchParams } from "react-router-dom";
+import { contentDraftFromListing, isEditableContentDraft } from "../utils/contentDraft";
 import { createContent, submitContent } from "../api/catalog";
 import PrivateAssetUploader from "../components/uploads/PrivateAssetUploader";
 import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
@@ -265,6 +267,8 @@ function CourseListingEditor() {
 
 function ContentListingEditor() {
   const { refreshMyListings, notify } = usePlatform();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedDraftId = searchParams.get("draft");
   const [form, setForm] = useState({ title: "", price: "", contentType: "digital" });
   const [draft, setDraft] = useState(null);
   const [asset, setAsset] = useState(null);
@@ -273,6 +277,36 @@ function ContentListingEditor() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const assetReady = asset?.status === "ready";
+
+  const restoreDraft = useCallback(async () => {
+    if (!requestedDraftId) return false;
+    setBusy(true);
+    setError("");
+    try {
+      const listings = await refreshMyListings();
+      const restored = contentDraftFromListing(
+        listings.find((item) => item.kind === "content" && item.id === requestedDraftId),
+      );
+      if (!restored) {
+        setError("This content draft is no longer editable. Refresh My listings to see its current status.");
+        return false;
+      }
+      setForm({ title: restored.title, price: restored.price, contentType: restored.contentType });
+      setDraft({ id: restored.id, contentVersionId: restored.contentVersionId });
+      setAsset(restored.asset);
+      setSubmitted(false);
+      return true;
+    } catch (restoreError) {
+      setError(restoreError.message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [refreshMyListings, requestedDraftId]);
+
+  useEffect(() => {
+    if (requestedDraftId) void restoreDraft();
+  }, [requestedDraftId, restoreDraft]);
 
   const createDraft = async (event) => {
     event.preventDefault();
@@ -290,6 +324,8 @@ function ContentListingEditor() {
         pricePoints: Number(form.price),
       });
       setDraft(created);
+      setAsset(null);
+      setSearchParams({ draft: created.id }, { replace: true });
       await refreshMyListings();
       notify("Content draft created. Upload and verify the private file before submission.");
     } catch (createError) {
@@ -297,6 +333,13 @@ function ContentListingEditor() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleAssetChange = (nextAsset) => {
+    setAsset(nextAsset);
+    void refreshMyListings().catch(() => {
+      // The current upload response remains the source of truth until a manual refresh succeeds.
+    });
   };
 
   const submitForReview = async () => {
@@ -328,10 +371,13 @@ function ContentListingEditor() {
             <PrivateAssetUploader
               contentVersionId={draft.contentVersionId}
               existingAsset={asset}
-              onAssetChange={setAsset}
+              onAssetChange={handleAssetChange}
               onStatusChange={setUploadStatus}
               disabled={submitted || busy}
             />
+            <div className="button-row">
+              <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={restoreDraft}>Refresh server status</Button>
+            </div>
             <p className="policy-note">Only a verified private file can be submitted. The API validates the actual object size and MIME type before review.</p>
           </>
         )}
@@ -377,13 +423,24 @@ export function PublishedPage() {
         <Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>
       </div>
       <div className="queue-list">
-        {publishedItems.map((item) => (
-          <div key={`${item.kind}-${item.id}`}>
-            {item.kind === "course" ? <GraduationCap size={19} /> : <FileText size={19} />}
-            <div><b>{item.title}</b><small>{item.kind === "course" ? item.format : item.format} · {item.price} points · last updated {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "—"}</small></div>
-            <ServerStatus value={item.status} />
-          </div>
-        ))}
+        {publishedItems.map((item) => {
+          const editableDraft = isEditableContentDraft(item);
+          return (
+            <div key={`${item.kind}-${item.id}`}>
+              {item.kind === "course" ? <GraduationCap size={19} /> : <FileText size={19} />}
+              <div>
+                <b>{item.title}</b>
+                <small>{item.format} · {item.price} points · last updated {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "—"}</small>
+                {item.kind === "content" && <span className="queue-detail">{item.asset?.status === "ready" ? `Verified file: ${item.asset.filename}` : `File status: ${item.fileStatus}`}</span>}
+              </div>
+              {editableDraft ? (
+                <Link className="button secondary sm" to={`/creator/content-editor?draft=${encodeURIComponent(item.id)}`}>Continue draft</Link>
+              ) : (
+                <ServerStatus value={item.status} />
+              )}
+            </div>
+          );
+        })}
       </div>
     </Card>
   );
