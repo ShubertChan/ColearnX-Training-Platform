@@ -2271,23 +2271,35 @@ tbody tr[role="button"]:focus-visible {
 }
 .admin-user-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 11px;
   width: 100%;
   align-items: center;
-  padding: 12px 4px;
   border: 0;
   border-bottom: 1px solid var(--line);
   color: var(--ink);
   background: transparent;
   text-align: left;
+}
+.admin-user-row-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 11px;
+  width: 100%;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 4px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
   cursor: pointer;
   transition: background-color 160ms ease-out;
 }
-.admin-user-row:hover {
+.admin-user-row-main:hover {
   background: #f6f8fc;
 }
-.admin-user-row:focus-visible {
+.admin-user-row-main:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
@@ -2315,6 +2327,16 @@ tbody tr[role="button"]:focus-visible {
   background: #e9edff;
   font-size: 12px;
   font-weight: 850;
+}
+@media (max-width: 620px) {
+  .admin-user-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .admin-user-row > .button {
+    justify-self: start;
+    margin: 0 4px 12px;
+  }
 }
 .admin-role-badges {
   margin: 12px 0 16px;

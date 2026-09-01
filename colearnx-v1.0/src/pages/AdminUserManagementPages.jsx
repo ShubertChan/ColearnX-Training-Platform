@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ChevronRight, ShieldAlert, UserCog, Users } from "lucide-react";
+import { ArrowLeft, ChevronRight, ShieldAlert, Trash2, UserCog, Users } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   deleteAdminUser,
@@ -9,7 +9,7 @@ import {
   setAdminUserRole,
   suspendAdminUser,
 } from "../api/admin";
-import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
+import { Badge, Button, Card, EmptyState, FormField, Modal } from "../components/ui";
 
 const roleLabel = (role) => role.charAt(0).toUpperCase() + role.slice(1);
 
@@ -22,20 +22,102 @@ export function AdminUsersPage() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState("active");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
   const load = async () => {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
       const response = await getAdminUsers({ search: search || undefined, status: status || undefined });
       setUsers(response.items);
-    } catch (loadError) { setError(loadError.message); } finally { setLoading(false); }
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setLoading(false);
+    }
   };
-  useEffect(() => { load(); }, []);
-  return <Card><div className="card-heading"><div><span className="eyebrow">User administration</span><h2>Platform users</h2></div><Button variant="secondary" onClick={load} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button></div><p className="muted">Select an account to review its profile, access status and audited administration actions.</p><div className="queue-actions"><input aria-label="Search users" placeholder="Search name or email" value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="Filter account status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="deleted">Deleted</option></select><Button className="sm" onClick={load} disabled={loading}>Apply filter</Button></div>{error && <p className="form-error">{error}</p>}{users.length ? <div className="admin-user-list">{users.map((user) => <button key={user.id} className="admin-user-row" onClick={() => navigate(`/admin/users/${user.id}`)}><span className="admin-user-avatar">{user.displayName.slice(0, 1).toUpperCase()}</span><span><b>{user.displayName}</b><small>{user.email}</small><em>{user.roles.length ? user.roles.map(roleLabel).join(", ") : "No active role"} · joined {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}</em></span><AccountStatus status={user.status} /><ChevronRight size={18} /></button>)}</div> : <EmptyState icon={Users} title="No accounts match" description="Adjust the search or status filter to view another account." />}</Card>;
-}
 
+  useEffect(() => { load(); }, []);
+
+  const openDeleteDialog = (user) => {
+    setDeleteCandidate(user);
+    setDeleteReason("");
+    setDeleteError("");
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleting) return;
+    setDeleteCandidate(null);
+    setDeleteReason("");
+    setDeleteError("");
+  };
+
+  const deleteFromList = async () => {
+    const reason = deleteReason.trim();
+    if (!deleteCandidate || deleting) return;
+    if (reason.length < 3) {
+      setDeleteError("Enter an administration reason of at least 3 characters before deleting this account.");
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteAdminUser(deleteCandidate.id, reason);
+      setUsers((current) => current.filter((user) => user.id !== deleteCandidate.id));
+      setDeleteCandidate(null);
+      setDeleteReason("");
+    } catch (deleteActionError) {
+      setDeleteError(deleteActionError.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return <>
+    <Card>
+      <div className="card-heading">
+        <div><span className="eyebrow">User administration</span><h2>Platform users</h2></div>
+        <Button variant="secondary" onClick={load} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>
+      </div>
+      <p className="muted">Deleted accounts are hidden by default. Their financial and moderation records remain available to administrators through the Deleted filter.</p>
+      <div className="queue-actions">
+        <input aria-label="Search users" placeholder="Search name or email" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <select aria-label="Filter account status" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+          <option value="deleted">Deleted</option>
+          <option value="">All statuses</option>
+        </select>
+        <Button className="sm" onClick={load} disabled={loading}>Apply filter</Button>
+      </div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {users.length ? <div className="admin-user-list">{users.map((user) => {
+        const deletable = user.status !== "deleted" && !user.roles.includes("admin");
+        return <div key={user.id} className="admin-user-row">
+          <button type="button" className="admin-user-row-main" onClick={() => navigate(`/admin/users/${user.id}`)}>
+            <span className="admin-user-avatar">{user.displayName.slice(0, 1).toUpperCase()}</span>
+            <span><b>{user.displayName}</b><small>{user.email}</small><em>{user.roles.length ? user.roles.map(roleLabel).join(", ") : "No active role"} · joined {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}</em></span>
+            <AccountStatus status={user.status} />
+            <ChevronRight size={18} />
+          </button>
+          {deletable && <Button type="button" variant="danger" size="sm" onClick={() => openDeleteDialog(user)} aria-label={`Delete ${user.email}`}><Trash2 size={15} /> Delete</Button>}
+        </div>;
+      })}</div> : <EmptyState icon={Users} title="No accounts match" description="Adjust the search or status filter to view another account." />}
+    </Card>
+    {deleteCandidate && <Modal title="Delete user account" onClose={closeDeleteDialog} footer={<><Button variant="secondary" onClick={closeDeleteDialog} disabled={deleting}>Cancel</Button><Button variant="danger" onClick={deleteFromList} disabled={deleting || deleteReason.trim().length < 3}>{deleting ? "Deleting…" : "Delete account"}</Button></>}>
+      <p><b>{deleteCandidate.email}</b> will lose access immediately. This cannot be restored through the administrator interface; financial and moderation records are retained for audit.</p>
+      <FormField label="Administration reason"><textarea value={deleteReason} onChange={(event) => setDeleteReason(event.target.value)} placeholder="Why is this account being deleted?" rows={3} disabled={deleting} /></FormField>
+      {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
+    </Modal>}
+  </>;
+}
 export function AdminUserDetailPage() {
   const { userId } = useParams();
   const navigate = useNavigate();
