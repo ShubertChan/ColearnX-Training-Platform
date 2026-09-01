@@ -202,6 +202,9 @@ const mapPublishedItem = (listing) => ({
   status: titleCase(listing.status),
   publicationStatus: titleCase(listing.publicationStatus || listing.status),
   versionStatus: titleCase(listing.versionStatus || ""),
+  contentVersionId: listing.contentVersionId || null,
+  fileStatus: listing.fileStatus || "missing",
+  asset: listing.asset || null,
   storageUrlPresent: listing.storageUrlPresent,
   updatedAt: listing.updatedAt,
 });

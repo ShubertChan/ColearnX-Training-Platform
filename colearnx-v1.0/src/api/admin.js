@@ -18,6 +18,11 @@ export const decideContentSubmission = (contentVersionId, input) =>
     .post(`/admin/content-versions/${contentVersionId}/decision`, input)
     .then(unwrap);
 
+export const previewContentSubmission = (contentVersionId) =>
+  apiClient
+    .post(`/admin/content-versions/${contentVersionId}/preview-url`, {})
+    .then(unwrap);
+
 export const getAdminUsers = ({ status, search, page = 1, limit = 50 } = {}) => {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (status) params.set("status", status);

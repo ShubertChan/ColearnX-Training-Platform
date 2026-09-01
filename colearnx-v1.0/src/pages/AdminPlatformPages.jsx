@@ -20,6 +20,7 @@ import {
   getContentSubmissions,
   getCourseSubmissions,
   getAdminUsers,
+  previewContentSubmission,
   reinstateAdminUser,
   suspendAdminUser,
 } from "../api/admin";
@@ -32,9 +33,37 @@ import { Badge, Button, Card, EmptyState, FormField, Metric } from "../component
 const titleCase = (value) => String(value || "").replace(/(^|_)([a-z])/g, (_match, _prefix, letter) => letter.toUpperCase());
 const Status = ({ value }) => <Badge tone={String(value).toLowerCase() === "approved" || String(value).toLowerCase() === "published" ? "success" : String(value).toLowerCase() === "rejected" ? "danger" : "warning"}>{titleCase(value)}</Badge>;
 
-function DecisionButtons({ onDecision, busy, approveValue = "approved" }) {
+function DecisionButtons({ onDecision, busy, approveValue = "approved", approvalDisabled = false }) {
   const [reason, setReason] = useState("");
-  return <div className="queue-actions"><input aria-label="Decision reason" placeholder="Decision reason" value={reason} onChange={(event) => setReason(event.target.value)} /><Button className="sm" disabled={busy || reason.trim().length < 3} onClick={() => onDecision(approveValue, reason.trim())}><CheckCircle2 size={14} /> Approve</Button><Button className="sm danger" disabled={busy || reason.trim().length < 3} onClick={() => onDecision("rejected", reason.trim())}><XCircle size={14} /> Reject</Button></div>;
+  return <div className="queue-actions"><input aria-label="Decision reason" placeholder="Decision reason" value={reason} onChange={(event) => setReason(event.target.value)} /><Button className="sm" disabled={busy || approvalDisabled || reason.trim().length < 3} onClick={() => onDecision(approveValue, reason.trim())}><CheckCircle2 size={14} /> Approve</Button><Button className="sm danger" disabled={busy || reason.trim().length < 3} onClick={() => onDecision("rejected", reason.trim())}><XCircle size={14} /> Reject</Button></div>;
+}
+
+function ContentReviewActions({ item, busy, onDecision }) {
+  const [previewed, setPreviewed] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const fileReady = String(item.fileStatus || "").toLowerCase() === "ready";
+
+  const preview = async () => {
+    let previewWindow = null;
+    setPreviewBusy(true);
+    setPreviewError("");
+    try {
+      previewWindow = window.open("", "_blank");
+      if (!previewWindow) throw new Error("Preview was blocked. Allow pop-ups and try again.");
+      previewWindow.opener = null;
+      const result = await previewContentSubmission(item.id);
+      previewWindow.location.replace(result.previewUrl);
+      setPreviewed(true);
+    } catch (loadError) {
+      previewWindow?.close();
+      setPreviewError(loadError.message);
+    } finally {
+      setPreviewBusy(false);
+    }
+  };
+
+  return <div className="stack compact-stack"><div className="queue-actions"><Button type="button" className="sm" variant="secondary" disabled={!fileReady || busy || previewBusy} onClick={preview}><ExternalLink size={14} /> {previewBusy ? "Opening…" : "Preview file"}</Button>{!fileReady && <small>File must be verified before it can be previewed.</small>}</div>{previewError && <p className="form-error" role="alert">{previewError}</p>}<DecisionButtons approveValue="published" busy={busy || previewBusy} approvalDisabled={!previewed} onDecision={onDecision} />{!previewed && fileReady && <small className="muted">Preview the private file before publishing.</small>}</div>;
 }
 
 export function AdminDashboardPage() {
@@ -272,16 +301,61 @@ export function AdminCatalogPage() {
   const [contents, setContents] = useState([]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+
   const refresh = async () => {
     setError("");
-    try { const [nextCourses, nextContents] = await Promise.all([getCourseSubmissions(), getContentSubmissions()]); setCourses(nextCourses); setContents(nextContents); } catch (loadError) { setError(loadError.message); }
+    try {
+      const [nextCourses, nextContents] = await Promise.all([getCourseSubmissions(), getContentSubmissions()]);
+      setCourses(nextCourses);
+      setContents(nextContents);
+    } catch (loadError) {
+      setError(loadError.message);
+    }
   };
-  useEffect(() => { refresh(); }, []);
+
+  useEffect(() => { void refresh(); }, []);
+
   const decide = async (kind, id, decision, reason) => {
-    setBusy(id);
-    try { if (kind === "course") await decideCourseSubmission(id, { decision, reason }); else await decideContentSubmission(id, { decision, reason }); await refresh(); } finally { setBusy(""); }
+    setBusy(`${kind}-${id}`);
+    setError("");
+    try {
+      if (kind === "course") await decideCourseSubmission(id, { decision, reason });
+      else await decideContentSubmission(id, { decision, reason });
+      await refresh();
+    } catch (decisionError) {
+      setError(decisionError.message);
+    } finally {
+      setBusy("");
+    }
   };
-  const queue = [...courses.map((item) => ({ ...item, kind: "course" })), ...contents.map((item) => ({ ...item, kind: "content" }))];
-  if (!queue.length && !error) return <EmptyState icon={BookOpen} title="No catalogue submissions" description="Submitted trainer courses and creator content will appear here." action={<Button onClick={refresh}>Refresh</Button>} />;
-  return <Card><div className="card-heading"><div><span className="eyebrow">Catalogue control</span><h2>Publication review</h2></div><Button variant="secondary" onClick={refresh}>Refresh</Button></div>{error && <p className="form-error">{error}</p>}<div className="queue-list">{queue.map((item) => <div key={`${item.kind}-${item.id}`}><span>{item.kind === "course" ? <BookOpen size={18} /> : <FileText size={18} />}</span><div><b>{item.title}</b><small>{item.owner?.displayName || "Owner"} · {item.pricePoints} points · {item.kind === "course" ? item.deliveryModes?.join(", ") : item.contentType}</small></div><DecisionButtons approveValue="published" busy={busy === item.id} onDecision={(decision, reason) => decide(item.kind, item.id, decision, reason)} /></div>)}</div></Card>;
+
+  const queue = [
+    ...courses.map((item) => ({ ...item, kind: "course" })),
+    ...contents.map((item) => ({ ...item, kind: "content" })),
+  ];
+
+  if (!queue.length && !error) {
+    return <EmptyState icon={BookOpen} title="No catalogue submissions" description="Submitted trainer courses and creator content will appear here." action={<Button onClick={refresh}>Refresh</Button>} />;
+  }
+
+  return <Card>
+    <div className="card-heading">
+      <div><span className="eyebrow">Catalogue control</span><h2>Publication review</h2><p>Content must be privately previewed before it can be published.</p></div>
+      <Button variant="secondary" onClick={refresh} disabled={Boolean(busy)}>Refresh</Button>
+    </div>
+    {error && <p className="form-error" role="alert">{error}</p>}
+    <div className="queue-list">
+      {queue.map((item) => <div key={`${item.kind}-${item.id}`}>
+        <span>{item.kind === "course" ? <BookOpen size={18} /> : <FileText size={18} />}</span>
+        <div>
+          <b>{item.title}</b>
+          <small>{item.owner?.displayName || "Owner"} · {item.pricePoints} points · {item.kind === "course" ? item.deliveryModes?.join(", ") : item.contentType}</small>
+          {item.kind === "content" && <span className="queue-detail">Private file status: {item.fileStatus || "missing"}</span>}
+        </div>
+        {item.kind === "content"
+          ? <ContentReviewActions item={item} busy={busy === `${item.kind}-${item.id}`} onDecision={(decision, reason) => decide(item.kind, item.id, decision, reason)} />
+          : <DecisionButtons approveValue="published" busy={busy === `${item.kind}-${item.id}`} onDecision={(decision, reason) => decide(item.kind, item.id, decision, reason)} />}
+      </div>)}
+    </div>
+  </Card>;
 }
