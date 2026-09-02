@@ -365,7 +365,11 @@ function ContentListingEditor() {
         <FormField label="Content title"><input required disabled={Boolean(draft)} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></FormField>
         <FormField label="Price in points"><input required min="0" disabled={Boolean(draft)} type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
         <FormField label="Content type"><input required disabled={Boolean(draft)} value={form.contentType} onChange={(event) => setForm({ ...form, contentType: event.target.value })} /></FormField>
-        {!draft && <p className="policy-note">Create the server-side draft first. The file is then uploaded directly to private R2 storage and verified by the API; no browser-supplied storage URL is accepted.</p>}
+        {!draft && <>
+          <p className="policy-note">Create the server-side draft first. The file is then uploaded directly to private R2 storage and verified by the API; no browser-supplied storage URL is accepted.</p>
+          <PrivateAssetUploader contentVersionId="" existingAsset={null} onAssetChange={() => {}} disabled />
+          <p className="policy-note">The drag-and-drop area is shown now and unlocks immediately after the draft is created.</p>
+        </>}
         {draft && (
           <>
             <PrivateAssetUploader
