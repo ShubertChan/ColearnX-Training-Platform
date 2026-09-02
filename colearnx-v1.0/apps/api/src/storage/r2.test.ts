@@ -14,14 +14,20 @@ const { contentTypeMatches, createContentObjectKey, safeContentDisposition, vali
 test('normalizes the Windows ZIP MIME type and requires a matching extension', () => {
   const metadata = validateUploadMetadata({ filename: 'lesson.ZIP', mediaType: 'application/x-zip-compressed', sizeBytes: 1024 });
   assert.equal(metadata.mediaType, 'application/zip');
+  const document = validateUploadMetadata({ filename: 'guide.DOCX', mediaType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', sizeBytes: 1024 });
+  assert.equal(document.mediaType, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
   assert.throws(() => validateUploadMetadata({ filename: 'lesson.exe', mediaType: 'application/pdf', sizeBytes: 1024 }), (error: unknown) => {
     return error instanceof ApiError && error.status === 415 && error.code === 'CONTENT_FILE_TYPE_NOT_ALLOWED';
   });
 });
 
-test('rejects unsafe names and upload sizes above the configured maximum', () => {
+test('rejects unsafe names and applies the document and MP4 size limits', () => {
   assert.throws(() => validateUploadMetadata({ filename: '../notes.pdf', mediaType: 'application/pdf', sizeBytes: 1024 }), ApiError);
-  assert.throws(() => validateUploadMetadata({ filename: 'notes.pdf', mediaType: 'application/pdf', sizeBytes: 104857601 }), (error: unknown) => {
+  assert.throws(() => validateUploadMetadata({ filename: 'notes.pdf', mediaType: 'application/pdf', sizeBytes: 26214401 }), (error: unknown) => {
+    return error instanceof ApiError && error.status === 413 && error.code === 'CONTENT_FILE_TOO_LARGE';
+  });
+  assert.equal(validateUploadMetadata({ filename: 'lesson.mp4', mediaType: 'video/mp4', sizeBytes: 104857600 }).sizeBytes, 104857600);
+  assert.throws(() => validateUploadMetadata({ filename: 'huge-lesson.mp4', mediaType: 'video/mp4', sizeBytes: 104857601 }), (error: unknown) => {
     return error instanceof ApiError && error.status === 413 && error.code === 'CONTENT_FILE_TOO_LARGE';
   });
 });

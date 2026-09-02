@@ -40,7 +40,7 @@ The browser never sends `storageUrl`, a bucket name, an object key, or R2 creden
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/content-versions/:contentVersionId/upload-intents` | Creator-only. Requires `Idempotency-Key`; body `{ filename, mediaType, sizeBytes, sha256? }`. Returns a short-lived direct `PUT` URL and required `Content-Type`. Allows PDF, ZIP, JPEG, PNG, WebP, MP4 up to 100 MiB. |
+| POST | `/content-versions/:contentVersionId/upload-intents` | Creator-only. Requires `Idempotency-Key`; body `{ filename, mediaType, sizeBytes, sha256? }`. Returns a short-lived direct `PUT` URL and required `Content-Type`. Allows PDF, DOCX, ZIP, JPEG, PNG and WebP up to 25 MiB; MP4 up to 100 MiB. The API also enforces a 500 MiB creator storage quota and a maximum of three incomplete uploads. |
 | POST | `/content-versions/:contentVersionId/upload-intents/:assetId/complete` | Creator-only. Uses R2 `HeadObject` to verify the stored MIME type and size, then atomically marks the asset `ready`. |
 | DELETE | `/content-versions/:contentVersionId/upload-intents/:assetId` | Creator-only draft cleanup. It unlinks first, marks `delete_pending`, then removes the R2 object; a temporary R2 failure remains retryable. |
 | POST | `/content-versions/:contentVersionId/download-url` | Owner, administrator, or purchaser with a current access grant only. Returns a short-lived attachment URL; signing it records a purchaser's first access. |

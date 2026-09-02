@@ -160,23 +160,18 @@ export default function PrivateAssetUploader({
 
   const busy = ["preparing", "uploading", "verifying"].includes(state.status);
   const statusText = {
-    idle: "No private file selected.",
-    selected: "File selected. Start upload when ready.",
-    preparing: "Requesting a short-lived private upload authorisation.",
+    idle: "No file selected.",
+    selected: contentVersionId ? "File selected. Upload when ready." : "File selected. Create your content to begin uploading.",
+    preparing: "Preparing your upload.",
     uploading: `Uploading ${state.progress}% — ${formatBytes(state.uploadedBytes)} of ${formatBytes(state.totalBytes)}`,
-    verifying: "Upload sent. The server is verifying the private object.",
-    uploaded: "Uploaded and verified by the server.",
+    verifying: "Checking your file.",
+    uploaded: "File ready.",
     error: state.error,
-    cancelled: "Upload cancelled. Choose retry or select another file.",
+    cancelled: "Upload cancelled. Choose a file to try again.",
   }[state.status];
 
   return (
     <div className={`private-uploader state-${state.status}`}>
-      {usingLocalUploadDemo && (
-        <div className="upload-demo-note" role="note">
-          Local API simulation: the browser reads the selected bytes, but no file is sent to R2. Configure the staging API to run the real presigned PUT flow.
-        </div>
-      )}
       <label
         className={`upload-zone private ${dragActive ? "drag-active" : ""} ${disabled || busy ? "disabled" : ""}`}
         onDragEnter={(event) => {
@@ -196,11 +191,11 @@ export default function PrivateAssetUploader({
       >
         <UploadCloud size={30} />
         <div>
-          <b>{state.file?.name || state.asset?.filename || "Drop a private file here"}</b>
+          <b>{state.file?.name || state.asset?.filename || "Drop a file here"}</b>
           <p>
             {state.file || state.asset
               ? `${formatBytes(state.file?.size || state.asset?.sizeBytes)} · ${state.file ? validatePrivateAsset(state.file).mediaType : state.asset?.mediaType}`
-              : "PDF, ZIP, JPEG, PNG, WebP or MP4 · maximum 100 MiB"}
+              : "PDF, DOCX, ZIP and images up to 25 MiB · MP4 up to 100 MiB"}
           </p>
         </div>
         <span className="button secondary">
@@ -233,13 +228,10 @@ export default function PrivateAssetUploader({
           )}
         </span>
         <div>
-          <b>{state.status === "uploaded" ? "Private asset ready" : "Upload status"}</b>
+          <b>{state.status === "uploaded" ? "File ready" : "File upload"}</b>
           <p>{statusText}</p>
-          {state.requestId && (
-            <small>Request ID: <code>{state.requestId}</code></small>
-          )}
           {state.previousAsset?.status === "ready" && state.status !== "uploaded" && (
-            <small>The existing verified file remains active until replacement succeeds.</small>
+            <small>Your current file stays available until the replacement is ready.</small>
           )}
         </div>
       </div>
@@ -258,9 +250,9 @@ export default function PrivateAssetUploader({
       )}
 
       <div className="button-row upload-actions">
-        {state.status === "selected" && (
+        {state.status === "selected" && contentVersionId && (
           <Button type="button" onClick={upload} disabled={!contentVersionId || disabled}>
-            <UploadCloud size={16} /> Upload private file
+            <UploadCloud size={16} /> Upload file
           </Button>
         )}
         {state.status === "uploading" && (
@@ -270,7 +262,7 @@ export default function PrivateAssetUploader({
         )}
         {["error", "cancelled"].includes(state.status) && state.file && (
           <Button type="button" onClick={upload} disabled={!contentVersionId || disabled}>
-            <RefreshCw size={16} /> Retry with new authorisation
+            <RefreshCw size={16} /> Retry upload
           </Button>
         )}
         {ready && (
@@ -280,12 +272,12 @@ export default function PrivateAssetUploader({
         )}
       </div>
       {!contentVersionId && (
-        <small className="upload-gate-note">Save the content draft before choosing a private file.</small>
+        <small className="upload-gate-note">Create your content to start uploading the selected file.</small>
       )}
 
       {pendingReplacement && (
         <Modal
-          title="Replace the verified file?"
+          title="Replace this file?"
           onClose={() => setPendingReplacement(null)}
           footer={
             <>
@@ -304,7 +296,7 @@ export default function PrivateAssetUploader({
           }
         >
           <p>
-            <b>{state.asset?.filename}</b> remains available until the new file is uploaded and verified. A failed replacement will not remove the current file.
+            <b>{state.asset?.filename}</b> stays available until the replacement is ready. A failed replacement will not remove the current file.
           </p>
         </Modal>
       )}

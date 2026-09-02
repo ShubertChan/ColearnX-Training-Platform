@@ -42,10 +42,13 @@ R2_BUCKET_NAME=<private development bucket>
 R2_REGION=auto
 R2_SIGNED_UPLOAD_TTL_SECONDS=600
 R2_SIGNED_DOWNLOAD_TTL_SECONDS=300
-CONTENT_UPLOAD_MAX_BYTES=104857600
+CONTENT_UPLOAD_MAX_BYTES=26214400
+CONTENT_VIDEO_UPLOAD_MAX_BYTES=104857600
+CONTENT_STORAGE_QUOTA_BYTES=524288000
+CONTENT_PENDING_UPLOAD_LIMIT=3
 ```
 
-Configure that bucket's CORS rule to allow the exact local web origin (normally `http://localhost:5173`), methods `PUT`, `GET`, and `HEAD`, and request header `Content-Type`. Do not make the bucket public. Run `npm run db:migrate` before testing: `005_object_storage.sql` adds metadata only and does not alter legacy file URLs or user/order data. A controlled cleanup run is available through `npm --prefix apps/api run storage:reconcile`; it only removes expired or explicitly `delete_pending` objects that are not linked as a current content file.
+Configure that bucket's CORS rule to allow the exact local web origin (normally `http://localhost:5173`), methods `PUT`, `GET`, and `HEAD`, and request header `Content-Type`. Do not make the bucket public. Run `npm run db:migrate` before testing. Files other than MP4 are limited to 25 MiB, MP4 is limited to 100 MiB, each creator is limited to 500 MiB in total, and only three uploads may be incomplete at one time. A controlled cleanup run is available through `npm --prefix apps/api run storage:reconcile`; it only removes expired or explicitly `delete_pending` objects that are not linked as a current content file.
 
 ## Configuration still required before Stripe testing
 

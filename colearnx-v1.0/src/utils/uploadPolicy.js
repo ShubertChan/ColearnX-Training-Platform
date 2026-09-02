@@ -1,7 +1,9 @@
-export const MAX_PRIVATE_ASSET_BYTES = 100 * 1024 * 1024;
+export const MAX_PRIVATE_ASSET_BYTES = 25 * 1024 * 1024;
+export const MAX_PRIVATE_VIDEO_BYTES = 100 * 1024 * 1024;
 
 export const PRIVATE_ASSET_TYPES = Object.freeze({
   "application/pdf": [".pdf"],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
   "application/zip": [".zip"],
   "image/jpeg": [".jpg", ".jpeg"],
   "image/png": [".png"],
@@ -36,6 +38,12 @@ export function getPrivateAssetMediaType(file) {
   return extensionType[extension] || "";
 }
 
+export function privateAssetSizeLimit(mediaType) {
+  return mediaType === "video/mp4"
+    ? MAX_PRIVATE_VIDEO_BYTES
+    : MAX_PRIVATE_ASSET_BYTES;
+}
+
 export function validatePrivateAsset(file) {
   if (!file) {
     return { valid: false, code: "FILE_REQUIRED", message: "Choose a file to upload." };
@@ -43,19 +51,21 @@ export function validatePrivateAsset(file) {
   if (file.size <= 0) {
     return { valid: false, code: "FILE_EMPTY", message: "The selected file is empty." };
   }
-  if (file.size > MAX_PRIVATE_ASSET_BYTES) {
-    return {
-      valid: false,
-      code: "CONTENT_FILE_TOO_LARGE",
-      message: "The maximum private file size is 100 MiB.",
-    };
-  }
   const mediaType = getPrivateAssetMediaType(file);
   if (!mediaType) {
     return {
       valid: false,
       code: "CONTENT_FILE_TYPE_NOT_ALLOWED",
-      message: "Use PDF, ZIP, JPEG, PNG, WebP or MP4.",
+      message: "Use PDF, DOCX, ZIP, JPEG, PNG, WebP or MP4.",
+    };
+  }
+  if (file.size > privateAssetSizeLimit(mediaType)) {
+    return {
+      valid: false,
+      code: "CONTENT_FILE_TOO_LARGE",
+      message: mediaType === "video/mp4"
+        ? "MP4 videos can be up to 100 MiB."
+        : "Files can be up to 25 MiB. MP4 videos can be up to 100 MiB.",
     };
   }
   return { valid: true, mediaType };
