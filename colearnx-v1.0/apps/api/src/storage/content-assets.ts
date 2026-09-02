@@ -17,6 +17,7 @@ import {
   type HeadedObject,
   type UploadMetadata,
 } from './r2.js';
+import { storageQuotaViolation } from './storage-quota.js';
 import { env } from '../config/env.js';
 
 const uploadIntentInput = z.object({
@@ -133,6 +134,32 @@ function readIntentRecord(value: unknown): UploadIntentRecord | undefined {
     : undefined;
 }
 
+type StorageUsage = {
+  used_bytes: string;
+  pending_uploads: string;
+};
+
+async function assertCreatorStorageQuota(client: PoolClient, ownerUserId: string, requestedBytes: number) {
+  // Serialize quota checks for one creator. Without this lock, two browser tabs
+  // could both pass the check and exceed the account cap.
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [ownerUserId]);
+  const usage = await client.query<StorageUsage>(`SELECT
+      COALESCE(sum(COALESCE(verified_byte_size, declared_byte_size)), 0)::text AS used_bytes,
+      count(*) FILTER (
+        WHERE asset_status IN ('pending', 'uploaded') AND upload_expires_at > now()
+      )::text AS pending_uploads
+    FROM storage_assets
+    WHERE owner_user_id = $1 AND asset_status <> 'deleted'`, [ownerUserId]);
+  const current = usage.rows[0];
+  const violation = storageQuotaViolation({
+    usedBytes: Number(current.used_bytes),
+    pendingUploads: Number(current.pending_uploads),
+    requestedBytes,
+    maxBytes: env.CONTENT_STORAGE_QUOTA_BYTES,
+    maxPendingUploads: env.CONTENT_PENDING_UPLOAD_LIMIT,
+  });
+  if (violation) throw new ApiError(violation.status, violation.code, violation.message);
+}
 export async function createUploadIntent(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   requireCreator(actor);
@@ -159,6 +186,8 @@ export async function createUploadIntent(req: Request, res: Response) {
       }
       return replay;
     }
+
+    await assertCreatorStorageQuota(client, actor.id, metadata.sizeBytes);
 
     const uploadExpiresAt = new Date(Date.now() + env.R2_SIGNED_UPLOAD_TTL_SECONDS * 1000);
     const objectKey = createContentObjectKey(actor.id, contentVersionId, metadata.filename);

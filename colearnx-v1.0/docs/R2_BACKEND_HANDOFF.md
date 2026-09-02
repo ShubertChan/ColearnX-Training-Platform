@@ -83,7 +83,10 @@ R2_BUCKET_NAME=colearnx-staging-assets
 R2_REGION=auto
 R2_SIGNED_UPLOAD_TTL_SECONDS=600
 R2_SIGNED_DOWNLOAD_TTL_SECONDS=300
-CONTENT_UPLOAD_MAX_BYTES=104857600
+CONTENT_UPLOAD_MAX_BYTES=26214400
+CONTENT_VIDEO_UPLOAD_MAX_BYTES=104857600
+CONTENT_STORAGE_QUOTA_BYTES=524288000
+CONTENT_PENDING_UPLOAD_LIMIT=3
 ```
 
 可从 `R2_ACCOUNT_ID` 派生 endpoint：
@@ -236,7 +239,7 @@ Content-Type: application/json
 
 同一用户、同一请求指纹和同一 `Idempotency-Key` 的安全重放必须返回同一个未过期 upload intent；同一 key 搭配不同指纹返回 409。用户明确开始一次新的上传/替换尝试时使用新的 key。complete 端点则通过 asset 状态实现幂等，重复确认已 ready 的同一对象应返回当前安全元数据，不重复创建资产。
 
-本轮 staging 默认上限为 `104857600` bytes（100 MiB），默认 allowlist 为 `application/pdf`、`application/zip`、`image/jpeg`、`image/png`、`image/webp`、`video/mp4`。若 Windows 浏览器为 ZIP 报告兼容 MIME，必须在前后端契约中显式列出，不要退化为接受任意 `application/octet-stream`。不接受 `text/html`、JavaScript、SVG 或可执行文件，也不要仅信任文件扩展名。产品若调整范围，应同时更新后端校验、前端提示和测试。
+当前规则为：`application/pdf`、DOCX、ZIP 和图片单文件最多 `26214400` bytes（25 MiB），`video/mp4` 最多 `104857600` bytes（100 MiB）；每位 Creator 的所有未删除文件合计最多 500 MiB，同时最多三个未完成上传。若 Windows 浏览器为 ZIP 报告兼容 MIME，必须在前后端契约中显式列出，不要退化为接受任意 `application/octet-stream`。不接受 `text/html`、JavaScript、SVG 或可执行文件，也不要仅信任文件扩展名。前端只做快速反馈，后端必须在创建 upload intent 前强制检查单文件大小、总量和未完成上传数。
 
 ### 7.2 浏览器上传
 
@@ -411,8 +414,11 @@ Authorization: Bearer <access token>
 | 409 | `UPLOAD_NOT_PENDING` | 非 pending asset 调用 complete |
 | 409 | `UPLOAD_OBJECT_MISMATCH` | `HeadObject` 的大小或 MIME 与 intent 不一致 |
 | 409 | `CONTENT_FILE_NOT_READY` | 未完成上传就提交审核或发布 |
-| 413 | `CONTENT_FILE_TOO_LARGE` | 超过配置上限 |
-| 415 | `CONTENT_FILE_TYPE_NOT_ALLOWED` | MIME/扩展名不在 allowlist |
+| 413 | `CONTENT_FILE_TOO_LARGE` | 超过对应文件类型的配置上限 |
+| 413 | `CONTENT_STORAGE_QUOTA_EXCEEDED` | Creator 的总文件配额不足 |
+
+| 429 | `CONTENT_UPLOAD_PENDING_LIMIT` | 已有三个未完成上传 |
+
 | 503 | `OBJECT_STORAGE_UNAVAILABLE` | R2 暂时不可用；不返回 SDK 原始错误 |
 
 客户端可以根据稳定 `code` 显示提示，不应解析英文 message。
@@ -452,7 +458,7 @@ Owner/Admin 预览不得修改购买者的 `first_accessed_at`。
 - object key 服务端随机生成；
 - 文件大小和 MIME 同时在初始化与 complete 阶段校验；
 - 上传和下载端点使用现有认证与 mutation rate limit；
-- 增加每用户并发 pending 数量和每日上传额度，防止滥用和成本攻击；
+- 增加每用户并发 pending 数量和总文件配额，防止滥用和成本攻击；
 - 用 UUID、asset ID、content version ID、结果状态和 request ID 记录结构化日志；
 - 审计日志可记录 `content.upload.initialized`、`content.upload.completed`、`content.upload.deleted`、`content.download.granted`，但不得记录 signed URL 或 secret；
 - 不允许上传 HTML、脚本、SVG、可执行文件等可主动执行内容；
@@ -470,7 +476,7 @@ Owner/Admin 预览不得修改购买者的 `first_accessed_at`。
 - 已发布对象不得原地覆盖；
 - 数据库事务与 R2 操作不能组成真正的分布式事务，必须设计幂等 complete/delete 和可重试补偿。
 
-可以先用受控 Render Cron/One-off Job 执行清理；不要在普通请求里扫描整个 bucket。
+可以先用受控 Render Cron/One-off Job 每 15 分钟执行 `npm --prefix apps/api run storage:reconcile`；不要在普通请求里扫描整个 bucket。
 
 ## 11. 前端接入要求
 

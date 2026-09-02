@@ -246,7 +246,7 @@ function CourseListingEditor() {
   return (
     <form className="content-grid editor-layout" onSubmit={save}>
       <Card className="stack">
-        <div><span className="eyebrow">Course details</span><h2>Create a server-side draft</h2></div>
+        <div><span className="eyebrow">Course details</span><h2>Create course</h2></div>
         <FormField label="Course title"><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></FormField>
         <FormField label="Description"><textarea required value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FormField>
         <FormField label="Price in points"><input required min="0" type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
@@ -260,7 +260,7 @@ function CourseListingEditor() {
         {error && <p className="form-error">{error}</p>}
         <Button type="submit" disabled={busy || !form.deliveryModes.length}><Send size={16} /> {busy ? "Saving…" : submitForReview ? "Create and submit" : "Create draft"}</Button>
       </Card>
-      <Card className="editor-summary"><span className="eyebrow">Publication workflow</span><h3>Server-enforced review</h3><p>A draft is stored in PostgreSQL. Submission does not publish it; an administrator must approve it before it appears in the marketplace.</p></Card>
+      <Card className="editor-summary"><span className="eyebrow">Publication workflow</span><h3>Review before publishing</h3><p>Your course is saved for review before it appears in the marketplace.</p></Card>
     </form>
   );
 }
@@ -327,7 +327,7 @@ function ContentListingEditor() {
       setAsset(null);
       setSearchParams({ draft: created.id }, { replace: true });
       await refreshMyListings();
-      notify("Content draft created. Upload and verify the private file before submission.");
+      notify("Content created. Upload the selected file to continue.");
     } catch (createError) {
       setError(createError.message);
     } finally {
@@ -361,33 +361,27 @@ function ContentListingEditor() {
   return (
     <form className="content-grid editor-layout" onSubmit={createDraft}>
       <Card className="stack">
-        <div><span className="eyebrow">Content details</span><h2>Create a private content draft</h2></div>
+        <div><span className="eyebrow">Content details</span><h2>Create content</h2></div>
         <FormField label="Content title"><input required disabled={Boolean(draft)} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></FormField>
         <FormField label="Price in points"><input required min="0" disabled={Boolean(draft)} type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
         <FormField label="Content type"><input required disabled={Boolean(draft)} value={form.contentType} onChange={(event) => setForm({ ...form, contentType: event.target.value })} /></FormField>
-        {!draft && <>
-          <p className="policy-note">Create the server-side draft first. The file is then uploaded directly to private R2 storage and verified by the API; no browser-supplied storage URL is accepted.</p>
-          <PrivateAssetUploader contentVersionId="" existingAsset={null} onAssetChange={() => {}} disabled />
-          <p className="policy-note">The drag-and-drop area is shown now and unlocks immediately after the draft is created.</p>
+        <PrivateAssetUploader
+          contentVersionId={draft?.contentVersionId}
+          existingAsset={asset}
+          onAssetChange={handleAssetChange}
+          onStatusChange={setUploadStatus}
+          disabled={submitted || busy}
+        />
+        {!draft && <p className="policy-note">Choose or drop a file now, then create your content to upload it.</p>}
+        {draft && <>
+          <div className="button-row">
+            <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={restoreDraft}>Refresh file status</Button>
+          </div>
+          <p className="policy-note">Your file is checked before you can submit the content for review.</p>
         </>}
-        {draft && (
-          <>
-            <PrivateAssetUploader
-              contentVersionId={draft.contentVersionId}
-              existingAsset={asset}
-              onAssetChange={handleAssetChange}
-              onStatusChange={setUploadStatus}
-              disabled={submitted || busy}
-            />
-            <div className="button-row">
-              <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={restoreDraft}>Refresh server status</Button>
-            </div>
-            <p className="policy-note">Only a verified private file can be submitted. The API validates the actual object size and MIME type before review.</p>
-          </>
-        )}
         {error && <p className="form-error" role="alert">{error}</p>}
         {!draft ? (
-          <Button type="submit" disabled={busy}><Send size={16} /> {busy ? "Creating draft…" : "Create content draft"}</Button>
+          <Button type="submit" disabled={busy}><Send size={16} /> {busy ? "Creating content…" : "Create content"}</Button>
         ) : (
           <Button type="button" onClick={submitForReview} disabled={busy || submitted || !assetReady || ["preparing", "uploading", "verifying"].includes(uploadStatus)}>
             <Send size={16} /> {submitted ? "Submitted for administrator review" : busy ? "Submitting…" : "Submit for administrator review"}
@@ -395,10 +389,9 @@ function ContentListingEditor() {
         )}
       </Card>
       <Card className="editor-summary">
-        <span className="eyebrow">Private-file workflow</span>
-        <h3>{submitted ? "Submitted for review" : draft ? assetReady ? "Verified file ready" : "Awaiting private file" : "Draft required"}</h3>
-        <p>Files are not stored in PostgreSQL and their R2 object keys are never exposed to the browser. Upload authorisation and buyer download links are short-lived.</p>
-        {draft?.contentVersionId && <small className="draft-reference">Draft version: {draft.contentVersionId}</small>}
+        <span className="eyebrow">Content upload</span>
+        <h3>{submitted ? "Submitted for review" : assetReady ? "File ready" : draft ? "Upload your file" : "Add a file"}</h3>
+        <p>Choose a file, create your content, then submit it for review.</p>
       </Card>
     </form>
   );
@@ -419,7 +412,7 @@ export function PublishedPage() {
     }
   };
   if (!publishedItems.length)
-    return <EmptyState icon={BookOpen} title="No listings yet" description="Server-side drafts and submissions will appear here after you create them." action={<Button onClick={refresh} disabled={loading}>Refresh</Button>} />;
+    return <EmptyState icon={BookOpen} title="No listings yet" description="Your courses and content will appear here after you create them." action={<Button onClick={refresh} disabled={loading}>Refresh</Button>} />;
   return (
     <Card>
       <div className="card-heading">

@@ -40,7 +40,10 @@ R2_BUCKET_NAME=<private staging R2 bucket name>
 R2_REGION=auto
 R2_SIGNED_UPLOAD_TTL_SECONDS=600
 R2_SIGNED_DOWNLOAD_TTL_SECONDS=300
-CONTENT_UPLOAD_MAX_BYTES=104857600
+CONTENT_UPLOAD_MAX_BYTES=26214400
+CONTENT_VIDEO_UPLOAD_MAX_BYTES=104857600
+CONTENT_STORAGE_QUOTA_BYTES=524288000
+CONTENT_PENDING_UPLOAD_LIMIT=3
 
 ENABLE_LOCAL_DELIVERY=false
 ENABLE_HOSTED_VIDEO=false
@@ -64,7 +67,7 @@ The refresh cookie is `HttpOnly`, `Secure`, and `SameSite=None` in staging so th
 
 Create one private staging bucket; do not expose a public R2/custom-domain URL. Create a bucket-scoped R2 API token that can read, write, and delete objects **only** in that bucket. Put the account ID, access-key ID, token secret and bucket name into Render's secure environment editor as the `R2_*` variables above. Never place any R2 value in the Pages build variables or a GitHub secret file.
 
-The bucket CORS rule must allow the exact deployed web origin, methods `PUT`, `GET`, and `HEAD`, and request header `Content-Type`. Do not use `*` for production origins. The backend supplies the short-lived signed URLs and verifies every completed upload using `HeadObject`; it does not proxy file bytes through Render. Schedule the controlled command `npm --prefix apps/api run storage:reconcile` with the same restricted API/R2 credentials to remove expired orphaned objects and retry `delete_pending` records.
+The bucket CORS rule must allow the exact deployed web origin, methods `PUT`, `GET`, and `HEAD`, and request header `Content-Type`. Do not use `*` for production origins. The backend supplies the short-lived signed URLs and verifies every completed upload using `HeadObject`; it does not proxy file bytes through Render. Schedule `npm --prefix apps/api run storage:reconcile` every 15 minutes with the same restricted API/R2 credentials to remove expired orphaned objects and retry `delete_pending` records.
 
 ## Cloudflare Pages
 
@@ -86,7 +89,7 @@ Pages to expose the sandbox checkout.
 
 ## Neon migration and seed
 
-PostgreSQL 16 is supported by the current schema and migrations. `001_initial_schema.sql` and `002_commerce_hardening.sql` are immutable once recorded in `schema_migrations`; all later changes must be new, forward-only migration files. Before applying `005_object_storage.sql`, create a Neon branch or restore-point snapshot. It is additive only: it creates `storage_assets`, adds a nullable `content_versions.storage_asset_id`, and does not copy, delete, or overwrite account/order/file data.
+PostgreSQL 16 is supported by the current schema and migrations. `001_initial_schema.sql` and `002_commerce_hardening.sql` are immutable once recorded in `schema_migrations`; all later changes must be new, forward-only migration files. Before applying pending `005_object_storage.sql` through `007_storage_quota_index.sql`, create a Neon branch or restore-point snapshot. These migrations are additive: they create storage metadata, account-deletion controls and a quota index; they do not copy, delete, or overwrite account/order/file data.
 
 For the current staging database, run migrations with a controlled Neon Owner direct/unpooled connection. The separate `colearnx_migrator` role must not be used for DDL until it has explicit `CREATE` and object-ownership privileges. The migration command only requires these variables:
 

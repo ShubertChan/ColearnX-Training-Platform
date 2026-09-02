@@ -6,6 +6,7 @@ import { ApiError } from '../lib/http.js';
 
 const mediaTypeExtensions: Record<string, readonly string[]> = {
   'application/pdf': ['pdf'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['docx'],
   'application/zip': ['zip'],
   'image/jpeg': ['jpg', 'jpeg'],
   'image/png': ['png'],
@@ -42,6 +43,12 @@ function normalizedMediaType(value: string) {
   return mediaTypeAliases[raw] ?? raw;
 }
 
+function uploadSizeLimit(mediaType: string) {
+  return mediaType === 'video/mp4'
+    ? env.CONTENT_VIDEO_UPLOAD_MAX_BYTES
+    : env.CONTENT_UPLOAD_MAX_BYTES;
+}
+
 function extensionOf(filename: string) {
   const match = /\.([a-z0-9]+)$/i.exec(filename);
   return match?.[1]?.toLowerCase() ?? '';
@@ -60,7 +67,7 @@ export function validateUploadMetadata(input: UploadMetadata): UploadMetadata {
   if (!Number.isSafeInteger(input.sizeBytes) || input.sizeBytes <= 0) {
     throw new ApiError(400, 'VALIDATION_ERROR', 'The upload size is invalid.');
   }
-  if (input.sizeBytes > env.CONTENT_UPLOAD_MAX_BYTES) {
+  if (input.sizeBytes > uploadSizeLimit(mediaType)) {
     throw new ApiError(413, 'CONTENT_FILE_TOO_LARGE', 'The file exceeds the upload size limit.');
   }
   return { filename, mediaType, sizeBytes: input.sizeBytes, sha256: input.sha256 };
