@@ -1,12 +1,13 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { deletedAccountDisplayName, deletedAccountEmail } from './account-deletion.js';
 import type { Actor } from '../auth/auth.js';
 import { query, withTransaction } from '../db/database.js';
 import { ApiError, ok } from '../lib/http.js';
 import { parse, uuid } from '../lib/validation.js';
 
 const listUsersInput = z.object({
-  status: z.enum(['active', 'suspended', 'deleted']).optional(),
+  status: z.enum(['active', 'suspended']).optional(),
   search: z.string().trim().min(1).max(200).optional(),
   page: z.coerce.number().int().min(1).max(10_000).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -86,7 +87,8 @@ export async function listUsers(req: Request, res: Response) {
     LEFT JOIN profiles p ON p.user_id = u.user_id
     LEFT JOIN user_roles ur ON ur.user_id = u.user_id AND ur.revoked_at IS NULL
     LEFT JOIN roles r ON r.role_id = ur.role_id
-    WHERE ($1::text IS NULL OR u.account_status = $1)
+    WHERE u.account_status <> 'deleted'
+      AND ($1::text IS NULL OR u.account_status = $1)
       AND ($2::text IS NULL OR lower(u.email::text) LIKE '%' || lower($2) || '%'
         OR lower(u.full_name) LIKE '%' || lower($2) || '%'
         OR lower(COALESCE(p.display_name, '')) LIKE '%' || lower($2) || '%')
@@ -105,13 +107,13 @@ export async function getUser(req: Request, res: Response) {
   const admin = res.locals.actor as Actor;
   const userId = parse(uuid, req.params.id);
   const user = await findUserDetail(userId);
-  if (!user) throw new ApiError(404, 'USER_NOT_FOUND', 'User was not found.');
+  if (!user || user.account_status === 'deleted') throw new ApiError(404, 'USER_NOT_FOUND', 'User was not found.');
   await query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, request_id)
     VALUES ($1, 'admin.user.view', 'users', $2, $3)`, [admin.id, userId, res.locals.requestId]);
   return ok(res, userDetailResponse(user));
 }
 
-async function updateAccountStatus(req: Request, res: Response, nextStatus: 'active' | 'suspended' | 'deleted', actionType: string) {
+async function updateAccountStatus(req: Request, res: Response, nextStatus: 'active' | 'suspended', actionType: string) {
   const admin = res.locals.actor as Actor;
   const userId = parse(uuid, req.params.id);
   const input = parse(accountActionInput, req.body);
@@ -155,8 +157,41 @@ async function updateAccountStatus(req: Request, res: Response, nextStatus: 'act
 
 export const suspendUser = (req: Request, res: Response) => updateAccountStatus(req, res, 'suspended', 'admin.user.suspended');
 export const reinstateUser = (req: Request, res: Response) => updateAccountStatus(req, res, 'active', 'admin.user.reinstated');
-// Keep the user row and finance history for auditability; deletion disables all access permanently.
-export const deleteUser = (req: Request, res: Response) => updateAccountStatus(req, res, 'deleted', 'admin.user.deleted');
+
+export async function deleteUser(req: Request, res: Response) {
+  const admin = res.locals.actor as Actor;
+  const userId = parse(uuid, req.params.id);
+  const input = parse(accountActionInput, req.body);
+  await withTransaction(async (client) => {
+    const target = await client.query<{ user_id: string; account_status: 'active' | 'suspended' | 'deleted' }>(
+      `SELECT user_id, account_status FROM users WHERE user_id = $1 FOR UPDATE`, [userId],
+    );
+    if (!target.rowCount) throw new ApiError(404, 'USER_NOT_FOUND', 'User was not found.');
+    const current = target.rows[0];
+    const roles = await client.query<{ role_code: string }>(`SELECT r.role_code FROM user_roles ur
+      JOIN roles r ON r.role_id = ur.role_id WHERE ur.user_id = $1 AND ur.revoked_at IS NULL`, [userId]);
+    if (current.user_id === admin.id) throw new ApiError(409, 'SELF_ACCOUNT_ACTION_FORBIDDEN', 'Administrators cannot change their own account status.');
+    if (roles.rows.some((role) => role.role_code === 'admin')) throw new ApiError(409, 'ADMIN_ACCOUNT_PROTECTED', 'Use a separate audited administrator-recovery procedure for another administrator account.');
+    if (current.account_status === 'deleted') throw new ApiError(404, 'USER_NOT_FOUND', 'User was not found.');
+
+    await client.query(`UPDATE users
+      SET full_name = $2, email = $3, account_status = 'deleted',
+        email_verified_at = NULL, email_verification_required_at = NULL, updated_at = now()
+      WHERE user_id = $1`, [userId, deletedAccountDisplayName, deletedAccountEmail(userId)]);
+    await client.query(`UPDATE profiles
+      SET display_name = $2, phone = NULL, location = NULL, bio = NULL, updated_at = now()
+      WHERE user_id = $1`, [userId, deletedAccountDisplayName]);
+    await client.query(`UPDATE user_roles SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [userId]);
+    await client.query(`UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = 'account-deleted'
+      WHERE user_id = $1 AND revoked_at IS NULL`, [userId]);
+    await client.query(`DELETE FROM email_verification_challenges WHERE user_id = $1`, [userId]);
+    await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
+      VALUES ($1, 'admin.user.deleted', 'users', $2,
+        jsonb_build_object('previousStatus', $3::text, 'newStatus', 'deleted', 'reason', $4::text), $5)`,
+    [admin.id, userId, current.account_status, input.reason, res.locals.requestId]);
+  });
+  return ok(res, { deleted: true });
+}
 
 export async function changeUserRole(req: Request, res: Response) {
   const admin = res.locals.actor as Actor;
