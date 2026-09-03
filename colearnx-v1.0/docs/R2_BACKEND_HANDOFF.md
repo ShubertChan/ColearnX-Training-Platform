@@ -1,3 +1,5 @@
+> **Status update (2026-09-03):** This is an earlier design handoff, not the deployment source of truth. The current implementation supports safe, sequential multiple files per content draft. Use [API.md](API.md) and [R2_UPLOAD_DEPLOY_CHECKLIST.md](R2_UPLOAD_DEPLOY_CHECKLIST.md) for the current contract, deployment steps, CORS requirements, and recovery procedure.
+
 # CoLearnX R2 私有文件上传后端交接
 
 ## 1. 目标与当前现状

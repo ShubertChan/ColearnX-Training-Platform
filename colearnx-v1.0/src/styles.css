@@ -2907,3 +2907,115 @@ tbody tr[role="button"]:focus-visible {
 .editor-summary .draft-reference, .editor-summary .form-error { display: block; margin-top: 9px; text-align: left; }
 .learning-actions { display: grid; justify-items: start; gap: 6px; }
 .learning-actions .form-error { margin: 0; font-size: 11px; }
+
+/* Content attachment queue. */
+.upload-file-list {
+  display: grid;
+  gap: 8px;
+}
+.upload-file-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+}
+.upload-file-row.ready {
+  border-color: #b8e0c3;
+  background: #f7fcf8;
+}
+.upload-file-row.error,
+.upload-file-row.interrupted {
+  border-color: #efc0bd;
+  background: #fffafa;
+}
+.upload-file-main {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.upload-file-main b,
+.upload-file-main small,
+.upload-file-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.upload-file-main b {
+  color: var(--ink);
+  font-size: 12px;
+}
+.upload-file-main small,
+.upload-file-message {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.upload-file-row.ready .upload-file-message {
+  color: #176b38;
+  font-weight: 700;
+}
+.upload-file-row.error .upload-file-message,
+.upload-file-row.interrupted .upload-file-message {
+  color: var(--danger);
+}
+.upload-file-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  color: var(--brand);
+  background: #eef2ff;
+}
+.upload-file-icon.ready {
+  color: var(--success);
+  background: #e9f8ee;
+}
+.upload-file-icon.error,
+.upload-file-icon.interrupted {
+  color: var(--danger);
+  background: #fff0ef;
+}
+.upload-file-main .upload-progress {
+  height: 5px;
+  margin-top: 4px;
+}
+.asset-icon-action {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+}
+.asset-icon-action:hover:not(:disabled) {
+  background: #f0f3ff;
+  color: var(--brand-dark);
+}
+.asset-icon-action.remove:hover:not(:disabled) {
+  color: var(--danger);
+  background: #fff0ef;
+}
+.asset-icon-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+@media (max-width: 620px) {
+  .upload-file-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .upload-file-row .asset-icon-action.retry {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .upload-file-row .asset-icon-action.remove {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}

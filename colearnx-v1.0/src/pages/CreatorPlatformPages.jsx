@@ -271,12 +271,10 @@ function ContentListingEditor() {
   const requestedDraftId = searchParams.get("draft");
   const [form, setForm] = useState({ title: "", price: "", contentType: "digital" });
   const [draft, setDraft] = useState(null);
-  const [asset, setAsset] = useState(null);
-  const [uploadStatus, setUploadStatus] = useState("idle");
+  const [uploadSummary, setUploadSummary] = useState({ readyCount: 0, activeCount: 0 });
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
-  const assetReady = asset?.status === "ready";
 
   const restoreDraft = useCallback(async () => {
     if (!requestedDraftId) return false;
@@ -293,7 +291,7 @@ function ContentListingEditor() {
       }
       setForm({ title: restored.title, price: restored.price, contentType: restored.contentType });
       setDraft({ id: restored.id, contentVersionId: restored.contentVersionId });
-      setAsset(restored.asset);
+      setUploadSummary({ readyCount: 0, activeCount: 0 });
       setSubmitted(false);
       return true;
     } catch (restoreError) {
@@ -324,10 +322,10 @@ function ContentListingEditor() {
         pricePoints: Number(form.price),
       });
       setDraft(created);
-      setAsset(null);
+      setUploadSummary({ readyCount: 0, activeCount: 0 });
       setSearchParams({ draft: created.id }, { replace: true });
       await refreshMyListings();
-      notify("Content created. Upload the selected file to continue.");
+      notify("Content created. Selected files will now upload automatically.");
     } catch (createError) {
       setError(createError.message);
     } finally {
@@ -335,15 +333,12 @@ function ContentListingEditor() {
     }
   };
 
-  const handleAssetChange = (nextAsset) => {
-    setAsset(nextAsset);
-    void refreshMyListings().catch(() => {
-      // The current upload response remains the source of truth until a manual refresh succeeds.
-    });
-  };
+  const handleAssetsChange = useCallback((nextSummary) => {
+    setUploadSummary(nextSummary);
+  }, []);
 
   const submitForReview = async () => {
-    if (!draft?.id || !assetReady || submitted) return;
+    if (!draft?.id || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0 || submitted) return;
     setBusy(true);
     setError("");
     try {
@@ -367,36 +362,28 @@ function ContentListingEditor() {
         <FormField label="Content type"><input required disabled={Boolean(draft)} value={form.contentType} onChange={(event) => setForm({ ...form, contentType: event.target.value })} /></FormField>
         <PrivateAssetUploader
           contentVersionId={draft?.contentVersionId}
-          existingAsset={asset}
-          onAssetChange={handleAssetChange}
-          onStatusChange={setUploadStatus}
+          onAssetsChange={handleAssetsChange}
           disabled={submitted || busy}
         />
-        {!draft && <p className="policy-note">Choose or drop a file now, then create your content to upload it.</p>}
-        {draft && <>
-          <div className="button-row">
-            <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={restoreDraft}>Refresh file status</Button>
-          </div>
-          <p className="policy-note">Your file is checked before you can submit the content for review.</p>
-        </>}
+        {!draft && <p className="policy-note">Choose or drop files now. They upload automatically immediately after you create the content.</p>}
+        {draft && <p className="policy-note">Files upload one at a time and are checked by the server. You can remove any file with the × button.</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
         {!draft ? (
           <Button type="submit" disabled={busy}><Send size={16} /> {busy ? "Creating content…" : "Create content"}</Button>
         ) : (
-          <Button type="button" onClick={submitForReview} disabled={busy || submitted || !assetReady || ["preparing", "uploading", "verifying"].includes(uploadStatus)}>
+          <Button type="button" onClick={submitForReview} disabled={busy || submitted || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0}>
             <Send size={16} /> {submitted ? "Submitted for administrator review" : busy ? "Submitting…" : "Submit for administrator review"}
           </Button>
         )}
       </Card>
       <Card className="editor-summary">
         <span className="eyebrow">Content upload</span>
-        <h3>{submitted ? "Submitted for review" : assetReady ? "File ready" : draft ? "Upload your file" : "Add a file"}</h3>
-        <p>Choose a file, create your content, then submit it for review.</p>
+        <h3>{submitted ? "Submitted for review" : uploadSummary.activeCount ? "Uploading files" : uploadSummary.readyCount ? `${uploadSummary.readyCount} file${uploadSummary.readyCount === 1 ? "" : "s"} ready` : draft ? "Add files" : "Add files"}</h3>
+        <p>{submitted ? "Your content is waiting for an administrator review." : uploadSummary.activeCount ? "Your files are uploading automatically. Keep this page open until each row has a green check." : "Add one or more files, then submit the completed content for review."}</p>
       </Card>
     </form>
   );
 }
-
 export const CourseEditorPage = () => <CourseListingEditor />;
 export const ContentEditorPage = () => <ContentListingEditor />;
 

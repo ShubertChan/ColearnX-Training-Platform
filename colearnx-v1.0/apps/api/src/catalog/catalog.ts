@@ -118,9 +118,9 @@ export async function submitContent(req: Request, res: Response) {
         AND cv.version_status = 'draft' AND cv.version_no = 1
       FOR UPDATE OF c, cv`, [contentId, actor.id]);
     if (!content.rowCount) throw new ApiError(409, 'CONTENT_NOT_SUBMITTABLE', 'Only an owned draft content item may be submitted.');
-    const asset = content.rows[0].storage_asset_id ? await client.query(`SELECT 1 FROM storage_assets
-      WHERE storage_asset_id = $1 AND content_version_id = $2 AND owner_user_id = $3 AND asset_status = 'ready'`,
-    [content.rows[0].storage_asset_id, content.rows[0].content_version_id, actor.id]) : { rowCount: 0 };
+    const asset = await client.query(`SELECT 1 FROM storage_assets
+      WHERE content_version_id = $1 AND owner_user_id = $2 AND asset_status = 'ready'
+      LIMIT 1`, [content.rows[0].content_version_id, actor.id]);
     if (!asset.rowCount) throw new ApiError(409, 'CONTENT_FILE_NOT_READY', 'A verified content file is required before submission.');
     await client.query(`UPDATE contents SET publication_status = 'submitted', updated_at = now() WHERE content_id = $1`, [contentId]);
     await client.query(`UPDATE content_versions SET version_status = 'submitted' WHERE content_version_id = $1`, [content.rows[0].content_version_id]);
@@ -248,9 +248,9 @@ export async function decideContentSubmission(req: Request, res: Response) {
       FOR UPDATE OF cv, c`, [contentVersionId]);
     if (!content.rowCount) throw new ApiError(409, 'CONTENT_NOT_REVIEWABLE', 'Only submitted content may be reviewed.');
     if (input.decision === 'published') {
-      const asset = content.rows[0].storage_asset_id ? await client.query(`SELECT 1 FROM storage_assets
-        WHERE storage_asset_id = $1 AND content_version_id = $2 AND owner_user_id = $3 AND asset_status = 'ready'`,
-      [content.rows[0].storage_asset_id, contentVersionId, content.rows[0].creator_user_id]) : { rowCount: 0 };
+      const asset = await client.query(`SELECT 1 FROM storage_assets
+        WHERE content_version_id = $1 AND owner_user_id = $2 AND asset_status = 'ready'
+        LIMIT 1`, [contentVersionId, content.rows[0].creator_user_id]);
       if (!asset.rowCount) throw new ApiError(409, 'CONTENT_FILE_NOT_READY', 'A verified content file is required before publication.');
       await client.query(`UPDATE contents SET publication_status = 'published', updated_at = now() WHERE content_id = $1`, [content.rows[0].content_id]);
       await client.query(`UPDATE content_versions SET version_status = 'published', published_at = now() WHERE content_version_id = $1`, [contentVersionId]);
