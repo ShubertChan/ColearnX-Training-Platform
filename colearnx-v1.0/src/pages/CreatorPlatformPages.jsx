@@ -5,11 +5,13 @@ import {
   FileText,
   GraduationCap,
   Send,
+  Trash2,
   ShieldCheck,
 } from "lucide-react";
 import { usePlatform } from "../context/PlatformContext";
 import { Link, useSearchParams } from "react-router-dom";
-import { contentDraftFromListing, isEditableContentDraft } from "../utils/contentDraft";
+import { contentDraftFromListing, isEditableContentDraft, isMissingContentDraftFile } from "../utils/contentDraft";
+import { listingsForWorkspace, workspaceListingCopy } from "../utils/listingWorkspace";
 import { createContent, submitContent } from "../api/catalog";
 import PrivateAssetUploader from "../components/uploads/PrivateAssetUploader";
 import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
@@ -282,9 +284,12 @@ function ContentListingEditor() {
     setError("");
     try {
       const listings = await refreshMyListings();
-      const restored = contentDraftFromListing(
-        listings.find((item) => item.kind === "content" && item.id === requestedDraftId),
-      );
+      const listing = listings.find((item) => item.kind === "content" && item.id === requestedDraftId);
+      if (isMissingContentDraftFile(listing)) {
+        setError("This draft is missing its required file. Delete it from My listings and create a new draft.");
+        return false;
+      }
+      const restored = contentDraftFromListing(listing);
       if (!restored) {
         setError("This content draft is no longer editable. Refresh My listings to see its current status.");
         return false;
@@ -388,8 +393,13 @@ export const CourseEditorPage = () => <CourseListingEditor />;
 export const ContentEditorPage = () => <ContentListingEditor />;
 
 export function PublishedPage() {
-  const { publishedItems, refreshMyListings, role } = usePlatform();
+  const { publishedItems, refreshMyListings, role, deleteDraftListing, notify } = usePlatform();
   const [loading, setLoading] = useState(false);
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const listings = listingsForWorkspace(publishedItems, role);
+  const copy = workspaceListingCopy(role);
+
   const refresh = async () => {
     setLoading(true);
     try {
@@ -398,27 +408,77 @@ export function PublishedPage() {
       setLoading(false);
     }
   };
-  if (!publishedItems.length)
-    return <EmptyState icon={BookOpen} title="No listings yet" description="Your courses and content will appear here after you create them." action={<Button onClick={refresh} disabled={loading}>Refresh</Button>} />;
+
+  const deleteDraft = async (item) => {
+    const itemKey = `${item.kind}-${item.id}`;
+    setDeletingId(itemKey);
+    try {
+      await deleteDraftListing(item);
+      setConfirmingId(null);
+    } catch (deleteError) {
+      notify(deleteError.message || "The draft could not be deleted. Refresh and try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (!listings.length) {
+    return (
+      <EmptyState
+        icon={BookOpen}
+        title={copy.emptyTitle}
+        description={copy.emptyDescription}
+        action={<Button onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>}
+      />
+    );
+  }
+
   return (
     <Card>
       <div className="card-heading">
-        <div><span className="eyebrow">My listings</span><h2>{role} catalogue records</h2></div>
+        <div><span className="eyebrow">{role} workspace</span><h2>{copy.title}</h2></div>
         <Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>
       </div>
       <div className="queue-list">
-        {publishedItems.map((item) => {
-          const editableDraft = isEditableContentDraft(item);
+        {listings.map((item) => {
+          const itemKey = `${item.kind}-${item.id}`;
+          const isContentDraft = isEditableContentDraft(item);
+          const isCourseDraft = item.kind === "course" && item.status === "Draft" && item.publicationStatus === "Draft";
+          const isDraft = isContentDraft || isCourseDraft;
+          const missingContentFile = isMissingContentDraftFile(item);
+          const confirming = confirmingId === itemKey;
+          const deleting = deletingId === itemKey;
           return (
-            <div key={`${item.kind}-${item.id}`}>
+            <div key={itemKey}>
               {item.kind === "course" ? <GraduationCap size={19} /> : <FileText size={19} />}
               <div>
                 <b>{item.title}</b>
                 <small>{item.format} · {item.price} points · last updated {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "—"}</small>
-                {item.kind === "content" && <span className="queue-detail">{item.asset?.status === "ready" ? `Verified file: ${item.asset.filename}` : `File status: ${item.fileStatus}`}</span>}
+                {item.kind === "content" && <span className="queue-detail">{item.asset?.status === "ready" ? `Verified file: ${item.asset.filename}` : "File status: missing"}</span>}
               </div>
-              {editableDraft ? (
-                <Link className="button secondary sm" to={`/creator/content-editor?draft=${encodeURIComponent(item.id)}`}>Continue draft</Link>
+              {isDraft ? (
+                confirming ? (
+                  <div className="queue-actions draft-delete-confirmation" role="group" aria-label={`Delete draft ${item.title}`}>
+                    <span>Delete this draft?</span>
+                    <Button variant="ghost" size="sm" type="button" onClick={() => setConfirmingId(null)} disabled={deleting}>Keep</Button>
+                    <Button variant="danger" size="sm" type="button" onClick={() => void deleteDraft(item)} disabled={deleting}>
+                      <Trash2 size={14} /> {deleting ? "Deleting…" : "Delete"}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="queue-actions">
+                    {missingContentFile ? (
+                      <Button variant="secondary" size="sm" type="button" onClick={() => notify("File missing. Delete this incomplete draft or create a new content draft.")}>File missing</Button>
+                    ) : isContentDraft ? (
+                      <Link className="button secondary sm" to={`/creator/content-editor?draft=${encodeURIComponent(item.id)}`}>Continue draft</Link>
+                    ) : (
+                      <ServerStatus value="Draft" />
+                    )}
+                    <Button variant="ghost" size="sm" type="button" onClick={() => setConfirmingId(itemKey)} aria-label={`Delete draft ${item.title}`}>
+                      <Trash2 size={14} /> Delete draft
+                    </Button>
+                  </div>
+                )
               ) : (
                 <ServerStatus value={item.status} />
               )}

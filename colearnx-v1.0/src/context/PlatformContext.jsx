@@ -14,6 +14,8 @@ import { hasAccessToken, hasCsrfToken, setAccessToken, setCsrfToken } from "../a
 import {
   createContent,
   createCourse,
+  deleteContentDraft,
+  deleteCourseDraft,
   listContent,
   listCourses,
   listMyListings,
@@ -606,11 +608,22 @@ export function PlatformProvider({ children }) {
     return listing;
   };
 
-  const deletePublishedItem = () => {
-    notify("Deleting a listing is not available in this release.");
-    return false;
+  const deleteDraftListing = async (listing) => {
+    if (!listing?.id || !["course", "content"].includes(listing.kind)) {
+      throw new Error("This listing is not a deletable draft.");
+    }
+    const result = listing.kind === "course"
+      ? await deleteCourseDraft(listing.id)
+      : await deleteContentDraft(listing.id);
+    await refreshMyListings();
+    notify("Draft deleted. Any attached private files are queued for secure cleanup.");
+    return result;
   };
 
+  const deletePublishedItem = () => {
+    notify("Only drafts can be deleted. Published and submitted listings are retained for review and records.");
+    return false;
+  };
   const unavailableDeliveryAction = () => {
     notify("Secure content delivery and learning-progress tracking are not configured yet.");
     return false;
@@ -666,9 +679,10 @@ export function PlatformProvider({ children }) {
     decideTrainerCertification,
     saveProfile,
     savePublishedItem,
+    deleteDraftListing,
     deletePublishedItem,
   }), [
-    accountLoading, approvedRoles, applications, authenticated, balance, cart, contents, courses,
+    accountLoading, approvedRoles, applications, authenticated, balance, cart, contents, courses, deleteDraftListing,
     notify, orders, profile, publishedItems, refundRequests, refreshAdminQueues, refreshAdminRoleApplications, refreshCatalog,
     refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet, role, roleApplications, serverWallet,
     toast, topUpPackages, trainerCertifications, transactions,

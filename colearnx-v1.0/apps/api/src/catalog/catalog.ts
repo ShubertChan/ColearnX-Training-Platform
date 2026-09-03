@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Actor } from '../auth/auth.js';
 import { query, withTransaction } from '../db/database.js';
 import { ApiError, ok } from '../lib/http.js';
+import { deleteStoredObject } from '../storage/r2.js';
 import { parse, uuid } from '../lib/validation.js';
 
 const listQuery = z.object({ q: z.string().trim().max(120).optional(), category: z.string().trim().max(80).optional(), cursor: z.string().datetime().optional(), limit: z.coerce.number().int().min(1).max(100).default(20) });
@@ -12,6 +13,22 @@ const contentInput = z.object({ title: z.string().trim().min(1).max(200), catego
 const moderationDecisionInput = z.object({ decision: z.enum(['published', 'rejected']), reason: z.string().trim().min(3).max(2_000) });
 const moderationListQuery = z.object({ limit: z.coerce.number().int().min(1).max(100).default(50) });
 
+type PendingStorageAsset = {
+  storage_asset_id: string;
+  bucket_name: string;
+  object_key: string;
+};
+
+async function bestEffortDeleteArchivedDraftAsset(asset: PendingStorageAsset) {
+  try {
+    await deleteStoredObject({ bucketName: asset.bucket_name, objectKey: asset.object_key });
+    await query(`UPDATE storage_assets
+      SET asset_status = 'deleted', deleted_at = now(), updated_at = now()
+      WHERE storage_asset_id = $1 AND asset_status = 'delete_pending'`, [asset.storage_asset_id]);
+  } catch {
+    // Retain delete_pending for the scheduled R2 reconciliation task.
+  }
+}
 function courseResponse(row: Record<string, unknown>) {
   return { id: row.course_run_id, courseId: row.course_id, title: row.title, description: row.description, pricePoints: Number(row.price_points), capacity: row.capacity, status: row.run_status, startsAt: row.starts_at, endsAt: row.ends_at, owner: { id: row.owner_user_id, displayName: row.owner_name }, category: row.category_id ? { id: row.category_id, name: row.category_name } : null, deliveryModes: row.delivery_modes ?? [] };
 }
@@ -131,6 +148,98 @@ export async function submitContent(req: Request, res: Response) {
   return ok(res, result);
 }
 
+export async function deleteCourseDraft(req: Request, res: Response) {
+  const actor = res.locals.actor as Actor;
+  const courseRunId = parse(uuid, req.params.id);
+  const result = await withTransaction(async (client) => {
+    const course = await client.query<{ course_id: string }>(`SELECT c.course_id
+      FROM course_runs cr
+      JOIN courses c ON c.course_id = cr.course_id
+      WHERE cr.course_run_id = $1
+        AND c.owner_user_id = $2
+        AND c.publication_status = 'draft'
+        AND cr.run_status = 'draft'
+      FOR UPDATE OF c, cr`, [courseRunId, actor.id]);
+    if (!course.rowCount) {
+      throw new ApiError(409, 'COURSE_DRAFT_NOT_DELETABLE', 'Only an owned draft course may be deleted.');
+    }
+
+    const references = await client.query<{ has_order: boolean; has_enrolment: boolean }>(`SELECT
+      EXISTS (SELECT 1 FROM order_items WHERE course_run_id = $1) AS has_order,
+      EXISTS (SELECT 1 FROM course_enrolments WHERE course_run_id = $1) AS has_enrolment`, [courseRunId]);
+    if (references.rows[0].has_order || references.rows[0].has_enrolment) {
+      throw new ApiError(409, 'COURSE_DRAFT_DELETE_BLOCKED', 'This course has learner records and cannot be deleted.');
+    }
+
+    await client.query(`UPDATE course_delivery_options
+      SET option_status = 'disabled'
+      WHERE course_run_id = $1`, [courseRunId]);
+    await client.query(`UPDATE course_runs SET run_status = 'archived' WHERE course_run_id = $1`, [courseRunId]);
+    await client.query(`UPDATE courses
+      SET publication_status = 'archived', updated_at = now()
+      WHERE course_id = $1`, [course.rows[0].course_id]);
+    await client.query(`INSERT INTO admin_action_logs
+      (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
+      VALUES ($1, 'course.draft.deleted', 'course_runs', $2,
+        jsonb_build_object('outcome', 'archived'), $3)`,
+    [actor.id, courseRunId, res.locals.requestId]);
+    return { id: courseRunId, kind: 'course', status: 'deleted' };
+  });
+  return ok(res, result);
+}
+
+export async function deleteContentDraft(req: Request, res: Response) {
+  const actor = res.locals.actor as Actor;
+  const contentId = parse(uuid, req.params.id);
+  const result = await withTransaction(async (client) => {
+    const content = await client.query<{ content_version_id: string }>(`SELECT cv.content_version_id
+      FROM contents c
+      JOIN content_versions cv ON cv.content_id = c.content_id
+      WHERE c.content_id = $1
+        AND c.creator_user_id = $2
+        AND c.publication_status = 'draft'
+        AND cv.version_status = 'draft'
+        AND cv.version_no = 1
+      FOR UPDATE OF c, cv`, [contentId, actor.id]);
+    if (!content.rowCount) {
+      throw new ApiError(409, 'CONTENT_DRAFT_NOT_DELETABLE', 'Only an owned draft content item may be deleted.');
+    }
+    const contentVersionId = content.rows[0].content_version_id;
+
+    const references = await client.query<{ has_order: boolean; has_access_grant: boolean; has_license: boolean; has_module: boolean }>(`SELECT
+      EXISTS (SELECT 1 FROM order_items WHERE content_version_id = $1) AS has_order,
+      EXISTS (SELECT 1 FROM content_access_grants WHERE content_version_id = $1) AS has_access_grant,
+      EXISTS (SELECT 1 FROM content_licenses WHERE content_version_id = $1) AS has_license,
+      EXISTS (SELECT 1 FROM course_module_contents WHERE content_version_id = $1) AS has_module`, [contentVersionId]);
+    const linked = references.rows[0];
+    if (linked.has_order || linked.has_access_grant || linked.has_license || linked.has_module) {
+      throw new ApiError(409, 'CONTENT_DRAFT_DELETE_BLOCKED', 'This content has linked learner or course records and cannot be deleted.');
+    }
+
+    // Archive metadata rather than hard-deleting it: immutable audit history is
+    // retained, and every private object is removed through the controlled R2
+    // cleanup path after its primary reference is detached.
+    await client.query(`UPDATE content_versions
+      SET storage_asset_id = NULL, version_status = 'retired'
+      WHERE content_version_id = $1`, [contentVersionId]);
+    const cleanupAssets = await client.query<PendingStorageAsset>(`UPDATE storage_assets
+      SET asset_status = 'delete_pending', updated_at = now()
+      WHERE content_version_id = $1 AND owner_user_id = $2 AND asset_status <> 'deleted'
+      RETURNING storage_asset_id, bucket_name, object_key`,
+    [contentVersionId, actor.id]);
+    await client.query(`UPDATE contents
+      SET publication_status = 'archived', updated_at = now()
+      WHERE content_id = $1`, [contentId]);
+    await client.query(`INSERT INTO admin_action_logs
+      (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
+      VALUES ($1, 'content.draft.deleted', 'contents', $2,
+        jsonb_build_object('contentVersionId', $3::uuid, 'outcome', 'archived', 'assetCleanup', 'delete_pending'), $4)`,
+    [actor.id, contentId, contentVersionId, res.locals.requestId]);
+    return { id: contentId, kind: 'content', status: 'deleted', cleanupAssets: cleanupAssets.rows };
+  });
+  await Promise.all(result.cleanupAssets.map(bestEffortDeleteArchivedDraftAsset));
+  return ok(res, { id: result.id, kind: result.kind, status: result.status });
+}
 export async function listMyListings(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const [courseResult, contentResult] = await Promise.all([
@@ -140,6 +249,8 @@ export async function listMyListings(req: Request, res: Response) {
       FROM courses c JOIN course_runs cr ON cr.course_id = c.course_id
       LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id
       WHERE c.owner_user_id = $1
+        AND c.publication_status <> 'archived'
+        AND cr.run_status <> 'archived'
       GROUP BY cr.course_run_id, c.course_id
       ORDER BY c.updated_at DESC, cr.course_run_id DESC`, [actor.id]),
     query(`SELECT c.content_id, cv.content_version_id, c.title, c.content_type, c.price_points,
@@ -149,6 +260,8 @@ export async function listMyListings(req: Request, res: Response) {
       FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id
       LEFT JOIN storage_assets sa ON sa.storage_asset_id = cv.storage_asset_id
       WHERE c.creator_user_id = $1
+        AND c.publication_status <> 'archived'
+        AND cv.version_status <> 'retired'
       ORDER BY c.updated_at DESC, cv.version_no DESC`, [actor.id]),
   ]);
   const courses = courseResult.rows.map((row) => ({
