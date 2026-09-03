@@ -18,7 +18,7 @@ import { createRefundRequest, decideRefund, getRefundRequest, listRefundRequests
 import { createRoleApplication, createTrainerCertification, decideRoleApplication, decideTrainerCertification, listRoleApplications, listTrainerCertifications, myRoleApplications, myTrainerCertifications } from './governance/governance.js';
 import { adjustPoints, cancelLiveCourseRun, completeLiveCourseRun, createTopUpPackage, retireTopUpPackage, setRevenueSharePolicy } from './admin/operations.js';
 import { changeUserRole, deleteUser, getUser, listUsers, reinstateUser, suspendUser } from './admin/users.js';
-import { completeUploadIntent, createContentDownloadUrl, createUploadIntent, deleteUploadIntent, previewContentAsset } from './storage/content-assets.js';
+import { completeUploadIntent, createContentDownloadUrl, createUploadIntent, deleteUploadIntent, listContentAssets, previewContentAsset } from './storage/content-assets.js';
 
 const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'res.headers.set-cookie'] });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many authentication attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
@@ -72,6 +72,7 @@ export function createApp() {
   api.post('/courses/:id/submit', authenticate, mutationLimiter, submitCourse);
   api.post('/content', authenticate, mutationLimiter, createContent);
   api.post('/content/:id/submit', authenticate, mutationLimiter, submitContent);
+  api.get('/content-versions/:contentVersionId/assets', authenticate, listContentAssets);
   api.post('/content-versions/:contentVersionId/upload-intents', authenticate, mutationLimiter, createUploadIntent);
   api.post('/content-versions/:contentVersionId/upload-intents/:assetId/complete', authenticate, mutationLimiter, completeUploadIntent);
   api.delete('/content-versions/:contentVersionId/upload-intents/:assetId', authenticate, mutationLimiter, deleteUploadIntent);

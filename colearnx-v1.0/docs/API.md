@@ -36,15 +36,16 @@ Authenticated routes require `Authorization: Bearer <access-token>`. The refresh
 
 ## Private R2 content files
 
-The browser never sends `storageUrl`, a bucket name, an object key, or R2 credentials. A Creator must first create a content draft, then upload a single permitted file through a short-lived presigned URL. Requests are rate-limited and authenticated; the API rechecks Creator ownership and draft state for every mutation.
+The browser never sends `storageUrl`, a bucket name, an object key, or R2 credentials. A Creator must first create a content draft, then can upload one or more permitted files through short-lived presigned URLs. The UI queues direct uploads one at a time; the API rechecks Creator ownership and draft state for every mutation.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/content-versions/:contentVersionId/upload-intents` | Creator-only. Requires `Idempotency-Key`; body `{ filename, mediaType, sizeBytes, sha256? }`. Returns a short-lived direct `PUT` URL and required `Content-Type`. Allows PDF, DOCX, ZIP, JPEG, PNG and WebP up to 25 MiB; MP4 up to 100 MiB. The API also enforces a 500 MiB creator storage quota and a maximum of three incomplete uploads. |
-| POST | `/content-versions/:contentVersionId/upload-intents/:assetId/complete` | Creator-only. Uses R2 `HeadObject` to verify the stored MIME type and size, then atomically marks the asset `ready`. |
+| GET | `/content-versions/:contentVersionId/assets` | Creator owner or administrator can list safe attachment metadata for a draft; a purchaser with a current grant can list ready published attachments. Never returns bucket, object key, signed URL or R2 credentials. |
+| POST | `/content-versions/:contentVersionId/upload-intents` | Creator-only. Requires `Idempotency-Key`; body `{ filename, mediaType, sizeBytes, sha256? }`. Returns a short-lived direct `PUT` URL and required `Content-Type`. Allows PDF, DOCX, ZIP, JPEG, PNG and WebP up to 25 MiB; MP4 up to 100 MiB. The API also enforces a 500 MiB creator storage quota and a maximum of three incomplete uploads. Starting a new upload on the same draft safely clears incomplete prior attempts, not ready attachments. |
+| POST | `/content-versions/:contentVersionId/upload-intents/:assetId/complete` | Creator-only. Uses R2 `HeadObject` to verify the stored MIME type and size, then atomically marks the asset `ready` without replacing other ready attachments. |
 | DELETE | `/content-versions/:contentVersionId/upload-intents/:assetId` | Creator-only draft cleanup. It unlinks first, marks `delete_pending`, then removes the R2 object; a temporary R2 failure remains retryable. |
-| POST | `/content-versions/:contentVersionId/download-url` | Owner, administrator, or purchaser with a current access grant only. Returns a short-lived attachment URL; signing it records a purchaser's first access. |
-| POST | `/admin/content-versions/:contentVersionId/preview-url` | Administrator-only short-lived preview URL for a `ready` asset. |
+| POST | `/content-versions/:contentVersionId/download-url` | Owner, administrator, or purchaser with a current access grant only. Optional body `{ assetId }` chooses a ready attachment; omitting it uses the backwards-compatible primary file. Returns a short-lived attachment URL; signing it records a purchaser's first access. |
+| POST | `/admin/content-versions/:contentVersionId/preview-url` | Administrator-only short-lived preview URL for a `ready` asset. Optional body `{ assetId }` selects a particular attachment. |
 
 `POST /content/:id/submit` and admin publication both reject a content version that has no owned, non-deleted `ready` asset with `409 CONTENT_FILE_NOT_READY`. Public catalogue endpoints never return a bucket, object key, legacy storage URL, or signed URL.
 

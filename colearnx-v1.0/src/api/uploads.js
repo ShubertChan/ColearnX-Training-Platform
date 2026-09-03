@@ -18,10 +18,12 @@ export async function requestUploadIntent(contentVersionId, file) {
     const assetId = id("asset");
     const intent = {
       assetId,
+      contentVersionId,
       method: "PUT",
       uploadUrl: `demo://private-r2/${assetId}`,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       requiredHeaders: { "Content-Type": payload.mediaType },
+      status: "pending",
       ...payload,
     };
     demoIntents.set(assetId, intent);
@@ -43,6 +45,7 @@ export async function completeUploadIntent(contentVersionId, assetId) {
       error.code = "UPLOAD_INTENT_NOT_FOUND";
       throw error;
     }
+    intent.status = "ready";
     return {
       assetId,
       filename: intent.filename,
@@ -60,6 +63,18 @@ export async function completeUploadIntent(contentVersionId, assetId) {
   return response.data.data;
 }
 
+export async function listContentAssets(contentVersionId) {
+  if (usingLocalUploadDemo) {
+    return [...demoIntents.values()]
+      .filter((intent) => intent.contentVersionId === contentVersionId && intent.status !== "deleted")
+      .map(({ assetId, filename, mediaType, sizeBytes, status }) => ({
+        assetId, filename, mediaType, sizeBytes, status,
+      }));
+  }
+  const response = await apiClient.get(`/content-versions/${contentVersionId}/assets`);
+  return response.data.data.assets || [];
+}
+
 export async function removeUploadIntent(contentVersionId, assetId) {
   if (!assetId) return;
   if (usingLocalUploadDemo) {
@@ -72,7 +87,9 @@ export async function removeUploadIntent(contentVersionId, assetId) {
   );
 }
 
-export async function requestContentDownloadUrl(contentVersionId, fallback = {}) {
+export async function requestContentDownloadUrl(contentVersionId, assetIdOrFallback, fallbackInput = {}) {
+  const assetId = typeof assetIdOrFallback === "string" ? assetIdOrFallback : undefined;
+  const fallback = assetId ? fallbackInput : assetIdOrFallback || {};
   if (usingLocalUploadDemo) {
     const filename = fallback.filename || "colearnx-private-content.txt";
     const blob = new Blob(
@@ -90,15 +107,30 @@ export async function requestContentDownloadUrl(contentVersionId, fallback = {})
   }
   const response = await apiClient.post(
     `/content-versions/${contentVersionId}/download-url`,
-    {},
+    assetId ? { assetId } : {},
     { headers: { "Idempotency-Key": id("content-download") } },
   );
   return response.data.data;
 }
 
 export function getSafeUploadError(error) {
+  const code = error.code || "UPLOAD_FAILED";
+  if (code === "NETWORK_ERROR") {
+    return {
+      code,
+      message: "Cannot reach the upload service. Check your connection and try again.",
+      requestId: "",
+    };
+  }
+  if (code === "CONTENT_UPLOAD_PENDING_LIMIT") {
+    return {
+      code,
+      message: "An earlier upload is still being cleared. Try again in a moment.",
+      requestId: error.requestId || "",
+    };
+  }
   return {
-    code: error.code || "UPLOAD_FAILED",
+    code,
     message: error.message || "The upload could not be completed.",
     requestId: error.requestId || "",
   };
