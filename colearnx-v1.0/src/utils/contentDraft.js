@@ -7,8 +7,16 @@ export const isEditableContentDraft = (listing) =>
 
 export const isMissingContentDraftFile = (listing) =>
   isEditableContentDraft(listing) && listing?.asset?.status !== "ready";
+
+export const isDeletableDraftListing = (listing) =>
+  isEditableContentDraft(listing) || (
+    listing?.kind === "course" &&
+    normalizeStatus(listing.status) === "draft" &&
+    normalizeStatus(listing.publicationStatus || listing.status) === "draft"
+  );
+
 export function contentDraftFromListing(listing) {
-  if (!isEditableContentDraft(listing) || !listing.contentVersionId) return null;
+  if (!isEditableContentDraft(listing) || isMissingContentDraftFile(listing) || !listing.contentVersionId) return null;
   return {
     id: listing.id,
     contentVersionId: listing.contentVersionId,

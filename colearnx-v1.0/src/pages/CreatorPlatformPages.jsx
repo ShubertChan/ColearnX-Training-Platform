@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { usePlatform } from "../context/PlatformContext";
 import { Link, useSearchParams } from "react-router-dom";
-import { contentDraftFromListing, isEditableContentDraft, isMissingContentDraftFile } from "../utils/contentDraft";
+import { contentDraftFromListing, isDeletableDraftListing, isEditableContentDraft, isMissingContentDraftFile } from "../utils/contentDraft";
 import { listingsForWorkspace, workspaceListingCopy } from "../utils/listingWorkspace";
 import { createContent, submitContent } from "../api/catalog";
 import PrivateAssetUploader from "../components/uploads/PrivateAssetUploader";
@@ -443,8 +443,7 @@ export function PublishedPage() {
         {listings.map((item) => {
           const itemKey = `${item.kind}-${item.id}`;
           const isContentDraft = isEditableContentDraft(item);
-          const isCourseDraft = item.kind === "course" && item.status === "Draft" && item.publicationStatus === "Draft";
-          const isDraft = isContentDraft || isCourseDraft;
+          const isDraft = isDeletableDraftListing(item);
           const missingContentFile = isMissingContentDraftFile(item);
           const confirming = confirmingId === itemKey;
           const deleting = deletingId === itemKey;

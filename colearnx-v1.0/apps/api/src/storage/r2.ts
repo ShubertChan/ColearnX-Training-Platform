@@ -114,13 +114,13 @@ function unavailable() {
   return new ApiError(503, 'OBJECT_STORAGE_UNAVAILABLE', 'Object storage is temporarily unavailable.');
 }
 
-export async function signUpload(locator: ObjectLocator, mediaType: string) {
+export async function signUpload(locator: ObjectLocator, mediaType: string, expiresInSeconds: number) {
   try {
     return await getSignedUrl(storageClient(), new PutObjectCommand({
       Bucket: locator.bucketName,
       Key: locator.objectKey,
       ContentType: mediaType,
-    }), { expiresIn: env.R2_SIGNED_UPLOAD_TTL_SECONDS });
+    }), { expiresIn: expiresInSeconds });
   } catch {
     throw unavailable();
   }
