@@ -43,8 +43,11 @@ export function VerifyEmailPage() {
     setMessage("");
     setSubmitting(true);
     try {
-      await verifyRegistrationEmail({ email: email.trim(), code });
-      navigate("/login", { replace: true, state: { email: email.trim(), verified: true } });
+      const result = await verifyRegistrationEmail({ email: email.trim(), code });
+      navigate(result.authenticated ? "/home" : "/login", {
+        replace: true,
+        state: { email: email.trim(), verified: true },
+      });
     } catch (verificationError) {
       setError(verificationError.message);
     } finally {

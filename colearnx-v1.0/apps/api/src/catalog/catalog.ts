@@ -118,10 +118,18 @@ export async function submitContent(req: Request, res: Response) {
         AND cv.version_status = 'draft' AND cv.version_no = 1
       FOR UPDATE OF c, cv`, [contentId, actor.id]);
     if (!content.rowCount) throw new ApiError(409, 'CONTENT_NOT_SUBMITTABLE', 'Only an owned draft content item may be submitted.');
-    const asset = await client.query(`SELECT 1 FROM storage_assets
-      WHERE content_version_id = $1 AND owner_user_id = $2 AND asset_status = 'ready'
-      LIMIT 1`, [content.rows[0].content_version_id, actor.id]);
-    if (!asset.rowCount) throw new ApiError(409, 'CONTENT_FILE_NOT_READY', 'A verified content file is required before submission.');
+    const asset = await client.query<{ asset_count: number; ready_asset_count: number }>(`SELECT
+      count(*)::int AS asset_count,
+      count(*) FILTER (WHERE asset_status = 'ready')::int AS ready_asset_count
+      FROM storage_assets
+      WHERE content_version_id = $1 AND owner_user_id = $2
+        AND asset_status IN ('pending', 'uploaded', 'ready', 'quarantined')`,
+    [content.rows[0].content_version_id, actor.id]);
+    const activeAssetCount = Number(asset.rows[0]?.asset_count || 0);
+    const readyAssetCount = Number(asset.rows[0]?.ready_asset_count || 0);
+    if (!activeAssetCount || activeAssetCount !== readyAssetCount) {
+      throw new ApiError(409, 'CONTENT_FILE_NOT_READY', 'Every attached content file must be verified before submission.');
+    }
     await client.query(`UPDATE contents SET publication_status = 'submitted', updated_at = now() WHERE content_id = $1`, [contentId]);
     await client.query(`UPDATE content_versions SET version_status = 'submitted' WHERE content_version_id = $1`, [content.rows[0].content_version_id]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, request_id)
@@ -225,16 +233,56 @@ export async function decideCourseSubmission(req: Request, res: Response) {
 export async function listContentSubmissions(req: Request, res: Response) {
   const input = parse(moderationListQuery, req.query);
   const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.content_type, c.price_points,
-    c.creator_user_id, u.full_name AS owner_name, cv.storage_url, cv.storage_asset_id, sa.asset_status, cv.version_status
+    c.creator_user_id, u.full_name AS owner_name, cv.storage_url, cv.storage_asset_id, cv.version_status,
+    asset_summary.asset_count, asset_summary.ready_asset_count, asset_summary.assets
     FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id JOIN users u ON u.user_id = c.creator_user_id
-    LEFT JOIN storage_assets sa ON sa.storage_asset_id = cv.storage_asset_id
+    LEFT JOIN LATERAL (
+      SELECT
+        count(*) FILTER (WHERE sa.asset_status IN ('pending', 'uploaded', 'ready', 'quarantined'))::int AS asset_count,
+        count(*) FILTER (WHERE sa.asset_status = 'ready')::int AS ready_asset_count,
+        COALESCE(
+          jsonb_agg(
+            jsonb_build_object(
+              'assetId', sa.storage_asset_id,
+              'filename', sa.original_filename,
+              'mediaType', COALESCE(sa.verified_content_type, sa.declared_content_type),
+              'sizeBytes', COALESCE(sa.verified_byte_size, sa.declared_byte_size),
+              'status', sa.asset_status,
+              'uploadedAt', sa.uploaded_at
+            ) ORDER BY sa.created_at ASC
+          ) FILTER (WHERE sa.asset_status IN ('pending', 'uploaded', 'ready', 'quarantined')),
+          '[]'::jsonb
+        ) AS assets
+      FROM storage_assets sa
+      WHERE sa.content_version_id = cv.content_version_id
+    ) asset_summary ON true
     WHERE c.publication_status = 'submitted' AND cv.version_status = 'submitted'
     ORDER BY c.updated_at ASC, cv.content_version_id ASC LIMIT $1`, [input.limit]);
-  return ok(res, result.rows.map((row) => ({
-    id: row.content_version_id, contentId: row.content_id, title: row.title, contentType: row.content_type,
-    pricePoints: Number(row.price_points), owner: { id: row.creator_user_id, displayName: row.owner_name },
-    storageUrlPresent: Boolean(row.storage_url || row.storage_asset_id), fileStatus: row.asset_status ?? (row.storage_url ? 'legacy' : 'missing'), moderationStatus: row.version_status,
-  })));
+  return ok(res, result.rows.map((row) => {
+    const assets = (Array.isArray(row.assets) ? row.assets : []).map((asset: Record<string, unknown>) => ({
+      assetId: asset.assetId,
+      filename: asset.filename,
+      mediaType: asset.mediaType,
+      sizeBytes: asset.sizeBytes === null || asset.sizeBytes === undefined ? null : Number(asset.sizeBytes),
+      status: asset.status,
+      uploadedAt: asset.uploadedAt,
+    }));
+    const primaryAsset = assets.find((asset) => asset.assetId === row.storage_asset_id) ?? assets[0];
+    return {
+      id: row.content_version_id,
+      contentId: row.content_id,
+      title: row.title,
+      contentType: row.content_type,
+      pricePoints: Number(row.price_points),
+      owner: { id: row.creator_user_id, displayName: row.owner_name },
+      storageUrlPresent: Boolean(row.storage_url || assets.length),
+      fileStatus: primaryAsset?.status ?? (row.storage_url ? 'legacy' : 'missing'),
+      assetCount: Number(row.asset_count || 0),
+      readyAssetCount: Number(row.ready_asset_count || 0),
+      assets,
+      moderationStatus: row.version_status,
+    };
+  }));
 }
 
 export async function decideContentSubmission(req: Request, res: Response) {
@@ -248,10 +296,18 @@ export async function decideContentSubmission(req: Request, res: Response) {
       FOR UPDATE OF cv, c`, [contentVersionId]);
     if (!content.rowCount) throw new ApiError(409, 'CONTENT_NOT_REVIEWABLE', 'Only submitted content may be reviewed.');
     if (input.decision === 'published') {
-      const asset = await client.query(`SELECT 1 FROM storage_assets
-        WHERE content_version_id = $1 AND owner_user_id = $2 AND asset_status = 'ready'
-        LIMIT 1`, [contentVersionId, content.rows[0].creator_user_id]);
-      if (!asset.rowCount) throw new ApiError(409, 'CONTENT_FILE_NOT_READY', 'A verified content file is required before publication.');
+      const asset = await client.query<{ asset_count: number; ready_asset_count: number }>(`SELECT
+        count(*)::int AS asset_count,
+        count(*) FILTER (WHERE asset_status = 'ready')::int AS ready_asset_count
+        FROM storage_assets
+        WHERE content_version_id = $1 AND owner_user_id = $2
+          AND asset_status IN ('pending', 'uploaded', 'ready', 'quarantined')`,
+      [contentVersionId, content.rows[0].creator_user_id]);
+      const activeAssetCount = Number(asset.rows[0]?.asset_count || 0);
+      const readyAssetCount = Number(asset.rows[0]?.ready_asset_count || 0);
+      if (!activeAssetCount || activeAssetCount !== readyAssetCount) {
+        throw new ApiError(409, 'CONTENT_FILE_NOT_READY', 'Every attached content file must be verified before publication.');
+      }
       await client.query(`UPDATE contents SET publication_status = 'published', updated_at = now() WHERE content_id = $1`, [content.rows[0].content_id]);
       await client.query(`UPDATE content_versions SET version_status = 'published', published_at = now() WHERE content_version_id = $1`, [contentVersionId]);
     } else {

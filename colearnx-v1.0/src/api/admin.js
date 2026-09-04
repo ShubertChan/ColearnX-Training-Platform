@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient } from "./client.js";
 
 const unwrap = (response) => response.data.data;
 
@@ -18,9 +18,9 @@ export const decideContentSubmission = (contentVersionId, input) =>
     .post(`/admin/content-versions/${contentVersionId}/decision`, input)
     .then(unwrap);
 
-export const previewContentSubmission = (contentVersionId) =>
+export const previewContentSubmission = (contentVersionId, assetId) =>
   apiClient
-    .post(`/admin/content-versions/${contentVersionId}/preview-url`, {})
+    .post(`/admin/content-versions/${contentVersionId}/preview-url`, assetId ? { assetId } : {})
     .then(unwrap);
 
 export const getAdminUsers = ({ status, search, page = 1, limit = 50 } = {}) => {
