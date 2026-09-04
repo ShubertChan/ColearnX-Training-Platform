@@ -13,8 +13,14 @@ export const createCourse = (input) =>
 export const submitCourse = (courseRunId) =>
   apiClient.post(`/courses/${courseRunId}/submit`).then(unwrap);
 
+export const deleteCourseDraft = (courseRunId) =>
+  apiClient.delete(`/courses/${courseRunId}/draft`).then(unwrap);
+
 export const createContent = (input) =>
   apiClient.post("/content", input).then(unwrap);
 
 export const submitContent = (contentId) =>
   apiClient.post(`/content/${contentId}/submit`).then(unwrap);
+
+export const deleteContentDraft = (contentId) =>
+  apiClient.delete(`/content/${contentId}/draft`).then(unwrap);

@@ -5,6 +5,8 @@ export const isEditableContentDraft = (listing) =>
   normalizeStatus(listing.status) === "draft" &&
   normalizeStatus(listing.versionStatus || listing.status) === "draft";
 
+export const isMissingContentDraftFile = (listing) =>
+  isEditableContentDraft(listing) && listing?.asset?.status !== "ready";
 export function contentDraftFromListing(listing) {
   if (!isEditableContentDraft(listing) || !listing.contentVersionId) return null;
   return {
