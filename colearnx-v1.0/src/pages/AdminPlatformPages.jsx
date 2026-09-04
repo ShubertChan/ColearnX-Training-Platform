@@ -4,9 +4,11 @@ import {
   ArrowRight,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   ExternalLink,
   FileText,
+  Paperclip,
   ShieldCheck,
   Users,
   XCircle,
@@ -29,6 +31,12 @@ import {
   getAdminTrainerCertifications,
 } from "../api/governance";
 import { Badge, Button, Card, EmptyState, FormField, Metric } from "../components/ui";
+import {
+  canPublishReviewedAssets,
+  formatReviewFileSize,
+  normalizeReviewAssets,
+  reviewAssetKey,
+} from "../utils/adminReviewAssets";
 
 const titleCase = (value) => String(value || "").replace(/(^|_)([a-z])/g, (_match, _prefix, letter) => letter.toUpperCase());
 const Status = ({ value }) => <Badge tone={String(value).toLowerCase() === "approved" || String(value).toLowerCase() === "published" ? "success" : String(value).toLowerCase() === "rejected" ? "danger" : "warning"}>{titleCase(value)}</Badge>;
@@ -39,31 +47,127 @@ function DecisionButtons({ onDecision, busy, approveValue = "approved", approval
 }
 
 function ContentReviewActions({ item, busy, onDecision }) {
-  const [previewed, setPreviewed] = useState(false);
-  const [previewBusy, setPreviewBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [previewedAssetKeys, setPreviewedAssetKeys] = useState(() => new Set());
+  const [previewBusyKey, setPreviewBusyKey] = useState("");
   const [previewError, setPreviewError] = useState("");
-  const fileReady = String(item.fileStatus || "").toLowerCase() === "ready";
+  const assets = normalizeReviewAssets(item);
+  const readyAssetEntries = assets
+    .map((asset, index) => ({ asset, key: reviewAssetKey(asset, index), index }))
+    .filter(({ asset }) => asset.status === "ready");
+  const fileCount = Math.max(Number(item.assetCount || 0), assets.length);
+  const readyCount = Math.max(Number(item.readyAssetCount || 0), readyAssetEntries.length);
+  const allFilesReady = assets.length > 0 && assets.every((asset) => asset.status === "ready");
+  const allPreviewed = canPublishReviewedAssets(assets, previewedAssetKeys);
+  const filesPanelId = `content-files-${item.id}`;
 
-  const preview = async () => {
+  const preview = async (asset, index) => {
     let previewWindow = null;
-    setPreviewBusy(true);
+    const assetKey = reviewAssetKey(asset, index);
+    setPreviewBusyKey(assetKey);
     setPreviewError("");
     try {
       previewWindow = window.open("", "_blank");
       if (!previewWindow) throw new Error("Preview was blocked. Allow pop-ups and try again.");
       previewWindow.opener = null;
-      const result = await previewContentSubmission(item.id);
+      const result = await previewContentSubmission(item.id, asset.assetId);
       previewWindow.location.replace(result.previewUrl);
-      setPreviewed(true);
+      setPreviewedAssetKeys((current) => {
+        const next = new Set(current);
+        next.add(assetKey);
+        return next;
+      });
     } catch (loadError) {
       previewWindow?.close();
       setPreviewError(loadError.message);
     } finally {
-      setPreviewBusy(false);
+      setPreviewBusyKey("");
     }
   };
 
-  return <div className="stack compact-stack"><div className="queue-actions"><Button type="button" className="sm" variant="secondary" disabled={!fileReady || busy || previewBusy} onClick={preview}><ExternalLink size={14} /> {previewBusy ? "Opening…" : "Preview file"}</Button>{!fileReady && <small>File must be verified before it can be previewed.</small>}</div>{previewError && <p className="form-error" role="alert">{previewError}</p>}<DecisionButtons approveValue="published" busy={busy || previewBusy} approvalDisabled={!previewed} onDecision={onDecision} />{!previewed && fileReady && <small className="muted">Preview the private file before publishing.</small>}</div>;
+  return (
+    <div className="content-review-actions">
+      <div className="content-review-toolbar">
+        <div className="content-file-summary">
+          <Button
+            type="button"
+            className="sm"
+            variant="secondary"
+            disabled={!fileCount || busy}
+            aria-expanded={expanded}
+            aria-controls={filesPanelId}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            <Paperclip size={14} />
+            {fileCount} {fileCount === 1 ? "file" : "files"}
+            <ChevronDown className={expanded ? "expanded" : ""} size={14} />
+          </Button>
+          <small>{readyCount} ready · {previewedAssetKeys.size} reviewed</small>
+        </div>
+        <DecisionButtons
+          approveValue="published"
+          busy={busy || Boolean(previewBusyKey)}
+          approvalDisabled={!allPreviewed}
+          onDecision={onDecision}
+        />
+      </div>
+
+      {expanded && (
+        <div className="content-review-files" id={filesPanelId}>
+          <div className="content-review-files-heading">
+            <div>
+              <b>Uploaded files</b>
+              <small>Open each verified attachment before publishing this content.</small>
+            </div>
+            <Badge tone={allPreviewed ? "success" : "info"}>
+              {readyAssetEntries.filter(({ key }) => previewedAssetKeys.has(key)).length}/{readyAssetEntries.length} reviewed
+            </Badge>
+          </div>
+          {assets.length ? (
+            <div className="content-review-file-list">
+              {assets.map((asset, index) => {
+                const assetKey = reviewAssetKey(asset, index);
+                const ready = asset.status === "ready";
+                const reviewed = previewedAssetKeys.has(assetKey);
+                return (
+                  <div className="content-review-file" key={assetKey}>
+                    <span className={`content-review-file-icon ${ready ? "ready" : ""}`}><FileText size={17} /></span>
+                    <div className="content-review-file-copy">
+                      <b>{asset.filename}</b>
+                      <small>{asset.mediaType} · {formatReviewFileSize(asset.sizeBytes)}</small>
+                    </div>
+                    <Badge tone={ready ? "success" : "warning"}>{titleCase(asset.status)}</Badge>
+                    <Button
+                      type="button"
+                      className="sm"
+                      variant="secondary"
+                      aria-label={`${reviewed ? "Preview again" : "Preview"} ${asset.filename}`}
+                      disabled={!ready || busy || Boolean(previewBusyKey)}
+                      onClick={() => preview(asset, index)}
+                    >
+                      {reviewed ? <CheckCircle2 size={14} /> : <ExternalLink size={14} />}
+                      {previewBusyKey === assetKey ? "Opening…" : reviewed ? "Preview again" : "Preview file"}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : <p className="empty-copy">No uploaded files were found for this submission.</p>}
+        </div>
+      )}
+
+      {previewError && <p className="form-error" role="alert">{previewError}</p>}
+      {!allFilesReady && assets.length > 0 && (
+        <small className="muted">Every uploaded file must finish verification before publishing.</small>
+      )}
+      {allFilesReady && !allPreviewed && (
+        <small className="muted">Preview every verified file before publishing.</small>
+      )}
+      {!assets.length && (
+        <small className="muted">At least one verified file is required before publishing.</small>
+      )}
+    </div>
+  );
 }
 
 export function AdminDashboardPage() {
@@ -297,20 +401,21 @@ export function AdminUsersPage() {
 }
 
 export function AdminCatalogPage() {
+  const { refreshCatalog } = usePlatform();
   const [courses, setCourses] = useState([]);
   const [contents, setContents] = useState([]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
 
+  const loadQueues = async () => {
+    const [nextCourses, nextContents] = await Promise.all([getCourseSubmissions(), getContentSubmissions()]);
+    setCourses(nextCourses);
+    setContents(nextContents);
+  };
+
   const refresh = async () => {
     setError("");
-    try {
-      const [nextCourses, nextContents] = await Promise.all([getCourseSubmissions(), getContentSubmissions()]);
-      setCourses(nextCourses);
-      setContents(nextContents);
-    } catch (loadError) {
-      setError(loadError.message);
-    }
+    try { await loadQueues(); } catch (loadError) { setError(loadError.message); }
   };
 
   useEffect(() => { void refresh(); }, []);
@@ -321,7 +426,17 @@ export function AdminCatalogPage() {
     try {
       if (kind === "course") await decideCourseSubmission(id, { decision, reason });
       else await decideContentSubmission(id, { decision, reason });
-      await refresh();
+      const [queueRefresh, marketplaceRefresh] = await Promise.allSettled([
+        loadQueues(),
+        refreshCatalog(),
+      ]);
+      const refreshFailures = [
+        queueRefresh.status === "rejected" ? "the review queue" : "",
+        marketplaceRefresh.status === "rejected" ? "the marketplace" : "",
+      ].filter(Boolean);
+      if (refreshFailures.length) {
+        setError(`Decision saved, but ${refreshFailures.join(" and ")} could not refresh automatically.`);
+      }
     } catch (decisionError) {
       setError(decisionError.message);
     } finally {
@@ -344,13 +459,13 @@ export function AdminCatalogPage() {
       <Button variant="secondary" onClick={refresh} disabled={Boolean(busy)}>Refresh</Button>
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="queue-list">
-      {queue.map((item) => <div key={`${item.kind}-${item.id}`}>
+    <div className="queue-list catalogue-review-list">
+      {queue.map((item) => <div className={`catalogue-review-item ${item.kind}`} key={`${item.kind}-${item.id}`}>
         <span>{item.kind === "course" ? <BookOpen size={18} /> : <FileText size={18} />}</span>
         <div>
           <b>{item.title}</b>
           <small>{item.owner?.displayName || "Owner"} · {item.pricePoints} points · {item.kind === "course" ? item.deliveryModes?.join(", ") : item.contentType}</small>
-          {item.kind === "content" && <span className="queue-detail">Private file status: {item.fileStatus || "missing"}</span>}
+          {item.kind === "content" && <span className="queue-detail">Private attachments: {Math.max(Number(item.assetCount || 0), item.assets?.length || 0, item.storageUrlPresent ? 1 : 0)}</span>}
         </div>
         {item.kind === "content"
           ? <ContentReviewActions item={item} busy={busy === `${item.kind}-${item.id}`} onDecision={(decision, reason) => decide(item.kind, item.id, decision, reason)} />

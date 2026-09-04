@@ -16,6 +16,11 @@ import {
   verificationCodeMatches,
   verificationWindow,
 } from './email-verification.js';
+import {
+  registrationContinuationLifetimeSeconds,
+  signRegistrationContinuation,
+  verifyRegistrationContinuation,
+} from './registration-continuation.js';
 
 export type Actor = {
   id: string;
@@ -60,6 +65,7 @@ const resendVerificationSchema = z.object({ email: emailSchema });
 const accessTokenLifetime = '15m';
 const refreshLifetimeMs = 1000 * 60 * 60 * 24 * 14;
 const refreshCookieName = 'colearnx_refresh';
+const registrationContinuationCookieName = 'colearnx_registration';
 
 function signAccessToken(actor: Actor) {
   return jwt.sign({ sub: actor.id, email: actor.email, roles: actor.roles }, env.ACCESS_TOKEN_SECRET, { expiresIn: accessTokenLifetime });
@@ -78,7 +84,7 @@ function actorNeedsEmailVerification(actor: Actor) {
   return Boolean(actor.emailVerificationRequiredAt && !actor.emailVerifiedAt);
 }
 
-function refreshCookieOptions() {
+function authCookieBaseOptions() {
   const secure = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';
   return {
     httpOnly: true,
@@ -86,7 +92,17 @@ function refreshCookieOptions() {
     sameSite: secure ? 'none' as const : 'lax' as const,
     domain: env.COOKIE_DOMAIN || undefined,
     path: '/api/v1/auth',
-    maxAge: refreshLifetimeMs,
+  };
+}
+
+function refreshCookieOptions() {
+  return { ...authCookieBaseOptions(), maxAge: refreshLifetimeMs };
+}
+
+function registrationContinuationCookieOptions() {
+  return {
+    ...authCookieBaseOptions(),
+    maxAge: registrationContinuationLifetimeSeconds * 1000,
   };
 }
 
@@ -167,6 +183,14 @@ export async function register(req: Request, res: Response) {
     return challenge;
   });
 
+  res.cookie(
+    registrationContinuationCookieName,
+    signRegistrationContinuation({
+      userId: pendingChallenge.userId,
+      email: pendingChallenge.email,
+    }, env.REFRESH_TOKEN_SECRET),
+    registrationContinuationCookieOptions(),
+  );
   await sendPendingChallenge(pendingChallenge);
   return ok(res, {
     email: pendingChallenge.email,
@@ -178,6 +202,10 @@ export async function register(req: Request, res: Response) {
 
 export async function verifyEmail(req: Request, res: Response) {
   const input = parse(verificationSchema, req.body);
+  const continuation = verifyRegistrationContinuation(
+    req.cookies?.[registrationContinuationCookieName] as string | undefined,
+    env.REFRESH_TOKEN_SECRET,
+  );
   const outcome = await withTransaction(async (client) => {
     const users = await client.query<VerificationUser>(`SELECT user_id AS id, email::text AS email, account_status AS status,
       email_verified_at, email_verification_required_at
@@ -204,17 +232,46 @@ export async function verifyEmail(req: Request, res: Response) {
     await client.query('DELETE FROM email_verification_challenges WHERE user_id = $1', [user.id]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json)
       VALUES ($1, 'auth.email_verified', 'users', $2, jsonb_build_object('method', 'email_code'))`, [user.id, user.id]);
-    return { kind: 'verified' as const };
+    return { kind: 'verified' as const, userId: user.id, email: user.email };
   });
 
   if (outcome.kind === 'expired') throw new ApiError(400, 'EMAIL_VERIFICATION_CODE_EXPIRED', 'This verification code has expired. Request a new email.');
   if (outcome.kind === 'locked') throw new ApiError(429, 'EMAIL_VERIFICATION_CODE_LOCKED', 'Too many incorrect codes. Request a new email.');
   if (outcome.kind !== 'verified') throw new ApiError(400, 'EMAIL_VERIFICATION_INVALID', 'The verification code is incorrect or unavailable.');
-  return ok(res, { verified: true });
+  res.clearCookie(registrationContinuationCookieName, authCookieBaseOptions());
+  const continuationMatches = continuation
+    && continuation.userId === outcome.userId
+    && continuation.email.toLowerCase() === outcome.email.toLowerCase();
+  if (!continuationMatches) return ok(res, { verified: true, authenticated: false });
+
+  try {
+    const actor = await loadActor(outcome.userId);
+    if (!actor || actor.status !== 'active' || actorNeedsEmailVerification(actor)) {
+      return ok(res, { verified: true, authenticated: false });
+    }
+    const refreshToken = await createRefreshSession(actor, req, res);
+    return ok(res, {
+      verified: true,
+      authenticated: true,
+      user: actor,
+      accessToken: signAccessToken(actor),
+      csrfToken: createCsrfToken(refreshToken),
+    });
+  } catch (sessionError) {
+    res.locals.log?.warn({
+      requestId: res.locals.requestId,
+      errorName: sessionError instanceof Error ? sessionError.name : 'UnknownError',
+    }, 'Email verified but automatic sign-in could not be completed');
+    return ok(res, { verified: true, authenticated: false });
+  }
 }
 
 export async function resendEmailVerification(req: Request, res: Response) {
   const input = parse(resendVerificationSchema, req.body);
+  const continuation = verifyRegistrationContinuation(
+    req.cookies?.[registrationContinuationCookieName] as string | undefined,
+    env.REFRESH_TOKEN_SECRET,
+  );
   const pendingChallenge = await withTransaction(async (client) => {
     const users = await client.query<VerificationUser>(`SELECT user_id AS id, email::text AS email, account_status AS status,
       email_verified_at, email_verification_required_at
@@ -242,7 +299,22 @@ export async function resendEmailVerification(req: Request, res: Response) {
     return challenge;
   });
 
-  if (pendingChallenge) await sendPendingChallenge(pendingChallenge);
+  if (pendingChallenge) {
+    if (
+      continuation?.userId === pendingChallenge.userId
+      && continuation.email.toLowerCase() === pendingChallenge.email.toLowerCase()
+    ) {
+      res.cookie(
+        registrationContinuationCookieName,
+        signRegistrationContinuation({
+          userId: pendingChallenge.userId,
+          email: pendingChallenge.email,
+        }, env.REFRESH_TOKEN_SECRET),
+        registrationContinuationCookieOptions(),
+      );
+    }
+    await sendPendingChallenge(pendingChallenge);
+  }
   // This response intentionally does not disclose whether an address belongs
   // to a pending account, is already verified, or is subject to cooldown.
   return ok(res, { accepted: true }, 202);

@@ -100,6 +100,24 @@ const mapContent = (content) => ({
   purchased: false,
 });
 
+const preservePurchaseMetadata = (nextItems, currentItems) => {
+  const purchasedById = new Map(
+    currentItems.filter((item) => item.purchased).map((item) => [item.id, item]),
+  );
+  return nextItems.map((item) => {
+    const previous = purchasedById.get(item.id);
+    if (!previous) return item;
+    return {
+      ...item,
+      purchased: true,
+      purchasedAt: previous.purchasedAt,
+      orderItemId: previous.orderItemId,
+      orderId: previous.orderId,
+      refundStatus: previous.refundStatus,
+    };
+  });
+};
+
 const transactionPresentation = (transaction) => {
   const available = Number(transaction.availableDelta || 0);
   const frozen = Number(transaction.frozenDelta || 0);
@@ -239,8 +257,8 @@ export function PlatformProvider({ children }) {
 
   const refreshCatalog = useCallback(async () => {
     const [courseData, contentData] = await Promise.all([listCourses(), listContent()]);
-    setCourses(courseData.map(mapCourse));
-    setContents(contentData.map(mapContent));
+    setCourses((current) => preservePurchaseMetadata(courseData.map(mapCourse), current));
+    setContents((current) => preservePurchaseMetadata(contentData.map(mapContent), current));
   }, []);
 
   const refreshWallet = useCallback(async () => {
@@ -431,7 +449,32 @@ export function PlatformProvider({ children }) {
     return result;
   };
 
-  const verifyRegistrationEmail = async (input) => verifyEmailAddress(input);
+  const verifyRegistrationEmail = async (input) => {
+    const result = await verifyEmailAddress(input);
+    if (!result.authenticated || !result.user || !result.accessToken || !result.csrfToken) {
+      return result;
+    }
+
+    setAccessToken(result.accessToken);
+    setCsrfToken(result.csrfToken);
+    const initialRoles = applyServerIdentity(result.user);
+    setAccountLoading(false);
+
+    // Verification has already succeeded and the session is usable. Secondary
+    // hydration failures must not turn a consumed verification code into an error.
+    let roles = initialRoles;
+    try {
+      roles = applyServerIdentity(await getCurrentUser());
+    } catch {
+      // The verified session remains valid; account data can retry later.
+    }
+    try {
+      await refreshAccountData(roles);
+    } catch {
+      // Enter the workspace even if a non-auth dataset is briefly unavailable.
+    }
+    return result;
+  };
 
   const resendRegistrationEmail = async (input) => resendVerificationEmail(input);
 
