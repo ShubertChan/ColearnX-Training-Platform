@@ -1,5 +1,6 @@
 import { closeDatabase, query, withTransaction } from '../db/database.js';
 import { deleteStoredObject } from './r2.js';
+import { SIGNED_UPLOAD_EXPIRY_SAFETY_SECONDS } from './storage-deletion.js';
 
 type CleanupAsset = {
   storage_asset_id: string;
@@ -14,7 +15,8 @@ async function lockCleanupCandidates() {
   return withTransaction(async (client) => {
     await client.query(`WITH expired AS (
       SELECT storage_asset_id FROM storage_assets
-      WHERE asset_status IN ('pending', 'uploaded') AND upload_expires_at < now()
+      WHERE asset_status IN ('pending', 'uploaded')
+        AND upload_expires_at + ($2::integer * interval '1 second') <= now()
       ORDER BY upload_expires_at, storage_asset_id
       FOR UPDATE SKIP LOCKED
       LIMIT $1
@@ -22,17 +24,18 @@ async function lockCleanupCandidates() {
     UPDATE storage_assets sa
     SET asset_status = 'orphaned', updated_at = now()
     FROM expired
-    WHERE sa.storage_asset_id = expired.storage_asset_id`, [batchSize]);
+    WHERE sa.storage_asset_id = expired.storage_asset_id`, [batchSize, SIGNED_UPLOAD_EXPIRY_SAFETY_SECONDS]);
 
     const candidates = await client.query<CleanupAsset>(`SELECT sa.storage_asset_id, sa.bucket_name, sa.object_key
       FROM storage_assets sa
       WHERE sa.asset_status IN ('orphaned', 'delete_pending')
+        AND sa.upload_expires_at + ($2::integer * interval '1 second') <= now()
         AND NOT EXISTS (
           SELECT 1 FROM content_versions cv WHERE cv.storage_asset_id = sa.storage_asset_id
         )
       ORDER BY sa.updated_at, sa.storage_asset_id
       FOR UPDATE SKIP LOCKED
-      LIMIT $1`, [batchSize]);
+      LIMIT $1`, [batchSize, SIGNED_UPLOAD_EXPIRY_SAFETY_SECONDS]);
     return candidates.rows;
   });
 }

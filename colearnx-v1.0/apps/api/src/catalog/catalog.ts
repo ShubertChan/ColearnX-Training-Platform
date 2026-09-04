@@ -5,6 +5,7 @@ import type { Actor } from '../auth/auth.js';
 import { query, withTransaction } from '../db/database.js';
 import { ApiError, ok } from '../lib/http.js';
 import { deleteStoredObject } from '../storage/r2.js';
+import { canFinalizeStorageAssetDeletion } from '../storage/storage-deletion.js';
 import { parse, uuid } from '../lib/validation.js';
 
 const listQuery = z.object({ q: z.string().trim().max(120).optional(), category: z.string().trim().max(80).optional(), cursor: z.string().datetime().optional(), limit: z.coerce.number().int().min(1).max(100).default(20) });
@@ -17,11 +18,15 @@ type PendingStorageAsset = {
   storage_asset_id: string;
   bucket_name: string;
   object_key: string;
+  upload_expires_at: Date;
 };
 
 async function bestEffortDeleteArchivedDraftAsset(asset: PendingStorageAsset) {
   try {
     await deleteStoredObject({ bucketName: asset.bucket_name, objectKey: asset.object_key });
+    // A still-valid signed PUT could recreate an object after this deletion.
+    // Keep it retryable until reconciliation runs after URL expiry.
+    if (!canFinalizeStorageAssetDeletion(asset.upload_expires_at)) return;
     await query(`UPDATE storage_assets
       SET asset_status = 'deleted', deleted_at = now(), updated_at = now()
       WHERE storage_asset_id = $1 AND asset_status = 'delete_pending'`, [asset.storage_asset_id]);
@@ -233,7 +238,7 @@ export async function deleteContentDraft(req: Request, res: Response) {
     const cleanupAssets = await client.query<PendingStorageAsset>(`UPDATE storage_assets
       SET asset_status = 'delete_pending', updated_at = now()
       WHERE content_version_id = $1 AND owner_user_id = $2 AND asset_status <> 'deleted'
-      RETURNING storage_asset_id, bucket_name, object_key`,
+      RETURNING storage_asset_id, bucket_name, object_key, upload_expires_at`,
     [contentVersionId, actor.id]);
     await client.query(`UPDATE contents
       SET publication_status = 'archived', updated_at = now()

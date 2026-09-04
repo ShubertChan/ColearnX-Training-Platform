@@ -43,6 +43,7 @@ import {
   getWalletTransactions,
 } from "../api/wallet";
 import { normalizePortfolioUrl, parseRoleApplicationSupportingText } from "../utils/roleApplication";
+import { removeListingByIdentity } from "../utils/listingWorkspace";
 
 const PlatformContext = createContext(null);
 
@@ -651,17 +652,22 @@ export function PlatformProvider({ children }) {
     return listing;
   };
 
-  const deleteDraftListing = async (listing) => {
+  const deleteDraftListing = useCallback(async (listing) => {
     if (!listing?.id || !["course", "content"].includes(listing.kind)) {
       throw new Error("This listing is not a deletable draft.");
     }
     const result = listing.kind === "course"
       ? await deleteCourseDraft(listing.id)
       : await deleteContentDraft(listing.id);
-    await refreshMyListings();
-    notify("Draft deleted. Any attached private files are queued for secure cleanup.");
+    setPublishedItems((current) => removeListingByIdentity(current, listing));
+    try {
+      await refreshMyListings();
+      notify("Draft deleted. Any attached private files are queued for secure cleanup.");
+    } catch {
+      notify("Draft deleted. The list will resync the next time it is refreshed.");
+    }
     return result;
-  };
+  }, [notify, refreshMyListings]);
 
   const deletePublishedItem = () => {
     notify("Only drafts can be deleted. Published and submitted listings are retained for review and records.");

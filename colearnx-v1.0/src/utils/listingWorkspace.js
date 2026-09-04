@@ -10,6 +10,12 @@ export function listingsForWorkspace(listings, role) {
   return (listings || []).filter((listing) => listing.kind === kind);
 }
 
+export function removeListingByIdentity(listings, removed) {
+  return (listings || []).filter((listing) =>
+    listing.kind !== removed?.kind || listing.id !== removed?.id,
+  );
+}
+
 export function workspaceListingCopy(role) {
   return role === "Creator"
     ? {

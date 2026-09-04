@@ -18,6 +18,8 @@ import {
   type UploadMetadata,
 } from './r2.js';
 import { storageQuotaViolation } from './storage-quota.js';
+import { REPLACEMENT_ASSET_ORDER_BY_SQL } from './storage-asset-order.js';
+import { canFinalizeStorageAssetDeletion, remainingSignedUploadTtlSeconds } from './storage-deletion.js';
 import { env } from '../config/env.js';
 
 const uploadIntentInput = z.object({
@@ -233,7 +235,15 @@ export async function createUploadIntent(req: Request, res: Response) {
 
   await Promise.all(outcome.discarded.map((discarded) => bestEffortDelete(discarded)));
   const asset = outcome.asset;
-  const uploadUrl = await signUpload({ bucketName: asset.bucket_name, objectKey: asset.object_key }, asset.declared_content_type);
+  const expiresInSeconds = remainingSignedUploadTtlSeconds(asset.upload_expires_at);
+  if (expiresInSeconds < 1) {
+    throw new ApiError(409, 'UPLOAD_INTENT_EXPIRED', 'The upload intent has expired. Start a new upload.');
+  }
+  const uploadUrl = await signUpload(
+    { bucketName: asset.bucket_name, objectKey: asset.object_key },
+    asset.declared_content_type,
+    expiresInSeconds,
+  );
   return ok(res, pendingAssetResponse(asset, uploadUrl), 201);
 }
 
@@ -241,9 +251,12 @@ function mismatch(head: HeadedObject, asset: AssetRow) {
   return head.contentLength !== Number(asset.declared_byte_size) || !contentTypeMatches(asset.declared_content_type, head.contentType);
 }
 
-async function bestEffortDelete(asset: Pick<AssetRow, 'storage_asset_id' | 'bucket_name' | 'object_key'>) {
+async function bestEffortDelete(asset: Pick<AssetRow, 'storage_asset_id' | 'bucket_name' | 'object_key' | 'upload_expires_at'>) {
   try {
     await deleteStoredObject({ bucketName: asset.bucket_name, objectKey: asset.object_key });
+    // Leave the row retryable until its signed PUT URL can no longer recreate
+    // the object. Reconciliation deletes it again after the safety window.
+    if (!canFinalizeStorageAssetDeletion(asset.upload_expires_at)) return;
     await query(`UPDATE storage_assets
       SET asset_status = 'deleted', deleted_at = now(), updated_at = now()
       WHERE storage_asset_id = $1 AND asset_status = 'delete_pending'`, [asset.storage_asset_id]);
@@ -315,7 +328,7 @@ export async function deleteUploadIntent(req: Request, res: Response) {
         FROM storage_assets
         WHERE content_version_id = $1 AND owner_user_id = $2 AND storage_asset_id <> $3
           AND asset_status = 'ready'
-        ORDER BY completed_at DESC NULLS LAST, created_at ASC
+        ORDER BY ${REPLACEMENT_ASSET_ORDER_BY_SQL}
         LIMIT 1`, [contentVersionId, actor.id, stored.storage_asset_id]);
       await client.query(`UPDATE content_versions SET storage_asset_id = $2 WHERE content_version_id = $1`,
         [contentVersionId, replacement.rows[0]?.storage_asset_id ?? null]);
