@@ -2816,6 +2816,17 @@ tbody tr[role="button"]:focus-visible {
   .learning-row > .button {
     grid-column: 2;
   }
+  .order-history-card footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .asset-download-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .asset-download-row > .button {
+    grid-column: 2;
+    justify-self: start;
+  }
   .history-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -2905,6 +2916,85 @@ tbody tr[role="button"]:focus-visible {
 .upload-actions { margin: 0; }
 .upload-gate-note, .draft-reference { color: var(--muted); overflow-wrap: anywhere; }
 .editor-summary .draft-reference, .editor-summary .form-error { display: block; margin-top: 9px; text-align: left; }
+.order-history-list {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+.order-history-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.order-history-card header,
+.order-history-card footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.order-history-card header b,
+.order-history-card header small {
+  display: block;
+}
+.order-history-card header small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.order-history-items {
+  display: grid;
+  gap: 7px;
+}
+.order-history-items > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.order-history-items > div > svg {
+  color: var(--brand);
+}
+.order-history-items > div > span {
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.order-history-items > div > b,
+.order-history-card footer b {
+  color: var(--ink);
+}
+.order-history-card footer > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.asset-download-summary {
+  color: var(--muted);
+  font-size: 11px;
+}
+.asset-download-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--soft);
+}
+.asset-download-row > svg {
+  color: var(--brand);
+}
+.asset-download-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 11px;
+}
 .learning-actions { display: grid; justify-items: start; gap: 6px; }
 .learning-actions .form-error { margin: 0; font-size: 11px; }
 

@@ -1,5 +1,5 @@
-import { apiClient } from "./client";
-import { getPrivateAssetMediaType } from "../utils/uploadPolicy";
+import { apiClient } from "./client.js";
+import { getPrivateAssetMediaType } from "../utils/uploadPolicy.js";
 
 const env = import.meta.env || {};
 export const usingLocalUploadDemo = Boolean(env.DEV && !env.VITE_API_BASE_URL);
