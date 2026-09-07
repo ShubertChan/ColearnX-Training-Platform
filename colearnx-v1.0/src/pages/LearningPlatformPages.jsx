@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Download,
   FileArchive,
+  FileText,
   GraduationCap,
   ReceiptText,
   ShoppingCart,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { usePlatform } from "../context/PlatformContext";
-import { requestContentDownloadUrl } from "../api/uploads";
+import { listContentAssets, requestContentDownloadUrl } from "../api/uploads";
 import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
 
 const deliveryLabel = (modes = []) =>
@@ -87,41 +88,102 @@ export function OrderHistoryPage() {
   const [loading, setLoading] = useState(false);
   const refresh = async () => { setLoading(true); try { await refreshOrders(); } finally { setLoading(false); } };
   if (!orders.length) return <EmptyState icon={ReceiptText} title="No orders yet" description="Completed course and content purchases are recorded here." action={<Button onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh orders"}</Button>} />;
-  return <Card><div className="card-heading"><div><span className="eyebrow">Order history</span><h2>Server-issued receipts</h2></div><Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button></div><div className="responsive-table"><table><thead><tr><th>Order</th><th>Items</th><th>Total</th><th>Status</th><th /></tr></thead><tbody>{orders.map((order) => <tr key={order.id}><td><b>{order.orderNo}</b><span className="table-subtitle">{order.paidAt ? new Date(order.paidAt).toLocaleString() : "—"}</span></td><td>{order.items.length}</td><td>{order.total} points</td><td><Badge tone="success">{order.status}</Badge></td><td><Link className="button secondary sm" to={`/checkout-success/${order.id}`}>View</Link></td></tr>)}</tbody></table></div></Card>;
+  return (
+    <Card>
+      <div className="card-heading">
+        <div><span className="eyebrow">Order history</span><h2>Server-issued receipts</h2></div>
+        <Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>
+      </div>
+      <div className="order-history-list">
+        {orders.map((order) => (
+          <article key={order.id} className="order-history-card">
+            <header>
+              <div>
+                <b>{order.orderNo}</b>
+                <small>{order.paidAt ? new Date(order.paidAt).toLocaleString() : "Payment time unavailable"}</small>
+              </div>
+              <Badge tone={order.status === "Paid" ? "success" : "warning"}>{order.status}</Badge>
+            </header>
+            <div className="order-history-items" aria-label="Purchased items">
+              {order.items.map((item) => (
+                <div key={item.id}>
+                  {item.kind === "content" ? <FileArchive size={16} /> : <GraduationCap size={16} />}
+                  <span>{item.title}</span>
+                  <b>{item.price} points</b>
+                </div>
+              ))}
+            </div>
+            <footer>
+              <span>Total <b>{order.total} points</b></span>
+              <Link className="button secondary sm" to={`/checkout-success/${order.id}`}>View receipt</Link>
+            </footer>
+          </article>
+        ))}
+      </div>
+    </Card>
+  );
 }
 
 function ContentDownloadButton({ contentVersionId }) {
+  const [assets, setAssets] = useState([]);
+  const [loadingAssets, setLoadingAssets] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const requestDownload = async () => {
+
+  const loadAssets = async () => {
+    setLoadingAssets(true);
+    setError("");
+    try {
+      const nextAssets = await listContentAssets(contentVersionId);
+      const readyAssets = nextAssets.filter((asset) => asset.status === "ready");
+      setAssets(readyAssets);
+      if (!readyAssets.length) setError("No verified files are available for this purchase yet.");
+    } catch (assetError) {
+      setError(assetError.message || "Could not load the purchased files. Try again.");
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
+
+  useEffect(() => { void loadAssets(); }, [contentVersionId]);
+
+  const requestDownload = async (asset) => {
     setBusy(true);
     setError("");
     try {
-      const result = await requestContentDownloadUrl(contentVersionId);
+      const result = await requestContentDownloadUrl(contentVersionId, asset.assetId);
       const link = document.createElement("a");
       link.href = result.downloadUrl;
-      link.download = result.filename || "colearnx-content";
+      link.download = result.filename || asset.filename || "colearnx-content";
       link.rel = "noopener";
       document.body.appendChild(link);
       link.click();
       link.remove();
       if (result.demoObjectUrl) window.setTimeout(() => URL.revokeObjectURL(result.downloadUrl), 1000);
     } catch (downloadError) {
-      setError(downloadError.message);
+      setError(downloadError.message || "The file could not be downloaded. Try again.");
     } finally {
       setBusy(false);
     }
   };
+
   return (
     <div className="learning-actions">
-      <Button type="button" variant="secondary" size="sm" onClick={requestDownload} disabled={busy}>
-        <Download size={15} /> {busy ? "Requesting…" : "Download"}
-      </Button>
+      <span className="asset-download-summary">{loadingAssets ? "Loading purchased files…" : `${assets.length} file${assets.length === 1 ? "" : "s"} available`}</span>
+      {assets.map((asset) => (
+        <div className="asset-download-row" key={asset.assetId}>
+          <FileText size={15} />
+          <span title={asset.filename}>{asset.filename}</span>
+          <Button type="button" variant="secondary" size="sm" onClick={() => void requestDownload(asset)} disabled={busy}>
+            <Download size={15} /> {busy ? "Requesting…" : "Download"}
+          </Button>
+        </div>
+      ))}
+      {!loadingAssets && <Button type="button" variant="ghost" size="sm" onClick={() => void loadAssets()} disabled={busy}>Refresh files</Button>}
       {error && <small className="form-error" role="alert">{error}</small>}
     </div>
   );
 }
-
 export function PurchasesPage() {
   const { orders } = usePlatform();
   const items = useMemo(
