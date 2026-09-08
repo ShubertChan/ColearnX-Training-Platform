@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Download,
   FileArchive,
   FileText,
@@ -125,12 +127,17 @@ export function OrderHistoryPage() {
 }
 
 function ContentDownloadButton({ contentVersionId }) {
-  const [assets, setAssets] = useState([]);
-  const [loadingAssets, setLoadingAssets] = useState(true);
+  const panelId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const [assets, setAssets] = useState(null);
+  const [loadingAssets, setLoadingAssets] = useState(false);
+  const assetRequestPending = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const loadAssets = async () => {
+    if (assetRequestPending.current) return;
+    assetRequestPending.current = true;
     setLoadingAssets(true);
     setError("");
     try {
@@ -141,11 +148,16 @@ function ContentDownloadButton({ contentVersionId }) {
     } catch (assetError) {
       setError(assetError.message || "Could not load the purchased files. Try again.");
     } finally {
+      assetRequestPending.current = false;
       setLoadingAssets(false);
     }
   };
 
-  useEffect(() => { void loadAssets(); }, [contentVersionId]);
+  const toggleFiles = () => {
+    const nextExpanded = !expanded;
+    setExpanded(nextExpanded);
+    if (nextExpanded && assets === null) void loadAssets();
+  };
 
   const requestDownload = async (asset) => {
     setBusy(true);
@@ -169,18 +181,30 @@ function ContentDownloadButton({ contentVersionId }) {
 
   return (
     <div className="learning-actions">
-      <span className="asset-download-summary">{loadingAssets ? "Loading purchased files…" : `${assets.length} file${assets.length === 1 ? "" : "s"} available`}</span>
-      {assets.map((asset) => (
-        <div className="asset-download-row" key={asset.assetId}>
-          <FileText size={15} />
-          <span title={asset.filename}>{asset.filename}</span>
-          <Button type="button" variant="secondary" size="sm" onClick={() => void requestDownload(asset)} disabled={busy}>
-            <Download size={15} /> {busy ? "Requesting…" : "Download"}
+      <Button type="button" variant="secondary" size="sm" onClick={toggleFiles} aria-expanded={expanded} aria-controls={panelId}>
+        {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        {expanded ? "Hide files" : "Show files"}
+      </Button>
+      <div id={panelId} hidden={!expanded}>
+        <div className="learning-actions" aria-busy={loadingAssets}>
+          <span className="asset-download-summary" role="status">
+            {loadingAssets ? "Loading purchased files…" : assets !== null ? `${assets.length} file${assets.length === 1 ? "" : "s"} available` : ""}
+          </span>
+          {(assets || []).map((asset) => (
+            <div className="asset-download-row" key={asset.assetId}>
+              <FileText size={15} />
+              <span title={asset.filename}>{asset.filename}</span>
+              <Button type="button" variant="secondary" size="sm" onClick={() => void requestDownload(asset)} disabled={busy || loadingAssets}>
+                <Download size={15} /> {busy ? "Requesting…" : "Download"}
+              </Button>
+            </div>
+          ))}
+          <Button type="button" variant="ghost" size="sm" onClick={() => void loadAssets()} disabled={busy || loadingAssets}>
+            {loadingAssets ? "Loading files…" : assets === null ? "Retry loading files" : "Refresh files"}
           </Button>
+          {error && <small className="form-error" role="alert">{error}</small>}
         </div>
-      ))}
-      {!loadingAssets && <Button type="button" variant="ghost" size="sm" onClick={() => void loadAssets()} disabled={busy}>Refresh files</Button>}
-      {error && <small className="form-error" role="alert">{error}</small>}
+      </div>
     </div>
   );
 }
@@ -207,7 +231,7 @@ export function PurchasesPage() {
                 : "Course delivery access is determined from the server-side order snapshot."}
             </p>
           </div>
-          {item.kind === "content" ? <ContentDownloadButton contentVersionId={item.productId} /> : null}
+          {item.kind === "content" ? <ContentDownloadButton key={item.productId} contentVersionId={item.productId} /> : null}
           <Link className="button secondary sm" to={`/checkout-success/${item.order.id}`}>View receipt</Link>
         </Card>
       ))}
