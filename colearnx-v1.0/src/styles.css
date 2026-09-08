@@ -2816,17 +2816,6 @@ tbody tr[role="button"]:focus-visible {
   .learning-row > .button {
     grid-column: 2;
   }
-  .order-history-card footer {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .asset-download-row {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .asset-download-row > .button {
-    grid-column: 2;
-    justify-self: start;
-  }
   .history-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -2997,6 +2986,24 @@ tbody tr[role="button"]:focus-visible {
 }
 .learning-actions { display: grid; justify-items: start; gap: 6px; }
 .learning-actions .form-error { margin: 0; font-size: 11px; }
+
+@media (max-width: 650px) {
+  .order-history-card footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .learning-row > .learning-actions {
+    grid-column: 2;
+    min-width: 0;
+  }
+  .asset-download-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .asset-download-row > .button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
 
 /* Content attachment queue. */
 .upload-file-list {
