@@ -22,6 +22,14 @@ import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
 const deliveryLabel = (modes = []) =>
   modes.map((mode) => `${mode[0].toUpperCase()}${mode.slice(1)}`).join(" + ") || "Not specified";
 
+const purchaseSummaryLabel = (items = []) => {
+  const firstItem = items[0];
+  if (!firstItem?.title) return "Purchase record";
+  if (items.length === 1) return firstItem.title;
+  const remainingItemCount = items.length - 1;
+  return `${firstItem.title} + ${remainingItemCount} other item${remainingItemCount === 1 ? "" : "s"}`;
+};
+
 export function CartPage() {
   const { cart, courses, balance, removeFromCart, checkout } = usePlatform();
   const navigate = useNavigate();
@@ -77,7 +85,7 @@ export function CheckoutSuccessPage() {
   if (!order) return <EmptyState icon={ReceiptText} title="Order not found" description="Refresh your order history after a completed checkout." action={<Link className="button primary" to="/orders">View order history</Link>} />;
   return (
     <Card className="order-receipt">
-      <section><CheckCircle2 size={38} /><span className="eyebrow">Checkout recorded</span><h2>Thank you for your purchase</h2><p>Order {order.orderNo}. The points ledger and access records were created by the server.</p></section>
+      <section><CheckCircle2 size={38} /><span className="eyebrow">Checkout recorded</span><h2>Thank you for your purchase</h2><p>Your purchase and access records were created by the server.</p></section>
       <section><div className="summary-row"><span>Status</span><Badge tone="success">{order.status}</Badge></div><div className="summary-row"><span>Total</span><b>{order.total} points</b></div><div className="summary-row"><span>Paid at</span><b>{order.paidAt ? new Date(order.paidAt).toLocaleString() : "—"}</b></div></section>
       <section><h3>Purchased items</h3>{order.items.map((item) => <div className="summary-row" key={item.id}><span>{item.title}</span><b>{item.price} points</b></div>)}</section>
       <div className="button-row"><Link className="button secondary" to="/purchases">My learning</Link><Link className="button primary" to="/orders">Order history</Link></div>
@@ -101,7 +109,7 @@ export function OrderHistoryPage() {
           <article key={order.id} className="order-history-card">
             <header>
               <div>
-                <b>{order.orderNo}</b>
+                <b>{purchaseSummaryLabel(order.items)}</b>
                 <small>{order.paidAt ? new Date(order.paidAt).toLocaleString() : "Payment time unavailable"}</small>
               </div>
               <Badge tone={order.status === "Paid" ? "success" : "warning"}>{order.status}</Badge>
@@ -132,7 +140,8 @@ function ContentDownloadButton({ contentVersionId }) {
   const [assets, setAssets] = useState(null);
   const [loadingAssets, setLoadingAssets] = useState(false);
   const assetRequestPending = useRef(false);
-  const [busy, setBusy] = useState(false);
+  const pendingDownloadAssetIds = useRef(new Set());
+  const [pendingDownloadIds, setPendingDownloadIds] = useState(() => new Set());
   const [error, setError] = useState("");
 
   const loadAssets = async () => {
@@ -160,10 +169,15 @@ function ContentDownloadButton({ contentVersionId }) {
   };
 
   const requestDownload = async (asset) => {
-    setBusy(true);
+    if (pendingDownloadAssetIds.current.has(asset.assetId)) return;
+    pendingDownloadAssetIds.current.add(asset.assetId);
+    setPendingDownloadIds((current) => new Set(current).add(asset.assetId));
     setError("");
     try {
-      const result = await requestContentDownloadUrl(contentVersionId, asset.assetId);
+      const result = await requestContentDownloadUrl(contentVersionId, asset.assetId, {
+        filename: asset.filename,
+        mediaType: asset.mediaType,
+      });
       const link = document.createElement("a");
       link.href = result.downloadUrl;
       link.download = result.filename || asset.filename || "colearnx-content";
@@ -175,7 +189,12 @@ function ContentDownloadButton({ contentVersionId }) {
     } catch (downloadError) {
       setError(downloadError.message || "The file could not be downloaded. Try again.");
     } finally {
-      setBusy(false);
+      pendingDownloadAssetIds.current.delete(asset.assetId);
+      setPendingDownloadIds((current) => {
+        const next = new Set(current);
+        next.delete(asset.assetId);
+        return next;
+      });
     }
   };
 
@@ -190,16 +209,19 @@ function ContentDownloadButton({ contentVersionId }) {
           <span className="asset-download-summary" role="status">
             {loadingAssets ? "Loading purchased files…" : assets !== null ? `${assets.length} file${assets.length === 1 ? "" : "s"} available` : ""}
           </span>
-          {(assets || []).map((asset) => (
-            <div className="asset-download-row" key={asset.assetId}>
-              <FileText size={15} />
-              <span title={asset.filename}>{asset.filename}</span>
-              <Button type="button" variant="secondary" size="sm" onClick={() => void requestDownload(asset)} disabled={busy || loadingAssets}>
-                <Download size={15} /> {busy ? "Requesting…" : "Download"}
-              </Button>
-            </div>
-          ))}
-          <Button type="button" variant="ghost" size="sm" onClick={() => void loadAssets()} disabled={busy || loadingAssets}>
+          {(assets || []).map((asset) => {
+            const isRequesting = pendingDownloadIds.has(asset.assetId);
+            return (
+              <div className="asset-download-row" key={asset.assetId}>
+                <FileText size={15} />
+                <span title={asset.filename}>{asset.filename}</span>
+                <Button type="button" variant="secondary" size="sm" onClick={() => void requestDownload(asset)} disabled={isRequesting || loadingAssets}>
+                  <Download size={15} /> {isRequesting ? "Requesting…" : "Download"}
+                </Button>
+              </div>
+            );
+          })}
+          <Button type="button" variant="ghost" size="sm" onClick={() => void loadAssets()} disabled={loadingAssets}>
             {loadingAssets ? "Loading files…" : assets === null ? "Retry loading files" : "Refresh files"}
           </Button>
           {error && <small className="form-error" role="alert">{error}</small>}
