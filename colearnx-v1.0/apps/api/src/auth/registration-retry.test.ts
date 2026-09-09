@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import argon2 from 'argon2';
 import type { PoolClient } from 'pg';
 
 process.env.NODE_ENV = 'test';
@@ -28,12 +29,14 @@ function clientWith(responses: QueryResponse[]) {
   return { client, calls };
 }
 
+const registrationPassword = 'Original-registration-test-42';
 const pendingUser = {
   id: '1c5a3ce6-cf5d-4b46-8b74-b5c8235aaf6e',
   email: 'member@example.com',
   status: 'active',
   email_verified_at: null,
   email_verification_required_at: new Date('2026-09-09T00:00:00.000Z'),
+  password_hash: await argon2.hash(registrationPassword, { type: argon2.argon2id }),
 };
 
 test('a repeat registration reuses a valid pending verification code', async () => {
@@ -42,7 +45,7 @@ test('a repeat registration reuses a valid pending verification code', async () 
     [{ expires_at: new Date(Date.now() + 60_000), resend_available_at: new Date(Date.now() + 30_000), failed_attempts: 0 }],
   ]);
 
-  const outcome = await resumePendingRegistration(client, pendingUser.email);
+  const outcome = await resumePendingRegistration(client, pendingUser.email, registrationPassword);
 
   assert.equal(outcome.kind, 'reuse');
   assert.equal(outcome.email, pendingUser.email);
@@ -55,7 +58,7 @@ test('an expired or locked pending verification code is replaced', async () => {
     { expires_at: new Date(Date.now() + 60_000), resend_available_at: new Date(Date.now() + 30_000), failed_attempts: 5 },
   ]) {
     const { client, calls } = clientWith([[pendingUser], [challenge], []]);
-    const outcome = await resumePendingRegistration(client, pendingUser.email);
+    const outcome = await resumePendingRegistration(client, pendingUser.email, registrationPassword);
 
     assert.equal(outcome.kind, 'send');
     assert.equal(outcome.challenge.userId, pendingUser.id);
@@ -68,6 +71,25 @@ test('a verified or unavailable account cannot resume registration', async () =>
     { ...pendingUser, email_verified_at: new Date('2026-09-09T00:01:00.000Z') },
   ]]);
 
-  assert.deepEqual(await resumePendingRegistration(client, pendingUser.email), { kind: 'conflict' });
+  assert.deepEqual(await resumePendingRegistration(client, pendingUser.email, registrationPassword), { kind: 'conflict' });
   assert.equal(calls.length, 1);
+});
+
+test('a retry with a different password cannot resume or alter the pending registration', async () => {
+  const { client, calls } = clientWith([[pendingUser]]);
+
+  const outcome = await resumePendingRegistration(client, pendingUser.email, 'Different-registration-test-42');
+
+  assert.deepEqual(outcome, { kind: 'conflict' });
+  assert.equal(calls.length, 1, 'must reject before reading or replacing the verification challenge');
+  assert.match(calls[0].text, /password_hash/);
+  assert.equal(calls.some((call) => /^\s*(?:INSERT|UPDATE|DELETE)\b/i.test(call.text)), false);
+});
+
+test('unavailable accounts cannot resume even with the original password', async () => {
+  for (const status of ['suspended', 'deleted']) {
+    const { client, calls } = clientWith([[{ ...pendingUser, status }]]);
+    assert.deepEqual(await resumePendingRegistration(client, pendingUser.email, registrationPassword), { kind: 'conflict' });
+    assert.equal(calls.length, 1);
+  }
 });
