@@ -44,6 +44,7 @@ import {
 } from "../api/wallet";
 import { normalizePortfolioUrl, parseRoleApplicationSupportingText } from "../utils/roleApplication";
 import { removeListingByIdentity } from "../utils/listingWorkspace";
+import { decoratePurchasedItems, purchaseMetadataByProduct } from "../utils/purchaseState";
 
 const PlatformContext = createContext(null);
 
@@ -102,24 +103,6 @@ const mapContent = (content) => ({
   isPublished: content.status === "published",
   purchased: false,
 });
-
-const preservePurchaseMetadata = (nextItems, currentItems) => {
-  const purchasedById = new Map(
-    currentItems.filter((item) => item.purchased).map((item) => [item.id, item]),
-  );
-  return nextItems.map((item) => {
-    const previous = purchasedById.get(item.id);
-    if (!previous) return item;
-    return {
-      ...item,
-      purchased: true,
-      purchasedAt: previous.purchasedAt,
-      orderItemId: previous.orderItemId,
-      orderId: previous.orderId,
-      refundStatus: previous.refundStatus,
-    };
-  });
-};
 
 const transactionPresentation = (transaction) => {
   const available = Number(transaction.availableDelta || 0);
@@ -251,6 +234,7 @@ export function PlatformProvider({ children }) {
   const [accountLoading, setAccountLoading] = useState(true);
   const [toast, setToast] = useState("");
   const adminRoleRequestRevision = useRef(0);
+  const ordersRequestRevision = useRef(0);
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -260,8 +244,8 @@ export function PlatformProvider({ children }) {
 
   const refreshCatalog = useCallback(async () => {
     const [courseData, contentData] = await Promise.all([listCourses(), listContent()]);
-    setCourses((current) => preservePurchaseMetadata(courseData.map(mapCourse), current));
-    setContents((current) => preservePurchaseMetadata(contentData.map(mapContent), current));
+    setCourses(courseData.map(mapCourse));
+    setContents(contentData.map(mapContent));
   }, []);
 
   const refreshWallet = useCallback(async () => {
@@ -279,29 +263,25 @@ export function PlatformProvider({ children }) {
   }, []);
 
   const refreshOrders = useCallback(async () => {
+    const requestRevision = ordersRequestRevision.current;
     const summaries = await listOrders();
     const details = await Promise.all(summaries.map((order) => getOrder(order.id)));
     const nextOrders = details.map(mapOrder);
-    const coursePurchases = new Map();
-    const contentPurchases = new Map();
-    nextOrders.forEach((order) => {
-      order.items.forEach((item) => {
-        const metadata = {
-          purchased: item.fulfilmentStatus !== "refunded",
-          purchasedAt: order.paidAt || order.createdAt,
-          orderItemId: item.id,
-          orderId: order.id,
-          refundStatus: item.fulfilmentStatus === "refunded" ? "Approved" : null,
-        };
-        if (item.kind === "course") coursePurchases.set(item.productId, metadata);
-        if (item.kind === "content") contentPurchases.set(item.productId, metadata);
-      });
-    });
+    if (requestRevision !== ordersRequestRevision.current) return [];
     setOrders(nextOrders);
-    setCourses((current) => current.map((course) => ({ ...course, ...(coursePurchases.get(course.id) || {}) })));
-    setContents((current) => current.map((content) => ({ ...content, ...(contentPurchases.get(content.id) || {}) })));
     return nextOrders;
   }, []);
+
+  // Purchase presentation is derived from this account's detailed order
+  // records; catalog state remains raw.
+  const purchasedCourses = useMemo(
+    () => decoratePurchasedItems(courses, purchaseMetadataByProduct(orders, "course")),
+    [courses, orders],
+  );
+  const purchasedContents = useMemo(
+    () => decoratePurchasedItems(contents, purchaseMetadataByProduct(orders, "content")),
+    [contents, orders],
+  );
 
   const refreshMyApplications = useCallback(async () => {
     const records = await getMyRoleApplications();
@@ -440,6 +420,8 @@ export function PlatformProvider({ children }) {
 
   const signIn = async ({ email, password }) => {
     const result = await loginAccount({ email, password });
+    ordersRequestRevision.current += 1;
+    setOrders([]);
     setAccessToken(result.accessToken);
     setCsrfToken(result.csrfToken);
     const roles = applyServerIdentity(await getCurrentUser());
@@ -494,6 +476,7 @@ export function PlatformProvider({ children }) {
     setAccessToken("");
     setCsrfToken("");
     setAuthenticated(false);
+    ordersRequestRevision.current += 1;
     setRoleState("Member");
     setApprovedRoles(["Member"]);
     setCart([]);
@@ -513,7 +496,7 @@ export function PlatformProvider({ children }) {
   };
 
   const addToCart = (courseId) => {
-    const course = courses.find((item) => item.id === courseId);
+    const course = purchasedCourses.find((item) => item.id === courseId);
     if (!course || course.purchased || !course.purchaseEnabled) return false;
     if (cart.includes(courseId)) {
       notify("Course is already in your cart.");
@@ -555,7 +538,7 @@ export function PlatformProvider({ children }) {
       return null;
     }
     const result = await createRefundRequest({ orderItemId: course.orderItemId, reason });
-    setCourses((current) => current.map((item) => item.id === course.id ? { ...item, refundStatus: "Pending" } : item));
+    await refreshOrders();
     notify("Refund request submitted for administrator review.");
     return result;
   };
@@ -688,8 +671,8 @@ export function PlatformProvider({ children }) {
     topUpPackages,
     accountLoading,
     cart,
-    courses,
-    contents,
+    courses: purchasedCourses,
+    contents: purchasedContents,
     transactions,
     applications,
     roleApplications,
@@ -734,7 +717,7 @@ export function PlatformProvider({ children }) {
     accountLoading, approvedRoles, applications, authenticated, balance, cart, contents, courses, deleteDraftListing,
     notify, orders, profile, publishedItems, refundRequests, refreshAdminQueues, refreshAdminRoleApplications, refreshCatalog,
     refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet, role, roleApplications, serverWallet,
-    toast, topUpPackages, trainerCertifications, transactions,
+    purchasedContents, purchasedCourses, toast, topUpPackages, trainerCertifications, transactions,
   ]);
 
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;
