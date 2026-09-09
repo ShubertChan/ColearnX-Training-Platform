@@ -20,8 +20,10 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { createTopUpCheckoutSession, getTopUpStatus } from "../api/payments";
+import { getTopUpPackages } from "../api/wallet";
 import { usePlatform } from "../context/PlatformContext";
 import { paymentsApiEnabled } from "../config/features";
+import { createTopUpPackageLoader, initialTopUpPackageState } from "../utils/topUpPackages";
 import {
   Badge,
   Button,
@@ -33,7 +35,7 @@ import {
 } from "../components/ui";
 
 export function WalletPage() {
-  const { balance, walletBalances, transactions, topUpPackages, refreshWallet, notify } = usePlatform();
+  const { balance, walletBalances, transactions, refreshWallet, notify } = usePlatform();
   const navigate = useNavigate();
   const location = useLocation();
   const [topup, setTopup] = useState(false);
@@ -158,21 +160,33 @@ export function WalletPage() {
       {paymentsApiEnabled && topup && (
         <TopUpModal
           onClose={() => setTopup(false)}
-          packages={topUpPackages}
         />
       )}
     </>
   );
 }
 
-function TopUpModal({ onClose, packages }) {
+function TopUpModal({ onClose }) {
   const [step, setStep] = useState(1);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [packageState, setPackageState] = useState(initialTopUpPackageState);
+  const packageLoader = useMemo(
+    () => createTopUpPackageLoader(getTopUpPackages, setPackageState),
+    [],
+  );
+  const { packages, status: packageStatus } = packageState;
 
   useEffect(() => {
-    if (!selectedPackageId && packages.length) setSelectedPackageId(packages[0].id);
+    void packageLoader.load();
+    return packageLoader.cancel;
+  }, [packageLoader]);
+
+  useEffect(() => {
+    if (!packages.some((plan) => plan.id === selectedPackageId)) {
+      setSelectedPackageId(packages[0]?.id || "");
+    }
   }, [packages, selectedPackageId]);
 
   const selectedPlan = packages.find((plan) => plan.id === selectedPackageId);
@@ -212,7 +226,7 @@ function TopUpModal({ onClose, packages }) {
             {step === 1 ? "Cancel" : "Back"}
           </Button>
           <Button
-            disabled={loading || (step === 1 && !selectedPlan)}
+            disabled={loading || packageStatus !== "ready" || !selectedPlan}
             onClick={() => (step === 2 ? startCheckout() : setStep(step + 1))}
           >
             {loading ? (
@@ -238,7 +252,7 @@ function TopUpModal({ onClose, packages }) {
         </span>
       </div>
       {step === 1 && (
-        <div className="plan-grid">
+        <div className="plan-grid" aria-busy={packageStatus === "loading"}>
           {packages.map((plan) => (
             <button
               className={selectedPackageId === plan.id ? "active" : ""}
@@ -250,7 +264,31 @@ function TopUpModal({ onClose, packages }) {
               <b>S${(plan.amountMinor / 100).toFixed(2)}</b>
             </button>
           ))}
-          {!packages.length && <p className="empty-copy">Loading secure top-up packages…</p>}
+          {packageStatus === "loading" && (
+            <div className="topup-package-status" role="status">
+              <LoaderCircle className="spin" size={24} aria-hidden="true" />
+              <p>Loading secure top-up packages…</p>
+            </div>
+          )}
+          {packageStatus === "error" && (
+            <div className="topup-package-status">
+              <div className="form-error" role="alert">
+                <AlertCircle size={18} aria-hidden="true" />
+                <span>{packageState.error}</span>
+              </div>
+              <Button variant="secondary" onClick={() => void packageLoader.load()}>
+                <RotateCcw size={16} aria-hidden="true" /> Retry loading packages
+              </Button>
+            </div>
+          )}
+          {packageStatus === "empty" && (
+            <div className="topup-package-status">
+              <p role="status">No top-up packages are available right now. Please try again later.</p>
+              <Button variant="secondary" onClick={() => void packageLoader.load()}>
+                <RotateCcw size={16} aria-hidden="true" /> Retry loading packages
+              </Button>
+            </div>
+          )}
         </div>
       )}
       {step === 2 && selectedPlan && (

@@ -2134,32 +2134,49 @@ tbody tr[role="button"]:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
-.plan-grid button {
+.plan-grid > button {
   padding: 17px 10px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
   cursor: pointer;
 }
-.plan-grid button.active {
+.plan-grid > button.active {
   border: 2px solid var(--brand);
   background: #f5f7ff;
 }
-.plan-grid span,
-.plan-grid small,
-.plan-grid b {
+.plan-grid > button span,
+.plan-grid > button small,
+.plan-grid > button b {
   display: block;
 }
-.plan-grid span {
+.plan-grid > button span {
   font-size: 25px;
   font-weight: 900;
 }
-.plan-grid small {
+.plan-grid > button small {
   color: var(--muted);
 }
-.plan-grid b {
+.plan-grid > button b {
   margin-top: 9px;
   color: var(--brand);
+}
+.topup-package-status {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--muted);
+}
+.topup-package-status p {
+  margin: 0;
+}
+.topup-package-status .form-error {
+  margin: 0;
+  text-align: left;
 }
 .method-list {
   display: grid;
