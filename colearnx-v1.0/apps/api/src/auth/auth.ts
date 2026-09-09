@@ -165,12 +165,15 @@ function canContinueRegistration(user: VerificationUser | undefined): user is Ve
   return Boolean(user && user.status === 'active' && user.email_verification_required_at && !user.email_verified_at);
 }
 
-export async function resumePendingRegistration(client: PoolClient, email: string): Promise<RegistrationOutcome> {
-  const users = await client.query<VerificationUser>(`SELECT user_id AS id, email::text AS email, account_status AS status,
-    email_verified_at, email_verification_required_at
+export async function resumePendingRegistration(client: PoolClient, email: string, password: string): Promise<RegistrationOutcome> {
+  const users = await client.query<VerificationUser & { password_hash: string }>(`SELECT user_id AS id, email::text AS email, account_status AS status,
+    email_verified_at, email_verification_required_at, password_hash
     FROM users WHERE lower(email::text) = lower($1) FOR UPDATE`, [email]);
   const user = users.rows[0];
   if (!canContinueRegistration(user)) return { kind: 'conflict' };
+  // A retry resumes the original registration, not a new password assignment.
+  // Check its credentials before issuing a continuation or changing a challenge.
+  if (!await argon2.verify(user.password_hash, password)) return { kind: 'conflict' };
 
   const current = await client.query<{ expires_at: Date; resend_available_at: Date; failed_attempts: number }>(
     'SELECT expires_at, resend_available_at, failed_attempts FROM email_verification_challenges WHERE user_id = $1 FOR UPDATE',
@@ -215,7 +218,7 @@ export async function register(req: Request, res: Response) {
       const existing = await client.query<VerificationUser>(`SELECT user_id AS id, email::text AS email, account_status AS status,
         email_verified_at, email_verification_required_at
         FROM users WHERE lower(email::text) = lower($1) FOR UPDATE`, [input.email]);
-      if (existing.rowCount) return resumePendingRegistration(client, input.email);
+      if (existing.rowCount) return resumePendingRegistration(client, input.email, input.password);
       const user = await client.query<VerificationUser>(`INSERT INTO users
       (full_name, email, password_hash, email_verification_required_at)
       VALUES ($1, $2, $3, now())
@@ -238,7 +241,7 @@ export async function register(req: Request, res: Response) {
     });
   } catch (error) {
     if (!isUniqueEmailViolation(error)) throw error;
-    outcome = await withTransaction((client) => resumePendingRegistration(client, input.email));
+    outcome = await withTransaction((client) => resumePendingRegistration(client, input.email, input.password));
   }
   if (outcome.kind === 'conflict') throw new ApiError(409, 'EMAIL_ALREADY_REGISTERED', 'Unable to create this account.');
   const registration = outcome.kind === 'send'
