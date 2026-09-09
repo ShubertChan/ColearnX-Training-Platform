@@ -38,7 +38,6 @@ import {
   getAdminRefundRequests,
 } from "../api/refunds";
 import {
-  getTopUpPackages,
   getWallet,
   getWalletTransactions,
 } from "../api/wallet";
@@ -220,7 +219,6 @@ export function PlatformProvider({ children }) {
   const [profile, setProfile] = useState({ name: "", email: "", phone: "", location: "", bio: "" });
   const [balance, setBalance] = useState(0);
   const [serverWallet, setServerWallet] = useState({ available: 0, frozen: 0, expired: 0, blocked: 0 });
-  const [topUpPackages, setTopUpPackages] = useState([]);
   const [courses, setCourses] = useState([]);
   const [contents, setContents] = useState([]);
   const [cart, setCart] = useState([]);
@@ -410,7 +408,6 @@ export function PlatformProvider({ children }) {
   }, [applyServerIdentity, refreshAccountData]);
 
   useEffect(() => {
-    getTopUpPackages().then(setTopUpPackages).catch(() => setTopUpPackages([]));
     refreshCatalog().catch(() => {
       setCourses([]);
       setContents([]);
@@ -668,7 +665,6 @@ export function PlatformProvider({ children }) {
     setRole,
     balance,
     walletBalances: serverWallet,
-    topUpPackages,
     accountLoading,
     cart,
     courses: purchasedCourses,
@@ -717,7 +713,7 @@ export function PlatformProvider({ children }) {
     accountLoading, approvedRoles, applications, authenticated, balance, cart, contents, courses, deleteDraftListing,
     notify, orders, profile, publishedItems, refundRequests, refreshAdminQueues, refreshAdminRoleApplications, refreshCatalog,
     refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet, role, roleApplications, serverWallet,
-    purchasedContents, purchasedCourses, toast, topUpPackages, trainerCertifications, transactions,
+    purchasedContents, purchasedCourses, toast, trainerCertifications, transactions,
   ]);
 
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;
