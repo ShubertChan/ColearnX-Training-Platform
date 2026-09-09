@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient } from "./client.js";
 
 const unwrap = (response) => response.data.data;
 const idempotencyKey = () =>
@@ -14,5 +14,16 @@ export const createCheckout = (items) =>
     )
     .then(unwrap);
 
-export const listOrders = () => apiClient.get("/orders?limit=100").then(unwrap);
+export const listOrders = async () => {
+  const orders = [];
+  let cursor;
+  do {
+    const response = await apiClient.get("/orders", {
+      params: { limit: 100, ...(cursor ? { cursor } : {}) },
+    });
+    orders.push(...response.data.data);
+    cursor = response.data.meta?.nextCursor || null;
+  } while (cursor);
+  return orders;
+};
 export const getOrder = (orderId) => apiClient.get(`/orders/${orderId}`).then(unwrap);

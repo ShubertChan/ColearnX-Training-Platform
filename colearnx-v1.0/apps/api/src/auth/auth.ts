@@ -2,6 +2,7 @@ import argon2 from 'argon2';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import type { NextFunction, Request, Response } from 'express';
+import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { env } from '../config/env.js';
 import { query, withTransaction } from '../db/database.js';
@@ -46,6 +47,11 @@ type PendingChallenge = {
   expiresAt: Date;
   resendAvailableAt: Date;
 };
+
+type RegistrationOutcome =
+  | { kind: 'send'; challenge: PendingChallenge }
+  | { kind: 'reuse'; userId: string; email: string; expiresAt: Date; resendAvailableAt: Date }
+  | { kind: 'conflict' };
 
 const emailSchema = z.string().trim().email().max(320);
 const credentialsSchema = z.object({ email: emailSchema, password: z.string().min(8).max(256) });
@@ -155,48 +161,109 @@ async function sendPendingChallenge(challenge: PendingChallenge) {
   }
 }
 
+function canContinueRegistration(user: VerificationUser | undefined): user is VerificationUser {
+  return Boolean(user && user.status === 'active' && user.email_verification_required_at && !user.email_verified_at);
+}
+
+export async function resumePendingRegistration(client: PoolClient, email: string): Promise<RegistrationOutcome> {
+  const users = await client.query<VerificationUser>(`SELECT user_id AS id, email::text AS email, account_status AS status,
+    email_verified_at, email_verification_required_at
+    FROM users WHERE lower(email::text) = lower($1) FOR UPDATE`, [email]);
+  const user = users.rows[0];
+  if (!canContinueRegistration(user)) return { kind: 'conflict' };
+
+  const current = await client.query<{ expires_at: Date; resend_available_at: Date; failed_attempts: number }>(
+    'SELECT expires_at, resend_available_at, failed_attempts FROM email_verification_challenges WHERE user_id = $1 FOR UPDATE',
+    [user.id],
+  );
+  const challenge = current.rows[0];
+  if (challenge && challenge.expires_at > new Date() && challenge.failed_attempts < env.EMAIL_VERIFICATION_MAX_ATTEMPTS) {
+    return {
+      kind: 'reuse',
+      userId: user.id,
+      email: user.email,
+      expiresAt: challenge.expires_at,
+      resendAvailableAt: challenge.resend_available_at,
+    };
+  }
+
+  const replacement = createChallenge(user.id, user.email);
+  await client.query(`INSERT INTO email_verification_challenges
+    (user_id, code_hash, expires_at, resend_available_at, failed_attempts)
+    VALUES ($1, $2, $3, $4, 0)
+    ON CONFLICT (user_id) DO UPDATE SET
+      code_hash = EXCLUDED.code_hash,
+      expires_at = EXCLUDED.expires_at,
+      resend_available_at = EXCLUDED.resend_available_at,
+      failed_attempts = 0,
+      updated_at = now()`,
+  [user.id, hashVerificationCode(replacement.code, env.EMAIL_VERIFICATION_CODE_PEPPER), replacement.expiresAt, replacement.resendAvailableAt]);
+  return { kind: 'send', challenge: replacement };
+}
+
+function isUniqueEmailViolation(error: unknown) {
+  return typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505';
+}
+
 const originIsAllowed = (req: Request) => !req.get('origin') || req.get('origin') === env.APP_ORIGIN;
 
 export async function register(req: Request, res: Response) {
   const input = parse(registrationSchema, req.body);
-  const pendingChallenge = await withTransaction(async (client) => {
-    const existing = await client.query('SELECT 1 FROM users WHERE lower(email::text) = lower($1)', [input.email]);
-    if (existing.rowCount) throw new ApiError(409, 'EMAIL_ALREADY_REGISTERED', 'Unable to create this account.');
-    const user = await client.query<VerificationUser>(`INSERT INTO users
+  let outcome: RegistrationOutcome;
+  try {
+    outcome = await withTransaction(async (client) => {
+      const existing = await client.query<VerificationUser>(`SELECT user_id AS id, email::text AS email, account_status AS status,
+        email_verified_at, email_verification_required_at
+        FROM users WHERE lower(email::text) = lower($1) FOR UPDATE`, [input.email]);
+      if (existing.rowCount) return resumePendingRegistration(client, input.email);
+      const user = await client.query<VerificationUser>(`INSERT INTO users
       (full_name, email, password_hash, email_verification_required_at)
       VALUES ($1, $2, $3, now())
       RETURNING user_id AS id, email::text AS email, account_status AS status,
         email_verified_at, email_verification_required_at`,
-    [input.displayName, input.email, await argon2.hash(input.password, { type: argon2.argon2id })]);
-    const userId = user.rows[0].id;
-    const challenge = createChallenge(userId, user.rows[0].email);
-    await client.query(`INSERT INTO email_verification_challenges
+      [input.displayName, input.email, await argon2.hash(input.password, { type: argon2.argon2id })]);
+      const userId = user.rows[0].id;
+      const challenge = createChallenge(userId, user.rows[0].email);
+      await client.query(`INSERT INTO email_verification_challenges
       (user_id, code_hash, expires_at, resend_available_at)
       VALUES ($1, $2, $3, $4)`,
-    [userId, hashVerificationCode(challenge.code, env.EMAIL_VERIFICATION_CODE_PEPPER), challenge.expiresAt, challenge.resendAvailableAt]);
-    await client.query(`INSERT INTO profiles (user_id, display_name) VALUES ($1, $2)`, [userId, input.displayName]);
-    await client.query('INSERT INTO point_accounts (user_id) VALUES ($1)', [userId]);
-    await client.query(`INSERT INTO user_roles (user_id, role_id) SELECT $1, role_id FROM roles WHERE role_code = 'member'`, [userId]);
-    await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json)
+      [userId, hashVerificationCode(challenge.code, env.EMAIL_VERIFICATION_CODE_PEPPER), challenge.expiresAt, challenge.resendAvailableAt]);
+      await client.query(`INSERT INTO profiles (user_id, display_name) VALUES ($1, $2)`, [userId, input.displayName]);
+      await client.query('INSERT INTO point_accounts (user_id) VALUES ($1)', [userId]);
+      await client.query(`INSERT INTO user_roles (user_id, role_id) SELECT $1, role_id FROM roles WHERE role_code = 'member'`, [userId]);
+      await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json)
       VALUES ($1, 'auth.register', 'users', $2, jsonb_build_object('roles', $3::jsonb, 'emailVerificationRequired', true))`,
-    [userId, userId, JSON.stringify(['member'])]);
-    return challenge;
-  });
+      [userId, userId, JSON.stringify(['member'])]);
+      return { kind: 'send' as const, challenge };
+    });
+  } catch (error) {
+    if (!isUniqueEmailViolation(error)) throw error;
+    outcome = await withTransaction((client) => resumePendingRegistration(client, input.email));
+  }
+  if (outcome.kind === 'conflict') throw new ApiError(409, 'EMAIL_ALREADY_REGISTERED', 'Unable to create this account.');
+  const registration = outcome.kind === 'send'
+    ? {
+        userId: outcome.challenge.userId,
+        email: outcome.challenge.email,
+        expiresAt: outcome.challenge.expiresAt,
+        resendAvailableAt: outcome.challenge.resendAvailableAt,
+      }
+    : outcome;
 
   res.cookie(
     registrationContinuationCookieName,
     signRegistrationContinuation({
-      userId: pendingChallenge.userId,
-      email: pendingChallenge.email,
+      userId: registration.userId,
+      email: registration.email,
     }, env.REFRESH_TOKEN_SECRET),
     registrationContinuationCookieOptions(),
   );
-  await sendPendingChallenge(pendingChallenge);
+  if (outcome.kind === 'send') await sendPendingChallenge(outcome.challenge);
   return ok(res, {
-    email: pendingChallenge.email,
+    email: registration.email,
     verificationRequired: true,
-    expiresAt: pendingChallenge.expiresAt.toISOString(),
-    resendAvailableAt: pendingChallenge.resendAvailableAt.toISOString(),
+    expiresAt: registration.expiresAt.toISOString(),
+    resendAvailableAt: registration.resendAvailableAt.toISOString(),
   }, 202);
 }
 
