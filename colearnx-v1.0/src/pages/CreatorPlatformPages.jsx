@@ -25,7 +25,7 @@ const roleCopy = {
   },
 };
 
-function normalizePortfolioUrl(value) {
+function normalizeWebUrl(value) {
   const candidate = value.trim();
   if (!candidate) return "";
   try {
@@ -50,7 +50,7 @@ function RoleApplicationCard({ type, status, onSubmit }) {
   const submit = async (event) => {
     event.preventDefault();
     setError("");
-    const portfolio = normalizePortfolioUrl(form.portfolio);
+    const portfolio = normalizeWebUrl(form.portfolio);
     if (portfolio === null) {
       setError("Enter a valid portfolio URL, for example https://example.com or www.example.com.");
       return;
@@ -152,13 +152,18 @@ function TrainerCertificationCard({ certifications, onSubmit }) {
   const [error, setError] = useState("");
   const submit = async (event) => {
     event.preventDefault();
-    setBusy(true);
     setError("");
+    const evidenceUrl = normalizeWebUrl(form.evidenceUrl);
+    if (evidenceUrl === null) {
+      setError("Enter a valid evidence URL, for example https://example.com or www.example.com.");
+      return;
+    }
+    setBusy(true);
     try {
       await onSubmit({
         certificationName: form.certificationName,
         certificationReference: form.certificationReference || undefined,
-        evidenceUrl: form.evidenceUrl || undefined,
+        evidenceUrl: evidenceUrl || undefined,
       });
       setForm({ certificationName: "", certificationReference: "", evidenceUrl: "" });
     } catch (submissionError) {
@@ -183,7 +188,19 @@ function TrainerCertificationCard({ certifications, onSubmit }) {
         <form className="application-form" onSubmit={submit}>
           <FormField label="Certification name"><input required value={form.certificationName} onChange={(event) => setForm({ ...form, certificationName: event.target.value })} /></FormField>
           <FormField label="Reference number (optional)"><input value={form.certificationReference} onChange={(event) => setForm({ ...form, certificationReference: event.target.value })} /></FormField>
-          <FormField label="Evidence URL (optional)"><input type="url" value={form.evidenceUrl} onChange={(event) => setForm({ ...form, evidenceUrl: event.target.value })} /></FormField>
+          <FormField
+            label="Evidence URL (optional)"
+            hint="Paste a public link, or enter a domain such as example.com."
+          >
+            <input
+              type="text"
+              inputMode="url"
+              autoComplete="url"
+              placeholder="https://example.com or www.example.com"
+              value={form.evidenceUrl}
+              onChange={(event) => setForm({ ...form, evidenceUrl: event.target.value })}
+            />
+          </FormField>
           {error && <p className="form-error">{error}</p>}
           <Button disabled={busy || latest?.status === "pending"} type="submit"><BadgeCheck size={16} /> {busy ? "Submitting…" : latest?.status === "pending" ? "Certification pending" : "Submit certification"}</Button>
         </form>

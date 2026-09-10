@@ -2505,6 +2505,10 @@ tbody tr[role="button"]:focus-visible {
   border: 0;
   outline: 0;
 }
+.input-with-icon input[type="password"]::-ms-reveal,
+.input-with-icon input[type="password"]::-ms-clear {
+  display: none;
+}
 .input-with-icon > button {
   display: grid;
   place-items: center;
