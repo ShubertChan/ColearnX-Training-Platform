@@ -3,6 +3,7 @@ import { CheckCircle2, Mail, RotateCcw } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button, FormField } from "../components/ui";
 import { usePlatform } from "../context/PlatformContext";
+import nextLogo from "../../assets/next-logo.jpg";
 
 const secondsUntil = (value) => {
   const timestamp = Date.parse(value || "");
@@ -25,6 +26,8 @@ export function VerifyEmailPage() {
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
+  const [expiresAt, setExpiresAt] = useState(location.state?.expiresAt || "");
+  const [expiresIn, setExpiresIn] = useState(() => secondsUntil(location.state?.expiresAt));
   const [cooldown, setCooldown] = useState(() =>
     secondsUntil(location.state?.resendAvailableAt),
   );
@@ -36,6 +39,13 @@ export function VerifyEmailPage() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [cooldown]);
+
+  useEffect(() => {
+    if (!expiresAt) return undefined;
+    setExpiresIn(secondsUntil(expiresAt));
+    const timer = window.setInterval(() => setExpiresIn(secondsUntil(expiresAt)), 1000);
+    return () => window.clearInterval(timer);
+  }, [expiresAt]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -60,9 +70,11 @@ export function VerifyEmailPage() {
     setMessage("");
     setResending(true);
     try {
-      await resendRegistrationEmail({ email: email.trim() });
+      const result = await resendRegistrationEmail({ email: email.trim() });
       setMessage("If this address has a pending CoLearnX registration, a new verification email will arrive shortly.");
-      setCooldown(60);
+      setExpiresAt(result.expiresAt || "");
+      setExpiresIn(secondsUntil(result.expiresAt));
+      setCooldown(secondsUntil(result.resendAvailableAt));
     } catch (resendError) {
       setError(resendError.message);
     } finally {
@@ -73,7 +85,7 @@ export function VerifyEmailPage() {
   return (
     <div className="auth-page">
       <section className="auth-story">
-        <img src="./assets/next-logo.jpg" alt="neXt" />
+        <img src={nextLogo} alt="neXt" />
         <div>
           <span className="eyebrow light">Account security</span>
           <h1>Confirm that this email address belongs to you.</h1>
@@ -89,7 +101,7 @@ export function VerifyEmailPage() {
         <form className="auth-form" onSubmit={submit}>
           <span className="eyebrow">Email verification</span>
           <h2>Enter your code</h2>
-          <p>Check your inbox for the eight-digit code. It expires after 10 minutes.</p>
+          <p>Check your inbox for the eight-digit code. {expiresAt ? expiresIn > 0 ? `This code expires in ${expiresIn}s.` : "This code has expired; request a new one." : "The expiry time is set by the server."}</p>
           <FormField label="Email address">
             <div className="input-with-icon">
               <Mail size={18} />

@@ -23,6 +23,7 @@ import {
   submitCourse,
 } from "../api/catalog";
 import { createCheckout, getOrder, listOrders } from "../api/commerce";
+import { hasPurchasePolicy } from "../utils/purchaseDisclosure";
 import {
   createRoleApplication,
   createTrainerCertification,
@@ -44,6 +45,9 @@ import {
 import { normalizePortfolioUrl, parseRoleApplicationSupportingText } from "../utils/roleApplication";
 import { removeListingByIdentity } from "../utils/listingWorkspace";
 import { decoratePurchasedItems, purchaseMetadataByProduct } from "../utils/purchaseState";
+import { loadCatalogSection } from "../utils/catalogState";
+import { cartItemKey } from "../utils/purchaseDisclosure";
+import { cartStorageKey, readAccountCart, mergeConfirmedOrders } from "../utils/frontendState";
 
 const PlatformContext = createContext(null);
 
@@ -62,7 +66,7 @@ const titleCase = (value) =>
 const deliveryLabel = (modes = []) =>
   modes.map((mode) => titleCase(mode)).join(" + ") || "Not specified";
 
-const mapCourse = (course) => ({
+export const mapCourse = (course) => ({
   id: course.id,
   courseId: course.courseId,
   title: course.title,
@@ -77,6 +81,10 @@ const mapCourse = (course) => ({
   capacity: course.capacity,
   startsAt: course.startsAt,
   endsAt: course.endsAt,
+  onlineVideo: Boolean(course.onlineVideo || course.progressTrackingType === "online_video"),
+  progressTrackingType: course.progressTrackingType || null,
+  totalDurationSeconds: Number(course.totalDurationSeconds || 0),
+  refundPolicyPreview: course.refundPolicyPreview || course.purchasePolicy?.refund || null,
   rating: "—",
   duration: 0,
   structure: "Course structure is provided after enrolment.",
@@ -87,18 +95,19 @@ const mapCourse = (course) => ({
   purchased: false,
 });
 
-const mapContent = (content) => ({
+export const mapContent = (content) => ({
   id: content.id,
   contentVersionId: content.id,
   contentId: content.contentId,
   title: content.title,
-  description: "No public description has been provided.",
+  description: content.description || content.summary || "No public description has been provided.",
   type: content.contentType || "Digital resource",
   price: Number(content.pricePoints || 0),
   creator: content.owner?.displayName || "CoLearnX creator",
   ownerId: content.owner?.id || null,
   category: content.category?.name || "General",
   rating: "—",
+  refundPolicyPreview: content.refundPolicyPreview || content.purchasePolicy?.refund || null,
   isPublished: content.status === "published",
   purchased: false,
 });
@@ -108,7 +117,8 @@ const transactionPresentation = (transaction) => {
   const frozen = Number(transaction.frozenDelta || 0);
   const expired = Number(transaction.expiredDelta || 0);
   const blocked = Number(transaction.blockedDelta || 0);
-  const amount = available || frozen || expired || blocked;
+  const deltas = { available, frozen, expired, blocked };
+  const amount = available + frozen + expired + blocked;
   const category =
     transaction.type === "topup"
       ? "Top-up"
@@ -126,8 +136,12 @@ const transactionPresentation = (transaction) => {
     item: String(transaction.reference || "CoLearnX transaction").replaceAll("_", " "),
     category,
     amount,
-    balance: "Server ledger",
-    status: "Completed",
+    deltas,
+    balancesAfter: { available: transaction.availableBalanceAfter ?? transaction.balanceAfter?.available ?? null, frozen: transaction.frozenBalanceAfter ?? transaction.balanceAfter?.frozen ?? null, expired: transaction.expiredBalanceAfter ?? transaction.balanceAfter?.expired ?? null, blocked: transaction.blockedBalanceAfter ?? transaction.balanceAfter?.blocked ?? null },
+    orderReference: transaction.orderReference || transaction.orderId || "",
+    refundReference: transaction.refundReference || transaction.refundRequestId || "",
+    balance: transaction.availableBalanceAfter ?? transaction.balanceAfter?.available ?? null,
+    status: transaction.status ? titleCase(transaction.status) : "Not supplied",
   };
 };
 
@@ -136,7 +150,7 @@ const mapOrder = (order) => ({
   orderNo: order.orderNo,
   createdAt: order.createdAt,
   paidAt: order.paidAt,
-  transactionReference: order.orderNo,
+  transactionReference: order.transactionReference || order.paymentTransaction?.reference || "",
   total: Number(order.totalPoints || 0),
   remainingBalance: null,
   status: titleCase(order.status),
@@ -146,12 +160,22 @@ const mapOrder = (order) => ({
     productId: item.productId,
     title: item.title,
     price: Number(item.pricePoints || 0),
-    trainer: "",
+    seller: item.seller?.displayName || item.sellerName || item.trainer || item.creator || "Seller recorded in order",
+    trainer: item.seller?.displayName || item.sellerName || item.trainer || "",
     delivery: deliveryLabel(item.deliveryModes),
     deliveryModes: item.deliveryModes || [],
-    refundPolicy: item.refundPolicy?.summary || "Refund policy is recorded with this order.",
+    refundPolicy: item.refundPolicy?.summary || item.refundPolicySnapshot?.summary || item.refundPolicySnapshot?.description || (typeof item.refundPolicy === "string" ? item.refundPolicy : "Refund snapshot text was not supplied."),
+    refundPolicySnapshot: item.refundPolicySnapshot || item.refundPolicy || null,
     refundDeadlineAt: item.refundDeadlineAt,
     fulfilmentStatus: item.fulfilmentStatus,
+    fulfilment: item.fulfilment || item.deliverySnapshot || null,
+    fulfilmentInstructions: item.fulfilmentInstructions || item.fulfilment?.instructions || "",
+    trainerContact: item.trainerContact || item.fulfilment?.trainerContact || "",
+    joinUrl: item.joinUrl || item.fulfilment?.joinUrl || "",
+    onlineVideo: Boolean(item.onlineVideo || item.progressTrackingType === "online_video"),
+    watchedSeconds: Number(item.watchedSeconds || item.progress?.watchedSeconds || 0),
+    totalDurationSeconds: Number(item.totalDurationSeconds || item.progress?.totalDurationSeconds || 0),
+    refundRecords: item.refundRecords || item.refunds || [],
   })),
 });
 
@@ -195,6 +219,11 @@ const mapPublishedItem = (listing) => ({
   marketplaceId: listing.id,
   title: listing.title,
   description: listing.description || "",
+  fulfilmentInstructions: listing.fulfilmentInstructions || "",
+  trainerContact: listing.trainerContact || "",
+  joinUrl: listing.joinUrl || "",
+  onlineVideo: Boolean(listing.onlineVideo || listing.progressTrackingType === "online_video"),
+  totalDurationSeconds: listing.totalDurationSeconds || "",
   category: "General",
   format: listing.contentType || deliveryLabel(listing.deliveryModes),
   price: Number(listing.pricePoints || 0),
@@ -221,7 +250,16 @@ export function PlatformProvider({ children }) {
   const [serverWallet, setServerWallet] = useState({ available: 0, frozen: 0, expired: 0, blocked: 0 });
   const [courses, setCourses] = useState([]);
   const [contents, setContents] = useState([]);
+  const [courseCatalogState, setCourseCatalogState] = useState({ status: "loading", error: "" });
+  const [contentCatalogState, setContentCatalogState] = useState({ status: "loading", error: "" });
+  const catalogRequest = useRef(null);
   const [cart, setCart] = useState([]);
+  const [cartOwner, setCartOwner] = useState("");
+  const accountId = useRef("");
+  const sessionRevision = useRef(0);
+  const confirmedOrders = useRef([]);
+  const pendingCheckout = useRef(null);
+  const datasetRequests = useRef({});
   const [orders, setOrders] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [applications, setApplications] = useState({ Trainer: "Not applied", Creator: "Not applied" });
@@ -230,6 +268,11 @@ export function PlatformProvider({ children }) {
   const [publishedItems, setPublishedItems] = useState([]);
   const [trainerCertifications, setTrainerCertifications] = useState([]);
   const [accountLoading, setAccountLoading] = useState(true);
+  const [capabilities, setCapabilities] = useState({});
+  const [dataErrors, setDataErrors] = useState({});
+  const [dataStates, setDataStates] = useState({ wallet: "loading", orders: "loading", applications: "loading", listings: "loading", certification: "loading", admin: "loading" });
+  const [accountError, setAccountError] = useState("");
+  const [purchaseSyncWarning, setPurchaseSyncWarning] = useState("");
   const [toast, setToast] = useState("");
   const adminRoleRequestRevision = useRef(0);
   const ordersRequestRevision = useRef(0);
@@ -240,13 +283,48 @@ export function PlatformProvider({ children }) {
     window.__colearnxToast = window.setTimeout(() => setToast(""), 3200);
   }, []);
 
-  const refreshCatalog = useCallback(async () => {
-    const [courseData, contentData] = await Promise.all([listCourses(), listContent()]);
-    setCourses(courseData.map(mapCourse));
-    setContents(contentData.map(mapContent));
+  useEffect(() => {
+    if (!cartOwner || cartOwner !== accountId.current) return;
+    try { window.localStorage.setItem(cartStorageKey(cartOwner), JSON.stringify(cart)); }
+    catch { notify("Your browser could not save the cart. Keep this tab open until checkout."); }
+  }, [cart, cartOwner, notify]);
+
+  const trackDataset = useCallback(async (name, task) => {
+    const revision = sessionRevision.current;
+    const request = (datasetRequests.current[name] || 0) + 1;
+    datasetRequests.current[name] = request;
+    setDataStates((current) => ({ ...current, [name]: "loading" }));
+    try {
+      const result = await task();
+      if (revision === sessionRevision.current && datasetRequests.current[name] === request) {
+        setDataStates((current) => ({ ...current, [name]: "ready" }));
+        setDataErrors((current) => { const next = { ...current }; delete next[name]; return next; });
+      }
+      return result;
+    } catch (error) {
+      if (revision === sessionRevision.current && datasetRequests.current[name] === request) {
+        setDataStates((current) => ({ ...current, [name]: "error" }));
+        setDataErrors((current) => ({ ...current, [name]: error.message || "Could not refresh this section." }));
+      }
+      throw error;
+    }
   }, []);
 
-  const refreshWallet = useCallback(async () => {
+  const refreshCatalog = useCallback(async () => {
+    if (catalogRequest.current) return (await catalogRequest.current).every(Boolean);
+    const request = Promise.all([
+      loadCatalogSection({ fetchItems: listCourses, mapItem: mapCourse, setItems: setCourses, setState: setCourseCatalogState }),
+      loadCatalogSection({ fetchItems: listContent, mapItem: mapContent, setItems: setContents, setState: setContentCatalogState }),
+    ]);
+    catalogRequest.current = request;
+    try {
+      const results = await request;
+      return results.every(Boolean);
+    } finally { catalogRequest.current = null; }
+  }, []);
+
+  const refreshWallet = useCallback(() => trackDataset("wallet", async () => {
+    const revision = sessionRevision.current;
     const [wallet, ledger] = await Promise.all([getWallet(), getWalletTransactions()]);
     const nextWallet = {
       available: Number(wallet.availablePoints || 0),
@@ -254,21 +332,24 @@ export function PlatformProvider({ children }) {
       expired: Number(wallet.expiredPoints || 0),
       blocked: Number(wallet.blockedPoints || 0),
     };
+    if (revision !== sessionRevision.current) return nextWallet;
     setServerWallet(nextWallet);
     setBalance(nextWallet.available);
     setTransactions(ledger.map(transactionPresentation));
     return nextWallet;
-  }, []);
+  }), [trackDataset]);
 
-  const refreshOrders = useCallback(async () => {
-    const requestRevision = ordersRequestRevision.current;
+  const refreshOrders = useCallback(() => trackDataset("orders", async () => {
+    const requestRevision = ++ordersRequestRevision.current;
     const summaries = await listOrders();
     const details = await Promise.all(summaries.map((order) => getOrder(order.id)));
     const nextOrders = details.map(mapOrder);
     if (requestRevision !== ordersRequestRevision.current) return [];
-    setOrders(nextOrders);
+    setOrders(mergeConfirmedOrders(nextOrders, confirmedOrders.current));
+    const acknowledgedIds = new Set(nextOrders.map((order) => order.id));
+    confirmedOrders.current = confirmedOrders.current.filter((order) => !acknowledgedIds.has(order.id));
     return nextOrders;
-  }, []);
+  }), [trackDataset]);
 
   // Purchase presentation is derived from this account's detailed order
   // records; catalog state remains raw.
@@ -282,8 +363,10 @@ export function PlatformProvider({ children }) {
   );
 
   const refreshMyApplications = useCallback(async () => {
+    const revision = sessionRevision.current;
     const records = await getMyRoleApplications();
     const formatted = records.map(mapRoleApplication);
+    if (revision !== sessionRevision.current) return [];
     setRoleApplications(formatted);
     const next = { Trainer: "Not applied", Creator: "Not applied" };
     formatted.forEach((record) => {
@@ -294,14 +377,18 @@ export function PlatformProvider({ children }) {
   }, []);
 
   const refreshMyListings = useCallback(async () => {
+    const revision = sessionRevision.current;
     const listings = await listMyListings();
     const formatted = listings.map(mapPublishedItem);
+    if (revision !== sessionRevision.current) return [];
     setPublishedItems(formatted);
     return formatted;
   }, []);
 
   const refreshMyTrainerCertifications = useCallback(async () => {
+    const revision = sessionRevision.current;
     const certifications = await getMyTrainerCertifications();
+    if (revision !== sessionRevision.current) return [];
     setTrainerCertifications(certifications);
     return certifications;
   }, []);
@@ -317,6 +404,7 @@ export function PlatformProvider({ children }) {
   }, []);
 
   const refreshAdminQueues = useCallback(async () => {
+    const revision = sessionRevision.current;
     const roleRequestRevision = adminRoleRequestRevision.current + 1;
     adminRoleRequestRevision.current = roleRequestRevision;
     const [rolesResult, refundsResult] = await Promise.allSettled([
@@ -326,7 +414,7 @@ export function PlatformProvider({ children }) {
     if (rolesResult.status === "fulfilled" && roleRequestRevision === adminRoleRequestRevision.current) {
       setRoleApplications(rolesResult.value.map(mapRoleApplication));
     }
-    if (refundsResult.status === "fulfilled") setRefundRequests(refundsResult.value.map(mapRefundRequest));
+    if (refundsResult.status === "fulfilled" && revision === sessionRevision.current) setRefundRequests(refundsResult.value.map(mapRefundRequest));
     if (rolesResult.status === "rejected" && refundsResult.status === "rejected") throw rolesResult.reason;
     return {
       roles: rolesResult.status === "fulfilled" ? rolesResult.value : [],
@@ -339,6 +427,21 @@ export function PlatformProvider({ children }) {
   }, []);
 
   const applyServerIdentity = useCallback((user) => {
+    if (!user?.id) throw new Error("The account identity is incomplete. Please sign in again.");
+    if (accountId.current !== user.id) {
+      sessionRevision.current += 1;
+      ordersRequestRevision.current += 1;
+      accountId.current = user.id;
+      confirmedOrders.current = [];
+      pendingCheckout.current = null;
+      setOrders([]); setTransactions([]); setBalance(0);
+      setPublishedItems([]); setTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
+      setApplications({ Trainer: "Not applied", Creator: "Not applied" });
+      setDataErrors({}); setPurchaseSyncWarning("");
+      let stored = [];
+      try { stored = readAccountCart(window.localStorage, user.id); } catch { /* Storage can be disabled. */ }
+      setCart(stored); setCartOwner(user.id);
+    }
     const granted = (user.roles || []).map(roleLabel);
     const nextRoles = granted.length ? granted : ["Member"];
     const primaryRole = nextRoles.includes("Admin")
@@ -356,35 +459,33 @@ export function PlatformProvider({ children }) {
       bio: user.profile?.bio || "",
     });
     setApprovedRoles(nextRoles);
+    setCapabilities(user.capabilities || {});
     setRoleState(primaryRole);
     setAuthenticated(true);
     return nextRoles;
   }, []);
 
   const refreshAccountData = useCallback(async (roles) => {
-    await refreshCatalog();
-    await Promise.all([refreshWallet(), refreshOrders(), refreshMyApplications()]);
-    if (roles.includes("Trainer") || roles.includes("Creator"))
-      await refreshMyListings();
-    if (roles.includes("Trainer")) await refreshMyTrainerCertifications();
-    if (roles.includes("Admin")) {
-      try {
-        await refreshAdminQueues();
-      } catch {
-        // Individual administrator pages report a retriable error when opened.
-      }
-    }
-  }, [refreshAdminQueues, refreshCatalog, refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet]);
+    const tasks = { catalog: refreshCatalog().then((ok) => { if (!ok) throw new Error("Some listings could not be refreshed."); }), wallet: refreshWallet(), orders: refreshOrders(), applications: trackDataset("applications", refreshMyApplications), listings: trackDataset("listings", () => roles.includes("Trainer") || roles.includes("Creator") ? refreshMyListings() : Promise.resolve()), certification: trackDataset("certification", () => roles.includes("Trainer") ? refreshMyTrainerCertifications() : Promise.resolve()), admin: trackDataset("admin", () => roles.includes("Admin") ? refreshAdminQueues() : Promise.resolve()) };
+    const keys = Object.keys(tasks); const results = await Promise.allSettled(Object.values(tasks)); const failures = {};
+    results.forEach((result, index) => { if (result.status === "rejected") failures[keys[index]] = result.reason?.message || "Could not refresh this section."; });
+    return { ok: !Object.keys(failures).length, failures };
+  }, [refreshAdminQueues, refreshCatalog, refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet, trackDataset]);
 
   const restoreSession = useCallback(async () => {
+    setAccountLoading(true); setAccountError("");
     try {
       if (hasAccessToken()) {
         try {
           const user = await getCurrentUser();
           const roles = applyServerIdentity(user);
-          await refreshAccountData(roles);
+          void refreshAccountData(roles);
           return true;
-        } catch {
+        } catch (error) {
+          if (![401, 403].includes(error.status)) {
+            setAccountError(error.message);
+            return false;
+          }
           setAccessToken("");
         }
       }
@@ -395,12 +496,13 @@ export function PlatformProvider({ children }) {
       setAccessToken(refreshed.accessToken);
       setCsrfToken(refreshed.csrfToken);
       const roles = applyServerIdentity(refreshed.user);
-      await refreshAccountData(roles);
+      void refreshAccountData(roles);
       return true;
-    } catch {
+    } catch (error) {
       setAccessToken("");
       setCsrfToken("");
       setAuthenticated(false);
+      if (![401, 403].includes(error.status)) setAccountError(error.message);
       return false;
     } finally {
       setAccountLoading(false);
@@ -408,10 +510,7 @@ export function PlatformProvider({ children }) {
   }, [applyServerIdentity, refreshAccountData]);
 
   useEffect(() => {
-    refreshCatalog().catch(() => {
-      setCourses([]);
-      setContents([]);
-    });
+    void refreshCatalog();
     restoreSession();
   }, [refreshCatalog, restoreSession]);
 
@@ -422,8 +521,8 @@ export function PlatformProvider({ children }) {
     setAccessToken(result.accessToken);
     setCsrfToken(result.csrfToken);
     const roles = applyServerIdentity(await getCurrentUser());
-    await refreshAccountData(roles);
-    return true;
+    void refreshAccountData(roles);
+    return { roles };
   };
 
   const registerMember = async ({ name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged }) => {
@@ -461,6 +560,8 @@ export function PlatformProvider({ children }) {
   const resendRegistrationEmail = async (input) => resendVerificationEmail(input);
 
   const signOut = async () => {
+    sessionRevision.current += 1;
+    adminRoleRequestRevision.current += 1;
     try {
       if (!hasCsrfToken()) {
         const csrf = await getCsrfToken();
@@ -476,7 +577,11 @@ export function PlatformProvider({ children }) {
     ordersRequestRevision.current += 1;
     setRoleState("Member");
     setApprovedRoles(["Member"]);
-    setCart([]);
+    setCapabilities({});
+    accountId.current = ""; confirmedOrders.current = [];
+    pendingCheckout.current = null;
+    setCart([]); setCartOwner(""); setAccountError(""); setDataErrors({}); setPurchaseSyncWarning("");
+    setPublishedItems([]); setTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
     setOrders([]);
     setTransactions([]);
     setBalance(0);
@@ -492,41 +597,67 @@ export function PlatformProvider({ children }) {
     return true;
   };
 
-  const addToCart = (courseId) => {
-    const course = purchasedCourses.find((item) => item.id === courseId);
-    if (!course || course.purchased || !course.purchaseEnabled) return false;
-    if (cart.includes(courseId)) {
-      notify("Course is already in your cart.");
+  const addToCart = (kind, id) => {
+    if (!authenticated || role === "Admin" || !approvedRoles.includes("Member")) return false;
+    const collection = kind === "content" ? purchasedContents : purchasedCourses;
+    const item = collection.find((candidate) => candidate.id === id);
+    if (!item || item.purchased || item.purchaseEnabled === false) return false;
+    if (!hasPurchasePolicy(item)) {
+      notify("Checkout is paused until the server supplies the exact refund-policy preview.");
       return false;
     }
-    setCart((current) => [...current, courseId]);
-    notify("Course added to cart.");
+    const nextItem = { kind, id, seller: item.trainer || item.creator, lastSeenPrice: item.price, policySummary: item.refundPolicyPreview?.summary || item.refundPolicyPreview?.description || "" };
+    if (cart.some((entry) => cartItemKey(entry) === cartItemKey(nextItem))) {
+      notify("This item is already in your cart.");
+      return false;
+    }
+    setCart((current) => [...current, nextItem]);
+    notify(`${kind === "content" ? "Resource" : "Course"} added to cart.`);
     return true;
   };
 
-  const removeFromCart = (courseId) => setCart((current) => current.filter((id) => id !== courseId));
+  const removeFromCart = (kind, id) => setCart((current) => current.filter((item) => cartItemKey(item) !== cartItemKey({ kind, id })));
 
-  const checkout = async (courseIds) => {
-    const items = courseIds.map((id) => ({ kind: "course", id }));
+  const checkout = async (items) => {
+    if (!authenticated || role === "Admin" || !approvedRoles.includes("Member")) throw new Error("A Member account is required to purchase.");
+    const catalogue = [...purchasedCourses.map((item) => ({ ...item, kind: "course" })), ...purchasedContents.map((item) => ({ ...item, kind: "content" }))];
+    if (items.some((entry) => !hasPurchasePolicy(catalogue.find((item) => cartItemKey(item) === cartItemKey(entry))))) throw new Error("Review the exact refund terms before checkout.");
     if (!items.length) {
-      notify("Select at least one course before checkout.");
+      notify("Select at least one item before checkout.");
       return null;
     }
-    const result = await createCheckout(items);
-    setCart((current) => current.filter((id) => !courseIds.includes(id)));
-    await Promise.all([refreshWallet(), refreshCatalog()]);
-    const nextOrders = await refreshOrders();
-    const order = nextOrders.find((item) => item.id === result.id) || mapOrder(result);
-    notify("Checkout completed and recorded in your wallet.");
+    const signature = JSON.stringify(items.map(cartItemKey).sort());
+    if (pendingCheckout.current?.signature !== signature) pendingCheckout.current = { signature, key: globalThis.crypto.randomUUID() };
+    const revision = sessionRevision.current;
+    const result = await createCheckout(items, pendingCheckout.current.key);
+    pendingCheckout.current = null;
+    if (revision !== sessionRevision.current) throw new Error("The account changed during checkout. Check the original account's order history before retrying payment.");
+    const order = mapOrder(result);
+    ordersRequestRevision.current += 1;
+    confirmedOrders.current = [order, ...confirmedOrders.current.filter((item) => item.id !== order.id)];
+    setOrders((current) => [order, ...current.filter((item) => item.id !== order.id)]);
+    const purchasedKeys = new Set(items.map(cartItemKey));
+    setCart((current) => current.filter((item) => !purchasedKeys.has(cartItemKey(item))));
+    setPurchaseSyncWarning("");
+    notify("Payment succeeded. Your order has been recorded.");
+    void Promise.allSettled([refreshWallet(), refreshCatalog(), refreshOrders()]).then((results) => {
+      if (results.some((entry) => entry.status === "rejected" || entry.value === false)) setPurchaseSyncWarning("Payment succeeded, but some account data could not refresh. Your receipt is safe; retry synchronisation below.");
+    });
     return order;
   };
 
-  const buyContent = async (contentId) => {
-    const result = await createCheckout([{ kind: "content", id: contentId }]);
-    await Promise.all([refreshWallet(), refreshCatalog()]);
-    await refreshOrders();
-    notify("Content purchase completed and recorded in your wallet.");
-    return result;
+  const buyContent = async (contentId) => checkout([{ kind: "content", id: contentId }]);
+
+  const retryPurchaseSync = async () => {
+    const results = await Promise.allSettled([refreshWallet(), refreshCatalog(), refreshOrders()]);
+    if (results.some((entry) => entry.status === "rejected" || entry.value === false)) return false;
+    setPurchaseSyncWarning(""); notify("Account data is synchronised."); return true;
+  };
+
+  const retryAccountData = async () => {
+    const result = await refreshAccountData(approvedRoles);
+    if (result.ok) notify("Workspace data refreshed.");
+    return result.ok;
   };
 
   const submitRefund = async ({ course, reason }) => {
@@ -610,9 +741,15 @@ export function PlatformProvider({ children }) {
           endsAt: input.endsAt || null,
           timezone: input.timezone || "Asia/Singapore",
           deliveryModes: input.deliveryModes?.length ? input.deliveryModes : ["cloud"],
+          fulfilmentInstructions: input.fulfilmentInstructions || null,
+          trainerContact: input.trainerContact || null,
+          joinUrl: input.joinUrl || null,
+          progressTrackingType: input.onlineVideo ? "online_video" : "none",
+          totalDurationSeconds: input.onlineVideo ? Number(input.totalDurationSeconds || 0) : null,
         }
       : {
           title: input.title,
+          description: input.description || "",
           contentType: input.format || "digital",
           pricePoints: Number(input.price),
         };
@@ -658,17 +795,30 @@ export function PlatformProvider({ children }) {
     return false;
   };
 
+  const trainerOperational = Boolean(capabilities.canCreateCourse ?? capabilities.trainerOperational ?? trainerCertifications.some((item) => String(item.status).toLowerCase() === "approved"));
+  const canPurchase = role !== "Admin" && approvedRoles.includes("Member");
+
   const value = useMemo(() => ({
     role,
     authenticated,
     approvedRoles,
+    capabilities,
+    canPurchase,
+    trainerOperational,
     setRole,
     balance,
     walletBalances: serverWallet,
     accountLoading,
+    accountError,
+    retrySession: restoreSession,
+    dataStates,
+    dataErrors,
+    purchaseSyncWarning,
     cart,
     courses: purchasedCourses,
     contents: purchasedContents,
+    courseCatalogState,
+    contentCatalogState,
     transactions,
     applications,
     roleApplications,
@@ -693,10 +843,12 @@ export function PlatformProvider({ children }) {
     refreshMyTrainerCertifications,
     refreshAdminRoleApplications,
     refreshAdminQueues,
+    retryAccountData,
     addToCart,
     removeFromCart,
     buyContent,
     checkout,
+    retryPurchaseSync,
     downloadCourse: unavailableDeliveryAction,
     updateCourseProgress: unavailableDeliveryAction,
     submitRefund,
@@ -710,10 +862,10 @@ export function PlatformProvider({ children }) {
     deleteDraftListing,
     deletePublishedItem,
   }), [
-    accountLoading, approvedRoles, applications, authenticated, balance, cart, contents, courses, deleteDraftListing,
+    accountLoading, accountError, dataStates, restoreSession, approvedRoles, applications, authenticated, balance, canPurchase, capabilities, cart, contents, courses, courseCatalogState, contentCatalogState, dataErrors, deleteDraftListing,
     notify, orders, profile, publishedItems, refundRequests, refreshAdminQueues, refreshAdminRoleApplications, refreshCatalog,
     refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet, role, roleApplications, serverWallet,
-    purchasedContents, purchasedCourses, toast, trainerCertifications, transactions,
+    purchaseSyncWarning, purchasedContents, purchasedCourses, toast, trainerCertifications, trainerOperational, transactions,
   ]);
 
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;

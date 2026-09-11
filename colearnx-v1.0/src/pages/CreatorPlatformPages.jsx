@@ -209,86 +209,11 @@ function TrainerCertificationCard({ certifications, onSubmit }) {
   );
 }
 
-function DeliverySelector({ value, onChange }) {
-  const options = ["cloud", "local", "live", "record"];
-  return (
-    <fieldset className="delivery-mode-picker">
-      <legend>Delivery modes</legend>
-      {options.map((mode) => (
-        <label className="delivery-mode-option" key={mode}>
-          <input
-            type="checkbox"
-            checked={value.includes(mode)}
-            onChange={() => onChange(value.includes(mode) ? value.filter((item) => item !== mode) : [...value, mode])}
-          />
-          <span><b>{mode[0].toUpperCase() + mode.slice(1)}</b></span>
-        </label>
-      ))}
-    </fieldset>
-  );
-}
-
-function CourseListingEditor() {
-  const { savePublishedItem, refreshMyListings } = usePlatform();
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    price: "",
-    capacity: "",
-    startsAt: "",
-    endsAt: "",
-    deliveryModes: ["cloud"],
-  });
-  const [submitForReview, setSubmitForReview] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const save = async (event) => {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      await savePublishedItem({
-        ...form,
-        kind: "course",
-        status: submitForReview ? "Published" : "Draft",
-        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
-        endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
-      });
-      await refreshMyListings();
-      setForm({ ...form, title: "", description: "", price: "", capacity: "", startsAt: "", endsAt: "" });
-    } catch (saveError) {
-      setError(saveError.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <form className="content-grid editor-layout" onSubmit={save}>
-      <Card className="stack">
-        <div><span className="eyebrow">Course details</span><h2>Create course</h2></div>
-        <FormField label="Course title"><input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></FormField>
-        <FormField label="Description"><textarea required value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FormField>
-        <FormField label="Price in points"><input required min="0" type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
-        <DeliverySelector value={form.deliveryModes} onChange={(deliveryModes) => setForm({ ...form, deliveryModes })} />
-        <FormField label="Capacity (optional)"><input min="1" type="number" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} /></FormField>
-        <div className="form-grid two">
-          <FormField label="Start time (optional)"><input type="datetime-local" value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} /></FormField>
-          <FormField label="End time (optional)"><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })} /></FormField>
-        </div>
-        <label className="check-label"><input type="checkbox" checked={submitForReview} onChange={(event) => setSubmitForReview(event.target.checked)} />Submit for administrator review after creating the draft</label>
-        {error && <p className="form-error">{error}</p>}
-        <Button type="submit" disabled={busy || !form.deliveryModes.length}><Send size={16} /> {busy ? "Saving…" : submitForReview ? "Create and submit" : "Create draft"}</Button>
-      </Card>
-      <Card className="editor-summary"><span className="eyebrow">Publication workflow</span><h3>Review before publishing</h3><p>Your course is saved for review before it appears in the marketplace.</p></Card>
-    </form>
-  );
-}
-
 function ContentListingEditor() {
   const { refreshMyListings, notify } = usePlatform();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedDraftId = searchParams.get("draft");
-  const [form, setForm] = useState({ title: "", price: "", contentType: "digital" });
+  const [form, setForm] = useState({ title: "", description: "", price: "", contentType: "digital" });
   const [draft, setDraft] = useState(null);
   const [uploadSummary, setUploadSummary] = useState({ readyCount: 0, activeCount: 0 });
   const [busy, setBusy] = useState(false);
@@ -311,7 +236,7 @@ function ContentListingEditor() {
         setError("This content draft is no longer editable. Refresh My listings to see its current status.");
         return false;
       }
-      setForm({ title: restored.title, price: restored.price, contentType: restored.contentType });
+      setForm({ title: restored.title, description: listing.description || "", price: restored.price, contentType: restored.contentType });
       setDraft({ id: restored.id, contentVersionId: restored.contentVersionId });
       setUploadSummary({ readyCount: 0, activeCount: 0 });
       setSubmitted(false);
@@ -325,8 +250,8 @@ function ContentListingEditor() {
   }, [refreshMyListings, requestedDraftId]);
 
   useEffect(() => {
-    if (requestedDraftId) void restoreDraft();
-  }, [requestedDraftId, restoreDraft]);
+    if (requestedDraftId && draft?.id !== requestedDraftId) void restoreDraft();
+  }, [requestedDraftId, restoreDraft, draft?.id]);
 
   const createDraft = async (event) => {
     event.preventDefault();
@@ -340,6 +265,7 @@ function ContentListingEditor() {
     try {
       const created = await createContent({
         title: form.title.trim(),
+        description: form.description.trim(),
         contentType: form.contentType.trim() || "digital",
         pricePoints: Number(form.price),
       });
@@ -360,7 +286,7 @@ function ContentListingEditor() {
   }, []);
 
   const submitForReview = async () => {
-    if (!draft?.id || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0 || submitted) return;
+    if (!draft?.id || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0 || uploadSummary.unresolvedCount > 0 || uploadSummary.loading || uploadSummary.error || submitted) return;
     setBusy(true);
     setError("");
     try {
@@ -380,6 +306,7 @@ function ContentListingEditor() {
       <Card className="stack">
         <div><span className="eyebrow">Content details</span><h2>Create content</h2></div>
         <FormField label="Content title"><input required disabled={Boolean(draft)} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></FormField>
+        <FormField label="Public description"><textarea required disabled={Boolean(draft)} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FormField>
         <FormField label="Price in points"><input required min="0" disabled={Boolean(draft)} type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
         <FormField label="Content type"><input required disabled={Boolean(draft)} value={form.contentType} onChange={(event) => setForm({ ...form, contentType: event.target.value })} /></FormField>
         <PrivateAssetUploader
@@ -393,7 +320,7 @@ function ContentListingEditor() {
         {!draft ? (
           <Button type="submit" disabled={busy}><Send size={16} /> {busy ? "Creating content…" : "Create content"}</Button>
         ) : (
-          <Button type="button" onClick={submitForReview} disabled={busy || submitted || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0}>
+          <Button type="button" onClick={submitForReview} disabled={busy || submitted || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0 || uploadSummary.unresolvedCount > 0 || uploadSummary.loading || Boolean(uploadSummary.error)}>
             <Send size={16} /> {submitted ? "Submitted for administrator review" : busy ? "Submitting…" : "Submit for administrator review"}
           </Button>
         )}
@@ -406,7 +333,7 @@ function ContentListingEditor() {
     </form>
   );
 }
-export const CourseEditorPage = () => <CourseListingEditor />;
+export { default as CourseEditorPage } from "./CourseEditorPage";
 export const ContentEditorPage = () => <ContentListingEditor />;
 
 export function PublishedPage() {
@@ -488,7 +415,7 @@ export function PublishedPage() {
                     ) : isContentDraft ? (
                       <Link className="button secondary sm" to={`/creator/content-editor?draft=${encodeURIComponent(item.id)}`}>Continue draft</Link>
                     ) : (
-                      <ServerStatus value="Draft" />
+                      <Link className="button secondary sm" to={`/trainer/course-editor?draft=${encodeURIComponent(item.id)}`}>Continue draft</Link>
                     )}
                     <Button variant="ghost" size="sm" type="button" onClick={() => setConfirmingId(itemKey)} aria-label={`Delete draft ${item.title}`}>
                       <Trash2 size={14} /> Delete draft
