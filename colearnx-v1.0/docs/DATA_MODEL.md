@@ -1,6 +1,6 @@
 # Data model
 
-The team-maintained editable ERD is [CoLearnX ERD V5.1 Presentation Edition.drawio](https://github.com/ShubertChan/ColearnX-Training-Platform/blob/main/final%20report_material/Diagram/CoLearnX%20ERD%20V5.1%20Presentation%20Edition.drawio). PostgreSQL is the business source of truth; the browser never connects to it. `001_initial_schema.sql` implements the ERD naming and relationships; `002_commerce_hardening.sql` adds only the required profile, snapshot, revenue-allocation and four-balance ledger details.
+The team-maintained editable ERD is [CoLearnX ERD V5.1 Presentation Edition.drawio](https://github.com/ShubertChan/ColearnX-Training-Platform/blob/main/final%20report_material/Diagram/CoLearnX%20ERD%20V5.1%20Presentation%20Edition.drawio). PostgreSQL is the business source of truth; the browser never connects to it. Forward migrations implement the ERD and backend contracts; `008_frontend_delivery_backend.sql` adds the course-delivery, account-recovery, privacy and server-cart extensions required by the current frontend.
 
 The migration uses UUID public identifiers, UTC `timestamptz`, `bigint` for points and minor currency units, case-insensitive email uniqueness, explicit foreign keys, partial unique indexes, and generated PostgreSQL full-text indexes.
 
@@ -8,6 +8,9 @@ The migration uses UUID public identifiers, UTC `timestamptz`, `bigint` for poin
 
 - `users` has one `profiles` row and one active `point_accounts` row. Roles are grants in `user_roles`; refresh tokens are stored only as hashes in `refresh_sessions`.
 - `courses`, `course_runs`, `contents`, and `content_versions` retain the ERD names. Course delivery is modeled by `course_delivery_options`, not a single overloaded format field.
+- `course_delivery_assets` stores private R2 metadata for a course run. A trigger verifies that the asset owner is also the course owner; object keys and buckets never leave protected server code.
+- `order_items.delivery_snapshot_json` freezes only buyer-authorised fulfilment instructions, Trainer contact and Live join URL at purchase time. `course_video_progress_sessions` supplies replay-resistant reports for `course_access_progress`.
+- `password_reset_challenges`, `privacy_requests`, `carts` and `cart_items` contain only token hashes, authenticated request metadata and server-validated product snapshots; no reset token or browser-only cart is authoritative.
 - `orders` and `order_items` hold immutable price, seller, delivery, refund-policy and revenue-share snapshots. A course item creates a `course_enrolments` row; a content item creates a `content_access_grants` row.
 - Stripe creates `point_topup_orders` and `payment_transactions`; verified webhook events create a balanced `point_transactions` / `point_ledger_entries` posting and update the point-account balance projection in the same transaction.
 - `admin_action_logs`, `point_transactions`, and `point_ledger_entries` reject ordinary UPDATE and DELETE operations through PostgreSQL triggers.
@@ -38,6 +41,10 @@ The migration uses UUID public identifiers, UTC `timestamptz`, `bigint` for poin
 `005_object_storage.sql` adds `storage_assets`; it stores R2 metadata only—never file bytes, signed URLs, access keys or secrets. Each row has a server-generated unique `(bucket_name, object_key)`, a content-version/owner relationship, declared and R2-verified size/MIME values, ETag, lifecycle timestamps and constrained status (`pending`, `uploaded`, `ready`, `quarantined`, `orphaned`, `delete_pending`, `deleted`). `content_versions.storage_asset_id` is a nullable composite foreign key back to its own asset, so legacy `storage_url` rows remain readable without conversion.
 
 The runtime `colearnx_app` role gets only `SELECT`, `INSERT`, and column-level status/verification `UPDATE` access to `storage_assets`; it cannot change an asset owner, declared values, bucket/key, schema, or delete metadata. The controlled Neon Owner direct/unpooled connection alone applies the migration. A submitted/published content version must reference an owned `ready` asset.
+
+## Course delivery, recovery and privacy migration
+
+`008_frontend_delivery_backend.sql` adds course description and hosted-video metadata, buyer-only Local/Live fulfilment fields, protected course asset lifecycle records, immutable delivery snapshots, progress-report sessions, password-reset token hashes, privacy request queueing and one active cart per user. New tables use explicit grants because the runtime role does not inherit default PostgreSQL privileges. The course asset owner trigger and partial unique indexes prevent cross-owner association, duplicate active reset challenges, duplicate outstanding privacy requests and duplicate cart products.
 
 ## Migration policy
 

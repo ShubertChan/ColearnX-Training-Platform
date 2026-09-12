@@ -176,6 +176,7 @@ const mapOrder = (order) => ({
     watchedSeconds: Number(item.watchedSeconds || item.progress?.watchedSeconds || 0),
     totalDurationSeconds: Number(item.totalDurationSeconds || item.progress?.totalDurationSeconds || 0),
     refundRecords: item.refundRecords || item.refunds || [],
+    downloaded: Boolean(item.downloadCompletedAt),
   })),
 });
 

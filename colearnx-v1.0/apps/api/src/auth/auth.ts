@@ -6,7 +6,7 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { env } from '../config/env.js';
 import { query, withTransaction } from '../db/database.js';
-import { sendVerificationEmail } from '../email/resend.js';
+import { sendPasswordResetEmail, sendVerificationEmail } from '../email/resend.js';
 import { createOpaqueToken, sha256 } from '../lib/crypto.js';
 import { ApiError, ok } from '../lib/http.js';
 import { parse } from '../lib/validation.js';
@@ -69,6 +69,14 @@ const verificationSchema = z.object({
 });
 const resendVerificationSchema = z.object({ email: emailSchema });
 const accessTokenLifetime = '15m';
+const forgotPasswordSchema = z.object({ email: emailSchema }).strict();
+const resetPasswordSchema = z.object({
+  token: z.string().trim().regex(/^[A-Za-z0-9_-]{32,200}$/),
+  password: z.string().min(8).max(256),
+  passwordConfirmation: z.string().min(8).max(256),
+}).strict().refine((input) => input.password === input.passwordConfirmation, {
+  message: 'Passwords do not match.', path: ['passwordConfirmation'],
+});
 const refreshLifetimeMs = 1000 * 60 * 60 * 24 * 14;
 const refreshCookieName = 'colearnx_refresh';
 const registrationContinuationCookieName = 'colearnx_registration';
@@ -390,6 +398,54 @@ export async function resendEmailVerification(req: Request, res: Response) {
   return ok(res, { accepted: true }, 202);
 }
 
+export async function forgotPassword(req: Request, res: Response) {
+  const input = parse(forgotPasswordSchema, req.body);
+  const token = createOpaqueToken();
+  const challenge = await withTransaction(async (client) => {
+    const user = await client.query<{ user_id: string; email: string }>(`SELECT user_id, email::text AS email FROM users
+      WHERE lower(email::text) = lower($1) AND account_status = 'active' FOR UPDATE`, [input.email]);
+    if (!user.rowCount) return null;
+    await client.query('UPDATE password_reset_challenges SET consumed_at = now() WHERE user_id = $1 AND consumed_at IS NULL', [user.rows[0].user_id]);
+    const expiresAt = new Date(Date.now() + env.PASSWORD_RESET_TOKEN_TTL_MINUTES * 60_000);
+    await client.query(`INSERT INTO password_reset_challenges (user_id, token_hash, expires_at, requested_ip_hash)
+      VALUES ($1, $2, $3, $4)`, [user.rows[0].user_id, sha256(token), expiresAt, sha256(req.ip || 'unknown')]);
+    await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
+      VALUES ($1, 'auth.password_reset_requested', 'users', $1, jsonb_build_object('outcome', 'pending'), $2)`,
+    [user.rows[0].user_id, res.locals.requestId]);
+    return { userId: user.rows[0].user_id, email: user.rows[0].email };
+  });
+  if (challenge) {
+    try {
+      const url = new URL('/reset-password', env.APP_ORIGIN);
+      url.searchParams.set('token', token);
+      await sendPasswordResetEmail({ to: challenge.email, resetUrl: url.toString(), expiresInMinutes: env.PASSWORD_RESET_TOKEN_TTL_MINUTES });
+    } catch {
+      await query('UPDATE password_reset_challenges SET consumed_at = now() WHERE user_id = $1 AND token_hash = $2 AND consumed_at IS NULL', [challenge.userId, sha256(token)]);
+    }
+  }
+  return ok(res, { accepted: true }, 202);
+}
+
+export async function resetPassword(req: Request, res: Response) {
+  const input = parse(resetPasswordSchema, req.body);
+  await withTransaction(async (client) => {
+    const challenge = await client.query<{ password_reset_challenge_id: string; user_id: string }>(`SELECT password_reset_challenge_id, user_id
+      FROM password_reset_challenges WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > now() FOR UPDATE`, [sha256(input.token)]);
+    if (!challenge.rowCount) throw new ApiError(400, 'PASSWORD_RESET_TOKEN_INVALID', 'The password reset link is invalid or has expired.');
+    const current = challenge.rows[0];
+    const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
+    await client.query('UPDATE users SET password_hash = $2, updated_at = now() WHERE user_id = $1', [current.user_id, passwordHash]);
+    await client.query('UPDATE password_reset_challenges SET consumed_at = now() WHERE password_reset_challenge_id = $1', [current.password_reset_challenge_id]);
+    await client.query(`UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = 'password-reset'
+      WHERE user_id = $1 AND revoked_at IS NULL`, [current.user_id]);
+    await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
+      VALUES ($1, 'auth.password_reset_completed', 'users', $1, jsonb_build_object('outcome', 'success'), $2)`,
+    [current.user_id, res.locals.requestId]);
+  });
+  res.clearCookie(refreshCookieName, refreshCookieOptions());
+  return ok(res, { reset: true });
+}
+
 export async function login(req: Request, res: Response) {
   const input = parse(credentialsSchema, req.body);
   const user = await query<{ id: string; password_hash: string }>('SELECT user_id AS id, password_hash FROM users WHERE lower(email::text) = lower($1)', [input.email]);
@@ -467,12 +523,18 @@ export function requireRole(...roles: string[]) {
 
 export async function me(_req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
-  const result = await query(`SELECT u.full_name, p.display_name, p.phone, p.location, p.bio
+  const result = await query(`SELECT u.full_name, p.display_name, p.phone, p.location, p.bio,
+      EXISTS (SELECT 1 FROM trainer_certifications tc WHERE tc.trainer_user_id = u.user_id AND tc.certification_status = 'approved') AS trainer_operational
     FROM users u LEFT JOIN profiles p ON p.user_id = u.user_id WHERE u.user_id = $1`, [actor.id]);
   return ok(res, { ...actor, profile: result.rowCount ? {
     displayName: result.rows[0].display_name ?? result.rows[0].full_name,
     phone: result.rows[0].phone, location: result.rows[0].location, bio: result.rows[0].bio,
-  } : null });
+  } : null, capabilities: {
+    trainerOperational: Boolean(result.rows[0]?.trainer_operational),
+    canCreateCourse: actor.roles.includes('trainer') && Boolean(result.rows[0]?.trainer_operational),
+    canCreateContent: actor.roles.includes('creator'),
+    canPurchase: actor.roles.includes('member') && !actor.roles.includes('admin'),
+  } });
 }
 
 export async function updateMe(req: Request, res: Response) {

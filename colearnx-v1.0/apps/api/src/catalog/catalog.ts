@@ -7,10 +7,46 @@ import { ApiError, ok } from '../lib/http.js';
 import { deleteStoredObject } from '../storage/r2.js';
 import { canFinalizeStorageAssetDeletion } from '../storage/storage-deletion.js';
 import { parse, uuid } from '../lib/validation.js';
+import { assertCourseReadyForSubmission, assertTrainerOperational } from '../storage/course-delivery.js';
 
 const listQuery = z.object({ q: z.string().trim().max(120).optional(), category: z.string().trim().max(80).optional(), cursor: z.string().datetime().optional(), limit: z.coerce.number().int().min(1).max(100).default(20) });
-const courseInput = z.object({ title: z.string().trim().min(1).max(200), description: z.string().trim().max(5000).default(''), categoryId: uuid.optional(), pricePoints: z.coerce.number().int().nonnegative(), capacity: z.coerce.number().int().positive().nullable().optional(), startsAt: z.string().datetime().nullable().optional(), endsAt: z.string().datetime().nullable().optional(), timezone: z.string().trim().max(80).optional(), deliveryModes: z.array(z.enum(['cloud', 'local', 'live', 'record'])).min(1).max(4) });
-const contentInput = z.object({ title: z.string().trim().min(1).max(200), categoryId: uuid.optional(), contentType: z.string().trim().min(1).max(80).default('digital'), pricePoints: z.coerce.number().int().nonnegative() }).strict();
+const courseInput = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(5000).default(''),
+  categoryId: uuid.optional(),
+  pricePoints: z.coerce.number().int().nonnegative(),
+  capacity: z.coerce.number().int().positive().nullable().optional(),
+  startsAt: z.string().datetime().nullable().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
+  timezone: z.string().trim().max(80).optional(),
+  deliveryModes: z.array(z.enum(['cloud', 'local', 'live', 'record'])).min(1).max(4),
+  fulfilmentInstructions: z.string().trim().min(1).max(5000).nullable().optional(),
+  trainerContact: z.string().trim().min(1).max(500).nullable().optional(),
+  joinUrl: z.string().url().max(2000).nullable().optional(),
+  progressTrackingType: z.enum(['none', 'online_video']).default('none'),
+  totalDurationSeconds: z.coerce.number().int().positive().nullable().optional(),
+}).superRefine((value, context) => {
+  const needsCoordination = value.deliveryModes.some((mode) => mode === 'local' || mode === 'live');
+  if (needsCoordination && (!value.fulfilmentInstructions || !value.trainerContact)) {
+    context.addIssue({ code: 'custom', path: ['fulfilmentInstructions'], message: 'Local and Live delivery require buyer-only instructions and Trainer contact details.' });
+  }
+  if (needsCoordination && !value.startsAt) {
+    context.addIssue({ code: 'custom', path: ['startsAt'], message: 'Self-arranged Local and Live courses require a confirmed start time for the 72-hour refund deadline.' });
+  }
+  if (value.progressTrackingType === 'online_video' && !value.totalDurationSeconds) {
+    context.addIssue({ code: 'custom', path: ['totalDurationSeconds'], message: 'Online video requires a total duration.' });
+  }
+  if (value.progressTrackingType === 'none' && value.totalDurationSeconds !== null && value.totalDurationSeconds !== undefined) {
+    context.addIssue({ code: 'custom', path: ['totalDurationSeconds'], message: 'A duration is only accepted for platform-hosted online video.' });
+  }
+});
+const contentInput = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(5000).default(''),
+  categoryId: uuid.optional(),
+  contentType: z.string().trim().min(1).max(80).default('digital'),
+  pricePoints: z.coerce.number().int().nonnegative(),
+}).strict();
 const moderationDecisionInput = z.object({ decision: z.enum(['published', 'rejected']), reason: z.string().trim().min(3).max(2_000) });
 const moderationListQuery = z.object({ limit: z.coerce.number().int().min(1).max(100).default(50) });
 
@@ -34,13 +70,31 @@ async function bestEffortDeleteArchivedDraftAsset(asset: PendingStorageAsset) {
     // Retain delete_pending for the scheduled R2 reconciliation task.
   }
 }
+function courseRefundPolicyPreview(deliveryModes: unknown) {
+  const modes = Array.isArray(deliveryModes) ? deliveryModes : [];
+  if (modes.some((mode) => mode === 'local' || mode === 'live')) {
+    return { rule: 'self-arranged-72h-v1', noticeHours: 72, summary: 'Self-arranged online or offline courses may be refunded only when requested at least 72 hours before the course starts.' };
+  }
+  return { rule: 'recorded-media-10pct-no-download-v1', watchedRatioMaximum: 0.1, requiresNoDownload: true, summary: 'Recorded video or file refunds require viewing at or below 10% and no protected file download.' };
+}
+
 function courseResponse(row: Record<string, unknown>) {
-  return { id: row.course_run_id, courseId: row.course_id, title: row.title, description: row.description, pricePoints: Number(row.price_points), capacity: row.capacity, status: row.run_status, startsAt: row.starts_at, endsAt: row.ends_at, owner: { id: row.owner_user_id, displayName: row.owner_name }, category: row.category_id ? { id: row.category_id, name: row.category_name } : null, deliveryModes: row.delivery_modes ?? [] };
+  const progressTrackingType = row.progress_tracking_type === 'online_video' ? 'online_video' : 'none';
+  return {
+    id: row.course_run_id, courseId: row.course_id, title: row.title, description: row.description,
+    pricePoints: Number(row.price_points), capacity: row.capacity, status: row.run_status,
+    startsAt: row.starts_at, endsAt: row.ends_at,
+    owner: { id: row.owner_user_id, displayName: row.owner_name },
+    category: row.category_id ? { id: row.category_id, name: row.category_name } : null,
+    deliveryModes: row.delivery_modes ?? [], progressTrackingType, onlineVideo: progressTrackingType === 'online_video',
+    totalDurationSeconds: progressTrackingType === 'online_video' ? Number(row.total_duration_seconds ?? 0) : null,
+    refundPolicyPreview: courseRefundPolicyPreview(row.delivery_modes),
+  };
 }
 
 export async function listCourses(req: Request, res: Response) {
   const input = parse(listQuery, req.query);
-  const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name,
+  const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, cr.progress_tracking_type, cr.total_duration_seconds, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name,
     COALESCE(jsonb_agg(cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
     FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id JOIN users u ON u.user_id = c.owner_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id AND cdo.option_status = 'active'
@@ -56,7 +110,7 @@ export async function listCourses(req: Request, res: Response) {
 
 export async function getCourse(req: Request, res: Response) {
   const id = parse(uuid, req.params.id);
-  const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name,
+  const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, cr.progress_tracking_type, cr.total_duration_seconds, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name,
     COALESCE(jsonb_agg(cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
     FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id JOIN users u ON u.user_id = c.owner_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id AND cdo.option_status = 'active'
@@ -68,24 +122,24 @@ export async function getCourse(req: Request, res: Response) {
 
 export async function listContent(req: Request, res: Response) {
   const input = parse(listQuery, req.query);
-  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name
+  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name
     FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id AND cv.version_status = 'published' JOIN users u ON u.user_id = c.creator_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id
     WHERE c.publication_status = 'published' AND ($1::text IS NULL OR c.search_vector @@ websearch_to_tsquery('simple', $1))
       AND ($2::text IS NULL OR cat.category_name = $2) AND ($3::timestamptz IS NULL OR cv.published_at < $3::timestamptz)
     ORDER BY cv.published_at DESC, cv.content_version_id DESC LIMIT $4`, [input.q || null, input.category || null, input.cursor ?? null, input.limit]);
-  const items = result.rows.map((row) => ({ id: row.content_version_id, contentId: row.content_id, title: row.title, contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status, publishedAt: row.published_at, owner: { id: row.creator_user_id, displayName: row.owner_name }, category: row.category_id ? { id: row.category_id, name: row.category_name } : null }));
+  const items = result.rows.map((row) => ({ id: row.content_version_id, contentId: row.content_id, title: row.title, description: row.description, contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status, publishedAt: row.published_at, owner: { id: row.creator_user_id, displayName: row.owner_name }, category: row.category_id ? { id: row.category_id, name: row.category_name } : null }));
   return ok(res, items, 200, { nextCursor: items.length === input.limit ? items.at(-1)?.publishedAt : null });
 }
 
 export async function getContent(req: Request, res: Response) {
   const id = parse(uuid, req.params.id);
-  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name
+  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name
     FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id AND cv.version_status = 'published' JOIN users u ON u.user_id = c.creator_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id WHERE cv.content_version_id = $1 AND c.publication_status = 'published'`, [id]);
   if (!result.rowCount) throw new ApiError(404, 'CONTENT_NOT_FOUND', 'Content version was not found.');
   const row = result.rows[0];
-  return ok(res, { id: row.content_version_id, contentId: row.content_id, title: row.title, contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status, publishedAt: row.published_at, owner: { id: row.creator_user_id, displayName: row.owner_name }, category: row.category_id ? { id: row.category_id, name: row.category_name } : null });
+  return ok(res, { id: row.content_version_id, contentId: row.content_id, title: row.title, description: row.description, contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status, publishedAt: row.published_at, owner: { id: row.creator_user_id, displayName: row.owner_name }, category: row.category_id ? { id: row.category_id, name: row.category_name } : null });
 }
 
 export async function createCourse(req: Request, res: Response) {
@@ -93,23 +147,54 @@ export async function createCourse(req: Request, res: Response) {
   const input = parse(courseInput, req.body);
   if (!actor.roles.includes('trainer')) throw new ApiError(403, 'TRAINER_ROLE_REQUIRED', 'An approved trainer role is required.');
   const course = await withTransaction(async (client) => {
-    const certified = await client.query(`SELECT 1 FROM trainer_certifications WHERE trainer_user_id = $1 AND certification_status = 'approved'`, [actor.id]);
-    if (!certified.rowCount) throw new ApiError(403, 'TRAINER_CERTIFICATION_REQUIRED', 'An approved trainer certification is required.');
+    await assertTrainerOperational(client, actor.id);
     const created = await client.query<{ course_id: string }>(`INSERT INTO courses (owner_user_id, category_id, title, description) VALUES ($1, $2, $3, $4) RETURNING course_id`, [actor.id, input.categoryId ?? null, input.title, input.description]);
-    const run = await client.query<{ course_run_id: string }>(`INSERT INTO course_runs (course_id, run_code, price_points, capacity, starts_at, ends_at, timezone, primary_delivery_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING course_run_id`, [created.rows[0].course_id, `run-${randomUUID()}`, input.pricePoints, input.capacity ?? null, input.startsAt ?? null, input.endsAt ?? null, input.timezone ?? null, input.deliveryModes[0]]);
-    for (const [index, mode] of input.deliveryModes.entries()) await client.query(`INSERT INTO course_delivery_options (course_run_id, delivery_type, access_mode, is_primary, option_status) VALUES ($1, $2, $3, $4, 'draft')`, [run.rows[0].course_run_id, mode, mode === 'live' ? 'attendance' : 'on_demand', index === 0]);
+    const run = await client.query<{ course_run_id: string }>(`INSERT INTO course_runs (course_id, run_code, price_points, capacity, starts_at, ends_at, timezone, primary_delivery_type, progress_tracking_type, total_duration_seconds) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING course_run_id`, [created.rows[0].course_id, `run-${randomUUID()}`, input.pricePoints, input.capacity ?? null, input.startsAt ?? null, input.endsAt ?? null, input.timezone ?? null, input.deliveryModes[0], input.progressTrackingType, input.totalDurationSeconds ?? null]);
+    for (const [index, mode] of input.deliveryModes.entries()) { const coordinates = mode === 'local' || mode === 'live'; await client.query(`INSERT INTO course_delivery_options (course_run_id, delivery_type, access_mode, is_primary, option_status, fulfilment_instructions, trainer_contact, join_url) VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7)`, [run.rows[0].course_run_id, mode, mode === 'live' ? 'attendance' : 'on_demand', index === 0, coordinates ? input.fulfilmentInstructions ?? null : null, coordinates ? input.trainerContact ?? null : null, coordinates ? input.joinUrl ?? null : null]); }
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id) VALUES ($1, 'course.create', 'courses', $2, jsonb_build_object('courseRunId', $3::uuid), $4)`, [actor.id, created.rows[0].course_id, run.rows[0].course_run_id, res.locals.requestId]);
     return { id: run.rows[0].course_run_id, courseId: created.rows[0].course_id, status: 'draft' };
   });
   return ok(res, course, 201);
 }
 
-export async function createContent(req: Request, res: Response) {
+export async function updateCourse(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
+  const id = parse(uuid, req.params.id);
+  const input = parse(courseInput, req.body);
+  if (!actor.roles.includes('trainer')) throw new ApiError(403, 'TRAINER_ROLE_REQUIRED', 'An approved trainer role is required.');
+  const result = await withTransaction(async (client) => {
+    await assertTrainerOperational(client, actor.id);
+    const draft = await client.query<{ course_id: string }>(`SELECT c.course_id FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id
+      WHERE cr.course_run_id = $1 AND c.owner_user_id = $2 AND c.publication_status = 'draft' AND cr.run_status = 'draft'
+      FOR UPDATE OF c, cr`, [id, actor.id]);
+    if (!draft.rowCount) throw new ApiError(409, 'COURSE_NOT_DRAFT', 'Only an owned draft course offering can be updated.');
+    await client.query(`UPDATE courses SET category_id = $2, title = $3, description = $4, updated_at = now()
+      WHERE course_id = $1`, [draft.rows[0].course_id, input.categoryId ?? null, input.title, input.description]);
+    await client.query(`UPDATE course_runs SET price_points = $2, capacity = $3, starts_at = $4, ends_at = $5,
+      timezone = $6, primary_delivery_type = $7, progress_tracking_type = $8, total_duration_seconds = $9
+      WHERE course_run_id = $1`, [id, input.pricePoints, input.capacity ?? null, input.startsAt ?? null, input.endsAt ?? null,
+      input.timezone ?? null, input.deliveryModes[0], input.progressTrackingType, input.totalDurationSeconds ?? null]);
+    await client.query('DELETE FROM course_delivery_options WHERE course_run_id = $1', [id]);
+    await client.query(`INSERT INTO course_delivery_options
+      (course_run_id, delivery_type, access_mode, is_primary, option_status, fulfilment_instructions, trainer_contact, join_url)
+      SELECT $1, type, CASE WHEN type = 'live' THEN 'attendance' ELSE 'on_demand' END, ordinal = 1, 'draft',
+        CASE WHEN type IN ('local', 'live') THEN $3 ELSE NULL END, CASE WHEN type IN ('local', 'live') THEN $4 ELSE NULL END,
+        CASE WHEN type = 'live' THEN $5 ELSE NULL END
+      FROM unnest($2::text[]) WITH ORDINALITY AS delivery(type, ordinal)`,
+    [id, input.deliveryModes, input.fulfilmentInstructions ?? null, input.trainerContact ?? null, input.joinUrl ?? null]);
+    await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
+      VALUES ($1, 'course.update', 'course_runs', $2, jsonb_build_object('outcome', 'success'), $3)`, [actor.id, id, res.locals.requestId]);
+    return { id, courseId: draft.rows[0].course_id, status: 'draft' };
+  });
+  return ok(res, result);
+}
+
+export async function createContent(req: Request, res: Response) {
   const input = parse(contentInput, req.body);
+  const actor = res.locals.actor as Actor;
   if (!actor.roles.includes('creator')) throw new ApiError(403, 'CREATOR_ROLE_REQUIRED', 'An approved creator role is required.');
   const result = await withTransaction(async (client) => {
-    const content = await client.query<{ content_id: string }>(`INSERT INTO contents (creator_user_id, category_id, content_type, title, price_points) VALUES ($1, $2, $3, $4, $5) RETURNING content_id`, [actor.id, input.categoryId ?? null, input.contentType, input.title, input.pricePoints]);
+    const content = await client.query<{ content_id: string }>(`INSERT INTO contents (creator_user_id, category_id, content_type, title, description, price_points) VALUES ($1, $2, $3, $4, $5, $6) RETURNING content_id`, [actor.id, input.categoryId ?? null, input.contentType, input.title, input.description, input.pricePoints]);
     const version = await client.query<{ content_version_id: string }>(`INSERT INTO content_versions (content_id, version_no) VALUES ($1, 1) RETURNING content_version_id`, [content.rows[0].content_id]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, request_id) VALUES ($1, 'content.create', 'contents', $2, $3)`, [actor.id, content.rows[0].content_id, res.locals.requestId]);
     return { id: content.rows[0].content_id, contentVersionId: version.rows[0].content_version_id, status: 'draft' };
@@ -120,7 +205,10 @@ export async function createContent(req: Request, res: Response) {
 export async function submitCourse(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const id = parse(uuid, req.params.id);
+  if (!actor.roles.includes('trainer')) throw new ApiError(403, 'TRAINER_ROLE_REQUIRED', 'An approved trainer role is required.');
   const result = await withTransaction(async (client) => {
+    await assertTrainerOperational(client, actor.id);
+    await assertCourseReadyForSubmission(client, id, actor.id);
     const course = await client.query<{ course_id: string }>(`UPDATE courses SET publication_status = 'submitted', updated_at = now() WHERE course_id = (SELECT course_id FROM course_runs WHERE course_run_id = $1) AND owner_user_id = $2 AND publication_status = 'draft' RETURNING course_id`, [id, actor.id]);
     if (!course.rowCount) throw new ApiError(409, 'COURSE_NOT_SUBMITTABLE', 'Only an owned draft course offering may be submitted.');
     await client.query(`UPDATE course_runs SET run_status = 'submitted' WHERE course_run_id = $1 AND run_status = 'draft'`, [id]);
@@ -257,8 +345,12 @@ export async function listMyListings(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const [courseResult, contentResult] = await Promise.all([
     query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity,
-      cr.starts_at, cr.ends_at, cr.run_status, c.publication_status, c.updated_at,
+      cr.starts_at, cr.ends_at, cr.run_status, c.publication_status, c.updated_at, cr.progress_tracking_type,
+      cr.total_duration_seconds,
       COALESCE(jsonb_agg(cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
+      , MAX(cdo.fulfilment_instructions) FILTER (WHERE cdo.delivery_type IN ('local', 'live')) AS fulfilment_instructions
+      , MAX(cdo.trainer_contact) FILTER (WHERE cdo.delivery_type IN ('local', 'live')) AS trainer_contact
+      , MAX(cdo.join_url) FILTER (WHERE cdo.delivery_type = 'live') AS join_url
       FROM courses c JOIN course_runs cr ON cr.course_id = c.course_id
       LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id
       WHERE c.owner_user_id = $1
@@ -266,7 +358,7 @@ export async function listMyListings(req: Request, res: Response) {
         AND cr.run_status <> 'archived'
       GROUP BY cr.course_run_id, c.course_id
       ORDER BY c.updated_at DESC, cr.course_run_id DESC`, [actor.id]),
-    query(`SELECT c.content_id, cv.content_version_id, c.title, c.content_type, c.price_points,
+    query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points,
       c.publication_status, cv.version_status, cv.storage_url, cv.storage_asset_id, sa.storage_asset_id AS asset_id,
       sa.original_filename, sa.declared_content_type, sa.verified_content_type, sa.declared_byte_size,
       sa.verified_byte_size, sa.asset_status, sa.uploaded_at, c.updated_at
@@ -281,11 +373,14 @@ export async function listMyListings(req: Request, res: Response) {
     kind: 'course', id: row.course_run_id, courseId: row.course_id, title: row.title,
     description: row.description, pricePoints: Number(row.price_points), capacity: row.capacity,
     startsAt: row.starts_at, endsAt: row.ends_at, status: row.run_status,
-    publicationStatus: row.publication_status, deliveryModes: row.delivery_modes ?? [], updatedAt: row.updated_at,
+    publicationStatus: row.publication_status, deliveryModes: row.delivery_modes ?? [],
+    fulfilmentInstructions: row.fulfilment_instructions, trainerContact: row.trainer_contact, joinUrl: row.join_url,
+    progressTrackingType: row.progress_tracking_type, totalDurationSeconds: row.total_duration_seconds ? Number(row.total_duration_seconds) : null,
+    updatedAt: row.updated_at,
   }));
   const contents = contentResult.rows.map((row) => ({
     kind: 'content', id: row.content_id, contentVersionId: row.content_version_id, title: row.title,
-    contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status,
+    description: row.description, contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status,
     versionStatus: row.version_status, storageUrlPresent: Boolean(row.storage_url || row.storage_asset_id),
     fileStatus: row.asset_status ?? (row.storage_url ? 'legacy' : 'missing'), updatedAt: row.updated_at,
     asset: row.asset_id ? {
@@ -320,13 +415,14 @@ export async function decideCourseSubmission(req: Request, res: Response) {
   const courseRunId = parse(uuid, req.params.id);
   const input = parse(moderationDecisionInput, req.body);
   const result = await withTransaction(async (client) => {
-    const course = await client.query<{ course_id: string }>(`SELECT c.course_id FROM course_runs cr
+    const course = await client.query<{ course_id: string; owner_user_id: string }>(`SELECT c.course_id, c.owner_user_id FROM course_runs cr
       JOIN courses c ON c.course_id = cr.course_id
       WHERE cr.course_run_id = $1 AND cr.run_status = 'submitted' AND c.publication_status = 'submitted'
       FOR UPDATE OF cr, c`, [courseRunId]);
     if (!course.rowCount) throw new ApiError(409, 'COURSE_NOT_REVIEWABLE', 'Only a submitted course offering may be reviewed.');
     if (input.decision === 'published') {
       const options = await client.query(`SELECT 1 FROM course_delivery_options WHERE course_run_id = $1 AND option_status = 'draft'`, [courseRunId]);
+      await assertCourseReadyForSubmission(client, courseRunId, course.rows[0].owner_user_id);
       if (!options.rowCount) throw new ApiError(409, 'COURSE_DELIVERY_UNAVAILABLE', 'A submitted course must have at least one delivery option.');
       await client.query(`UPDATE courses SET publication_status = 'published', updated_at = now() WHERE course_id = $1`, [course.rows[0].course_id]);
       await client.query(`UPDATE course_runs SET run_status = 'published' WHERE course_run_id = $1`, [courseRunId]);

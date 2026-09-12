@@ -31,3 +31,7 @@ npm.cmd run build
 ```
 
 The frontend/backend boundary and the server work still required for the reported issues are documented in [docs/FRONTEND_BACKEND_HANDOFF.md](docs/FRONTEND_BACKEND_HANDOFF.md).
+
+## Backend integration
+
+The repository also includes the backend delivery and refund workflows. Apply migration 008_frontend_delivery_backend.sql and configure the deployment secrets before using the protected delivery, video-progress, profile, privacy and password-reset endpoints. See [API contract](docs/API.md), [local runbook](docs/LOCAL_RUNBOOK.md), and [staging runbook](docs/STAGING_RENDER_NEON.md). The frontend treats server-recorded refund eligibility as authoritative.

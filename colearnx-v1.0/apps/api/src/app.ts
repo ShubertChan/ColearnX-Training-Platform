@@ -9,18 +9,22 @@ import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
 import { query } from './db/database.js';
 import { errorHandler, notFound, ok } from './lib/http.js';
-import { authenticate, csrf, login, logout, me, refresh, register, resendEmailVerification, requireRole, updateMe, verifyEmail } from './auth/auth.js';
+import { authenticate, csrf, forgotPassword, login, logout, me, refresh, register, resendEmailVerification, requireRole, resetPassword, updateMe, verifyEmail } from './auth/auth.js';
 import { createCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
-import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, deleteContentDraft, deleteCourseDraft, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse } from './catalog/catalog.js';
+import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, deleteContentDraft, deleteCourseDraft, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse, updateCourse } from './catalog/catalog.js';
 import { checkout, getOrder, listOrders } from './orders/commerce.js';
 import { createRefundRequest, decideRefund, getRefundRequest, listRefundRequestsForAdmin } from './refunds/service.js';
 import { createRoleApplication, createTrainerCertification, decideRoleApplication, decideTrainerCertification, listRoleApplications, listTrainerCertifications, myRoleApplications, myTrainerCertifications } from './governance/governance.js';
+import { getPublicProfile, requestAccountDeletion, requestDataExport } from './account/privacy.js';
+import { addCartItem, listCart, removeCartItem } from './cart/cart.js';
 import { adjustPoints, cancelLiveCourseRun, completeLiveCourseRun, createTopUpPackage, retireTopUpPackage, setRevenueSharePolicy } from './admin/operations.js';
 import { changeUserRole, deleteUser, getUser, listUsers, reinstateUser, suspendUser } from './admin/users.js';
 import { completeUploadIntent, createContentDownloadUrl, createUploadIntent, deleteUploadIntent, listContentAssets, previewContentAsset } from './storage/content-assets.js';
+import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUploadIntent, deleteCourseUploadIntent, getCourseDelivery, listCourseAssets, recordCourseProgress } from './storage/course-delivery.js';
 
-const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'res.headers.set-cookie'] });
+
+const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'req.body.token', 'res.headers.set-cookie'] });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many authentication attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
 const verificationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many verification attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
 const mutationLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
@@ -55,10 +59,15 @@ export function createApp() {
   const api = express.Router();
   api.get('/auth/csrf', csrf);
   api.post('/auth/register', authLimiter, register);
+  api.post('/auth/forgot-password', authLimiter, forgotPassword);
+  api.post('/auth/reset-password', authLimiter, resetPassword);
   api.post('/auth/verify-email', verificationLimiter, verifyEmail);
   api.post('/auth/resend-verification', verificationLimiter, resendEmailVerification);
   api.post('/auth/login', authLimiter, login);
   api.post('/auth/refresh', authLimiter, refresh);
+  api.get('/profiles/:id', getPublicProfile);
+  api.post('/me/data-export', authenticate, mutationLimiter, requestDataExport);
+  api.post('/me/deletion-requests', authenticate, mutationLimiter, requestAccountDeletion);
   api.post('/auth/logout', logout);
   api.get('/me', authenticate, me);
   api.patch('/me', authenticate, mutationLimiter, updateMe);
@@ -70,6 +79,7 @@ export function createApp() {
   api.get('/my/listings', authenticate, listMyListings);
   api.post('/courses', authenticate, mutationLimiter, createCourse);
   api.post('/courses/:id/submit', authenticate, mutationLimiter, submitCourse);
+  api.patch('/courses/:id', authenticate, mutationLimiter, updateCourse);
   api.delete('/courses/:id/draft', authenticate, mutationLimiter, deleteCourseDraft);
   api.post('/content', authenticate, mutationLimiter, createContent);
   api.post('/content/:id/submit', authenticate, mutationLimiter, submitContent);
@@ -80,6 +90,10 @@ export function createApp() {
   api.delete('/content-versions/:contentVersionId/upload-intents/:assetId', authenticate, mutationLimiter, deleteUploadIntent);
   api.post('/content-versions/:contentVersionId/download-url', authenticate, mutationLimiter, createContentDownloadUrl);
 
+  api.get('/courses/:courseRunId/assets', authenticate, listCourseAssets);
+  api.post('/courses/:courseRunId/upload-intents', authenticate, mutationLimiter, createCourseUploadIntent);
+  api.post('/courses/:courseRunId/upload-intents/:assetId/complete', authenticate, mutationLimiter, completeCourseUploadIntent);
+  api.delete('/courses/:courseRunId/upload-intents/:assetId', authenticate, mutationLimiter, deleteCourseUploadIntent);
   api.post('/role-applications', authenticate, mutationLimiter, createRoleApplication);
   api.get('/role-applications/me', authenticate, myRoleApplications);
   api.post('/trainer-certifications', authenticate, mutationLimiter, createTrainerCertification);
@@ -88,6 +102,9 @@ export function createApp() {
   api.get('/wallet', authenticate, wallet);
   api.get('/wallet/transactions', authenticate, walletTransactions);
   api.get('/wallet/top-up-packages', topUpPackages);
+  api.get('/cart', authenticate, listCart);
+  api.post('/cart/items', authenticate, mutationLimiter, addCartItem);
+  api.delete('/cart/items/:id', authenticate, mutationLimiter, removeCartItem);
   api.post('/wallet/top-ups/checkout-session', authenticate, mutationLimiter, createCheckoutSession);
   api.get('/wallet/top-ups/:id', authenticate, getTopUp);
 
@@ -95,6 +112,9 @@ export function createApp() {
   api.get('/orders', authenticate, listOrders);
   api.get('/orders/:id', authenticate, getOrder);
   api.post('/refund-requests', authenticate, mutationLimiter, createRefundRequest);
+  api.get('/order-items/:orderItemId/delivery', authenticate, getCourseDelivery);
+  api.post('/order-items/:orderItemId/delivery/download-url', authenticate, mutationLimiter, createCourseDownloadUrl);
+  api.post('/order-items/:orderItemId/progress', authenticate, mutationLimiter, recordCourseProgress);
   api.get('/refund-requests/:id', authenticate, getRefundRequest);
   api.get('/admin/role-applications', authenticate, requireRole('admin'), listRoleApplications);
   api.post('/admin/role-applications/:id/decision', authenticate, requireRole('admin'), mutationLimiter, decideRoleApplication);

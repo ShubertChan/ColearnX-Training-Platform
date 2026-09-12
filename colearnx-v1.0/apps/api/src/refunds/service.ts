@@ -21,7 +21,8 @@ type RefundEvidence = {
   refund_policy_snapshot_json: unknown;
   purchased_at: Date;
   starts_at: Date | null;
-  progress_percent: string;
+  watched_seconds: string;
+  total_seconds: string | null;
   first_accessed_at: Date | null;
   download_completed_at: Date | null;
 };
@@ -32,24 +33,28 @@ function modes(value: unknown) {
 
 function evaluateEvidence(evidence: RefundEvidence, requestTime: Date): RefundDecision {
   return evaluateRefund({
-    deliveryModes: modes(evidence.delivery_modes_snapshot_json),
-    purchasedAt: evidence.purchased_at,
+    policySnapshot: evidence.refund_policy_snapshot_json,
     requestTime,
-    progressPercent: Number(evidence.progress_percent),
-    startsAt: evidence.starts_at,
+    purchasedAt: evidence.purchased_at,
+    watchedSeconds: Number(evidence.watched_seconds),
+    totalDurationSeconds: evidence.total_seconds === null ? null : Number(evidence.total_seconds),
+    downloadCompletedAt: evidence.download_completed_at,
   });
 }
 
 async function loadEvidence(client: Pick<PoolClient, 'query'>, orderItemId: string, buyerId: string) {
   const result = await client.query<RefundEvidence>(`SELECT oi.order_item_id, oi.item_type, oi.fulfilment_status, oi.points_amount,
     oi.delivery_modes_snapshot_json, oi.refund_policy_snapshot_json, o.created_at AS purchased_at, cr.starts_at,
-    COALESCE(MAX(cap.watch_percent), 0)::text AS progress_percent,
-    MIN(cap.first_started_at) AS first_accessed_at, MAX(cap.download_completed_at) AS download_completed_at
+    COALESCE(MAX(cap.watched_seconds), 0)::text AS watched_seconds,
+    MAX(cap.total_seconds)::text AS total_seconds,
+    COALESCE(MIN(cap.first_started_at), MIN(cag.first_accessed_at)) AS first_accessed_at,
+    COALESCE(MAX(cap.download_completed_at), MAX(cag.first_accessed_at)) AS download_completed_at
     FROM order_items oi
     JOIN orders o ON o.order_id = oi.order_id
     LEFT JOIN course_runs cr ON cr.course_run_id = oi.course_run_id
     LEFT JOIN course_enrolments ce ON ce.order_item_id = oi.order_item_id
     LEFT JOIN course_access_progress cap ON cap.enrolment_id = ce.enrolment_id
+    LEFT JOIN content_access_grants cag ON cag.order_item_id = oi.order_item_id
     WHERE oi.order_item_id = $1 AND o.buyer_user_id = $2
     GROUP BY oi.order_item_id, o.order_id, cr.course_run_id`,
     [orderItemId, buyerId]);
@@ -70,15 +75,19 @@ export async function createRefundRequest(req: Request, res: Response) {
     if (!eligibility.eligible) {
       throw new ApiError(409, 'REFUND_NOT_ELIGIBLE', eligibility.explanation, { policyCode: eligibility.code });
     }
+    const watchedSeconds = Math.max(0, Number(evidence.watched_seconds));
+    const totalDurationSeconds = Math.max(0, Number(evidence.total_seconds ?? 0));
+    const watchPercent = totalDurationSeconds > 0 ? Number(((watchedSeconds / totalDurationSeconds) * 100).toFixed(2)) : 0;
     const inserted = await client.query<{ refund_request_id: string; refund_status: string; requested_at: Date }>(`INSERT INTO refund_requests
       (order_item_id, requested_by_user_id, requested_points, refund_reason, eligibility_code, watch_percent_snapshot,
        first_accessed_at_snapshot, download_completed_at_snapshot, policy_snapshot_json, eligibility_snapshot_json)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)
       RETURNING refund_request_id, refund_status, requested_at`, [
-      evidence.order_item_id, actor.id, evidence.points_amount, input.reason, eligibility.code, evidence.progress_percent,
+      evidence.order_item_id, actor.id, evidence.points_amount, input.reason, eligibility.code, watchPercent,
       evidence.first_accessed_at, evidence.download_completed_at,
       JSON.stringify(evidence.refund_policy_snapshot_json),
-      JSON.stringify({ ...eligibility, evaluatedAt: requestedAt.toISOString(), deliveryModes: modes(evidence.delivery_modes_snapshot_json) }),
+      JSON.stringify({ ...eligibility, evaluatedAt: requestedAt.toISOString(), deliveryModes: modes(evidence.delivery_modes_snapshot_json),
+        watchedSeconds, totalDurationSeconds, downloadRecorded: Boolean(evidence.download_completed_at) }),
     ]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
       VALUES ($1, 'refund.request', 'refund_requests', $2, jsonb_build_object('policyCode', $3::text, 'outcome', 'success'), $4)`,
