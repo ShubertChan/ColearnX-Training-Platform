@@ -19,6 +19,7 @@ import {
   type UploadMetadata,
 } from './r2.js';
 import { canFinalizeStorageAssetDeletion, remainingSignedUploadTtlSeconds } from './storage-deletion.js';
+import { assertAccountStorageQuota, lockStorageAccount } from './storage-quota.js';
 
 const uploadIntentInput = z.object({
   filename: z.string().trim().min(1).max(512),
@@ -210,6 +211,7 @@ export async function createCourseUploadIntent(req: Request, res: Response) {
   const metadata = validateUploadMetadata(parse(uploadIntentInput, req.body) as UploadMetadata);
   const requestFingerprint = fingerprint({ courseRunId, ...metadata });
   const outcome = await withTransaction(async (client) => {
+    await lockStorageAccount(client, actor.id);
     const course = await lockDraftCourse(client, actor.id, courseRunId);
     await assertTrainerOperational(client, actor.id);
     const existing = await client.query<{ request_fingerprint: string; response_body: { assetId?: string } | null }>(`SELECT request_fingerprint, response_body
@@ -226,6 +228,9 @@ export async function createCourseUploadIntent(req: Request, res: Response) {
       }
       return asset;
     }
+    await assertAccountStorageQuota(client, actor.id, metadata.sizeBytes, {
+      maxBytes: env.CONTENT_STORAGE_QUOTA_BYTES, maxPendingUploads: env.CONTENT_PENDING_UPLOAD_LIMIT,
+    });
     const expiresAt = new Date(Date.now() + env.R2_SIGNED_UPLOAD_TTL_SECONDS * 1000);
     const created = await client.query<CourseAsset>(`INSERT INTO course_delivery_assets
       (course_run_id, owner_user_id, asset_purpose, bucket_name, object_key, original_filename,
@@ -257,38 +262,53 @@ export async function createCourseUploadIntent(req: Request, res: Response) {
   }, 201);
 }
 
-export async function completeCourseUploadIntent(req: Request, res: Response) {
-  const actor = res.locals.actor as Actor;
-  requireTrainer(actor);
-  const courseRunId = parse(uuid, req.params.courseRunId);
-  const assetId = parse(uuid, req.params.assetId);
-  const completed = await withTransaction(async (client) => {
-    await lockDraftCourse(client, actor.id, courseRunId);
-    await assertTrainerOperational(client, actor.id);
-    const asset = await pendingAsset(client, assetId, courseRunId, actor.id);
-    if (asset.asset_status === 'ready') return asset;
-    if (asset.asset_status !== 'pending' || expired(asset.upload_expires_at)) {
-      throw new ApiError(409, 'UPLOAD_NOT_PENDING', 'This upload intent cannot be completed.');
-    }
-    const headed = await headUploadedObject({ bucketName: asset.bucket_name, objectKey: asset.object_key });
-    if (mismatch(headed, asset)) {
-      await client.query(`UPDATE course_delivery_assets SET asset_status = 'quarantined',
-        verified_content_type = $2, verified_byte_size = $3, etag = $4, uploaded_at = now(), updated_at = now()
-        WHERE course_delivery_asset_id = $1`, [assetId, headed.contentType?.split(';', 1)[0]?.trim() ?? null,
-        headed.contentLength && headed.contentLength > 0 ? headed.contentLength : null, headed.etag ?? null]);
+export async function completeCourseUploadTransaction(client: PoolClient,
+  input: { actorId: string; courseRunId: string; assetId: string; requestId?: string },
+  headObject: typeof headUploadedObject = headUploadedObject) {
+  const { actorId, courseRunId, assetId, requestId } = input;
+  await lockDraftCourse(client, actorId, courseRunId);
+  await assertTrainerOperational(client, actorId);
+  const asset = await pendingAsset(client, assetId, courseRunId, actorId);
+  if (asset.asset_status === 'ready') return { kind: 'ready' as const, asset };
+  if (asset.asset_status !== 'pending' || expired(asset.upload_expires_at)) {
+    throw new ApiError(409, 'UPLOAD_NOT_PENDING', 'This upload intent cannot be completed.');
+  }
+  const headed = await headObject({ bucketName: asset.bucket_name, objectKey: asset.object_key });
+  if (mismatch(headed, asset)) {
+    await client.query(`UPDATE course_delivery_assets SET asset_status = 'quarantined',
+      verified_content_type = $2, verified_byte_size = $3, etag = $4, uploaded_at = now(), updated_at = now()
+      WHERE course_delivery_asset_id = $1`, [assetId, headed.contentType?.split(';', 1)[0]?.trim() ?? null,
+      headed.contentLength && headed.contentLength > 0 ? headed.contentLength : null, headed.etag ?? null]);
+    // Return normally so the quarantine is committed. The HTTP 409 is raised afterwards.
+    return { kind: 'mismatch' as const, asset };
+  }
+  const result = await client.query<CourseAsset>(`UPDATE course_delivery_assets SET asset_status = 'ready',
+    verified_content_type = $2, verified_byte_size = $3, etag = $4, uploaded_at = now(), verified_at = now(), updated_at = now()
+    WHERE course_delivery_asset_id = $1
+    RETURNING course_delivery_asset_id, course_run_id, owner_user_id, asset_purpose, bucket_name, object_key,
+     original_filename, declared_content_type, declared_byte_size, verified_content_type, verified_byte_size,
+     etag, asset_status, upload_expires_at`, [assetId, asset.declared_content_type, Number(asset.declared_byte_size), headed.etag ?? null]);
+  await audit(client, actorId, 'course.upload.completed', assetId, requestId, { courseRunId, outcome: 'success' });
+  return { kind: 'ready' as const, asset: result.rows[0] };
+}
+
+export function createCourseUploadCompletionHandler(dependencies = { withTransaction, headObject: headUploadedObject }) {
+  return async (req: Request, res: Response) => {
+    const actor = res.locals.actor as Actor;
+    requireTrainer(actor);
+    const courseRunId = parse(uuid, req.params.courseRunId);
+    const assetId = parse(uuid, req.params.assetId);
+    const completed = await dependencies.withTransaction((client) => completeCourseUploadTransaction(client, {
+      actorId: actor.id, courseRunId, assetId, requestId: res.locals.requestId,
+    }, dependencies.headObject));
+    if (completed.kind === 'mismatch') {
       throw new ApiError(409, 'UPLOAD_OBJECT_MISMATCH', 'The uploaded file did not match its upload intent.');
     }
-    const result = await client.query<CourseAsset>(`UPDATE course_delivery_assets SET asset_status = 'ready',
-      verified_content_type = $2, verified_byte_size = $3, etag = $4, uploaded_at = now(), verified_at = now(), updated_at = now()
-      WHERE course_delivery_asset_id = $1
-      RETURNING course_delivery_asset_id, course_run_id, owner_user_id, asset_purpose, bucket_name, object_key,
-       original_filename, declared_content_type, declared_byte_size, verified_content_type, verified_byte_size,
-       etag, asset_status, upload_expires_at`, [assetId, asset.declared_content_type, Number(asset.declared_byte_size), headed.etag ?? null]);
-    await audit(client, actor.id, 'course.upload.completed', assetId, res.locals.requestId, { courseRunId, outcome: 'success' });
-    return result.rows[0];
-  });
-  return ok(res, assetResponse(completed));
+    return ok(res, assetResponse(completed.asset));
+  };
 }
+
+export const completeCourseUploadIntent = createCourseUploadCompletionHandler();
 
 export async function deleteCourseUploadIntent(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;

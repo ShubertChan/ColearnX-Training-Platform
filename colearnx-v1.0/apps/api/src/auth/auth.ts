@@ -10,6 +10,7 @@ import { sendPasswordResetEmail, sendVerificationEmail } from '../email/resend.j
 import { createOpaqueToken, sha256 } from '../lib/crypto.js';
 import { ApiError, ok } from '../lib/http.js';
 import { parse } from '../lib/validation.js';
+import { passwordResetUrl } from './password-reset-url.js';
 import {
   createVerificationCode,
   hashVerificationCode,
@@ -416,9 +417,7 @@ export async function forgotPassword(req: Request, res: Response) {
   });
   if (challenge) {
     try {
-      const url = new URL('/reset-password', env.APP_ORIGIN);
-      url.searchParams.set('token', token);
-      await sendPasswordResetEmail({ to: challenge.email, resetUrl: url.toString(), expiresInMinutes: env.PASSWORD_RESET_TOKEN_TTL_MINUTES });
+      await sendPasswordResetEmail({ to: challenge.email, resetUrl: passwordResetUrl(env.APP_ORIGIN, token), expiresInMinutes: env.PASSWORD_RESET_TOKEN_TTL_MINUTES });
     } catch {
       await query('UPDATE password_reset_challenges SET consumed_at = now() WHERE user_id = $1 AND token_hash = $2 AND consumed_at IS NULL', [challenge.userId, sha256(token)]);
     }
