@@ -3370,3 +3370,18 @@ tbody tr[role="button"]:focus-visible {
     justify-self: start;
   }
 }
+
+/* Password guidance (ASVS 2.1.8). Every unmet requirement is shown at once
+   rather than one per submit attempt. */
+.password-guidance { display: grid; gap: 0.55rem; margin: -0.35rem 0 0.9rem; }
+.password-strength { display: flex; align-items: center; gap: 0.6rem; font-size: 0.78rem; color: #5b6472; }
+.password-strength-bar { position: relative; flex: 1; height: 4px; border-radius: 999px; background: #e6e9ee; overflow: hidden; }
+.password-strength-bar::after { content: ""; position: absolute; inset: 0 auto 0 0; border-radius: 999px; transition: width 0.18s ease, background-color 0.18s ease; }
+.password-strength-bar[data-band="1"]::after { width: 25%; background: #d2544a; }
+.password-strength-bar[data-band="2"]::after { width: 50%; background: #d99323; }
+.password-strength-bar[data-band="3"]::after { width: 75%; background: #4f9a55; }
+.password-strength-bar[data-band="4"]::after { width: 100%; background: #2f7d54; }
+.password-checklist { display: grid; gap: 0.28rem; margin: 0; padding: 0; list-style: none; font-size: 0.78rem; }
+.password-checklist li { display: flex; align-items: center; gap: 0.4rem; }
+.password-checklist li.met { color: #2f7d54; }
+.password-checklist li.unmet { color: #6b7280; }

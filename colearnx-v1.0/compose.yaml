@@ -20,5 +20,20 @@ services:
       timeout: 5s
       retries: 20
 
+  # Provisioned in W2 so the stack is complete when the distributed rate
+  # limiter lands in W5. Bound to loopback and holding no durable data -- it
+  # must never be reachable from outside the host.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   colearnx_pgdata:

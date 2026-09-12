@@ -65,3 +65,29 @@ export async function sendPasswordResetEmail({ to, resetUrl, expiresInMinutes }:
   }
   if (!response.ok) throw new EmailDeliveryError();
 }
+
+/**
+ * ASVS 2.2.3. For an account holder who did not perform the change, this is
+ * the only out-of-band signal that it happened.
+ */
+export async function sendPasswordChangedEmail({ to }: { to: string }) {
+  if (env.EMAIL_PROVIDER !== 'resend') throw new EmailDeliveryError();
+  let response: Response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: env.EMAIL_FROM,
+        to: [to],
+        subject: 'Your CoLearnX password was changed',
+        text: 'Your CoLearnX password was just changed and all existing sessions were signed out. If this was not you, reset your password immediately to regain control of the account.',
+        html: '<p>Your CoLearnX password was just changed and all existing sessions were signed out.</p><p>If this was not you, reset your password immediately to regain control of the account.</p>',
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new EmailDeliveryError();
+  }
+  if (!response.ok) throw new EmailDeliveryError();
+}

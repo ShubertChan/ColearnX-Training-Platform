@@ -10,7 +10,13 @@ import { sendPasswordResetEmail, sendVerificationEmail } from '../email/resend.j
 import { createOpaqueToken, sha256 } from '../lib/crypto.js';
 import { ApiError, ok } from '../lib/http.js';
 import { parse } from '../lib/validation.js';
+import { sendPasswordChangedEmail } from '../email/resend.js';
+import { recordSecurityEvent, securityContext } from '../security/events.js';
+import { emailFingerprint } from '../security/fingerprint.js';
 import { passwordResetUrl } from './password-reset-url.js';
+import { verifyPasswordConstantWork } from './credential-verify.js';
+import { clearFailures, lockoutAlertThreshold, readLockState, registerFailure } from './lockout.js';
+import { assertPasswordAcceptable } from './password-gate.js';
 import {
   createVerificationCode,
   hashVerificationCode,
@@ -55,10 +61,17 @@ type RegistrationOutcome =
   | { kind: 'conflict' };
 
 const emailSchema = z.string().trim().email().max(320);
-const credentialsSchema = z.object({ email: emailSchema, password: z.string().min(8).max(256) });
+// Sign-in deliberately does NOT apply the registration policy. Accounts
+// created before migration 010 are grandfathered on shorter passwords, and a
+// 400 for a short submission would both lock those users out and disclose what
+// the policy is. Anything that is not the stored password gets the same 401.
+const loginSchema = z.object({ email: emailSchema, password: z.string().min(1).max(1024) });
+// Strength is enforced by assertPasswordAcceptable rather than by the schema,
+// so that registration and reset share one implementation and cannot drift.
+const credentialsSchema = z.object({ email: emailSchema, password: z.string().min(1).max(1024) });
 const registrationSchema = credentialsSchema.extend({
   displayName: z.string().trim().min(1).max(120),
-  passwordConfirmation: z.string().min(8).max(256),
+  passwordConfirmation: z.string().min(1).max(1024),
   acceptedTerms: z.literal(true),
   ageAcknowledged: z.literal(true),
 }).refine((input) => input.password === input.passwordConfirmation, {
@@ -73,8 +86,8 @@ const accessTokenLifetime = '15m';
 const forgotPasswordSchema = z.object({ email: emailSchema }).strict();
 const resetPasswordSchema = z.object({
   token: z.string().trim().regex(/^[A-Za-z0-9_-]{32,200}$/),
-  password: z.string().min(8).max(256),
-  passwordConfirmation: z.string().min(8).max(256),
+  password: z.string().min(1).max(1024),
+  passwordConfirmation: z.string().min(1).max(1024),
 }).strict().refine((input) => input.password === input.passwordConfirmation, {
   message: 'Passwords do not match.', path: ['passwordConfirmation'],
 });
@@ -221,6 +234,10 @@ const originIsAllowed = (req: Request) => !req.get('origin') || req.get('origin'
 
 export async function register(req: Request, res: Response) {
   const input = parse(registrationSchema, req.body);
+  const fingerprint = securityContext(req, res);
+  // Before the account is touched: a rejected password must not leave a
+  // half-created user or consume the address.
+  await assertPasswordAcceptable(input.password, { email: input.email, displayName: input.displayName }, 'registration', fingerprint, res);
   let outcome: RegistrationOutcome;
   try {
     outcome = await withTransaction(async (client) => {
@@ -401,58 +418,232 @@ export async function resendEmailVerification(req: Request, res: Response) {
 
 export async function forgotPassword(req: Request, res: Response) {
   const input = parse(forgotPasswordSchema, req.body);
+  const fingerprint = securityContext(req, res);
   const token = createOpaqueToken();
-  const challenge = await withTransaction(async (client) => {
-    const user = await client.query<{ user_id: string; email: string }>(`SELECT user_id, email::text AS email FROM users
+  const outcome = await withTransaction(async (client) => {
+    const user = await client.query<{ user_id: string; email: string; email_verified_at: Date | null }>(`SELECT user_id, email::text AS email, email_verified_at FROM users
       WHERE lower(email::text) = lower($1) AND account_status = 'active' FOR UPDATE`, [input.email]);
-    if (!user.rowCount) return null;
-    await client.query('UPDATE password_reset_challenges SET consumed_at = now() WHERE user_id = $1 AND consumed_at IS NULL', [user.rows[0].user_id]);
+    if (!user.rowCount) return { status: 'no_account' as const };
+    const account = user.rows[0];
+
+    // An address whose control was never proven must not receive a reset link:
+    // whoever registered it first would otherwise keep a foothold on someone
+    // else's address. Such accounts belong on the verification resend path,
+    // and sign-in would reject them afterwards anyway, so issuing a link here
+    // only produces a dead end the user cannot diagnose.
+    if (!account.email_verified_at) return { status: 'unverified' as const, userId: account.user_id };
+
+    // Per-account cooldown. The per-IP limiter in app.ts bounds one source;
+    // without this, one source within its budget can still send a link to many
+    // different inboxes, and a user clicking twice re-sends to their own.
+    const recent = await client.query<{ requested_at: Date }>(
+      'SELECT requested_at FROM password_reset_challenges WHERE user_id = $1 ORDER BY requested_at DESC LIMIT 1',
+      [account.user_id],
+    );
+    const cooldownMs = env.PASSWORD_RESET_COOLDOWN_SECONDS * 1000;
+    if (recent.rows[0] && recent.rows[0].requested_at.getTime() > Date.now() - cooldownMs) {
+      return { status: 'throttled' as const, userId: account.user_id };
+    }
+
+    await client.query('UPDATE password_reset_challenges SET consumed_at = now() WHERE user_id = $1 AND consumed_at IS NULL', [account.user_id]);
     const expiresAt = new Date(Date.now() + env.PASSWORD_RESET_TOKEN_TTL_MINUTES * 60_000);
     await client.query(`INSERT INTO password_reset_challenges (user_id, token_hash, expires_at, requested_ip_hash)
-      VALUES ($1, $2, $3, $4)`, [user.rows[0].user_id, sha256(token), expiresAt, sha256(req.ip || 'unknown')]);
+      VALUES ($1, $2, $3, $4)`, [account.user_id, sha256(token), expiresAt, fingerprint.ipHash]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
       VALUES ($1, 'auth.password_reset_requested', 'users', $1, jsonb_build_object('outcome', 'pending'), $2)`,
-    [user.rows[0].user_id, res.locals.requestId]);
-    return { userId: user.rows[0].user_id, email: user.rows[0].email };
+    [account.user_id, res.locals.requestId]);
+    return { status: 'issued' as const, userId: account.user_id, email: account.email };
   });
-  if (challenge) {
+
+  await recordSecurityEvent(fingerprint, {
+    type: outcome.status === 'throttled'
+      ? 'auth.reset_throttled'
+      : outcome.status === 'unverified' ? 'auth.reset_unverified_account' : 'auth.reset_requested',
+    actorUserId: 'userId' in outcome ? outcome.userId : null,
+    // The address is never stored, only a keyed fingerprint, which still lets
+    // the W7 rules count how many distinct inboxes one source probed.
+    context: { subject: emailFingerprint(input.email, env.SECURITY_HASH_PEPPER), outcome: outcome.status },
+  }, res);
+
+  if (outcome.status === 'issued') {
     try {
-      await sendPasswordResetEmail({ to: challenge.email, resetUrl: passwordResetUrl(env.APP_ORIGIN, token), expiresInMinutes: env.PASSWORD_RESET_TOKEN_TTL_MINUTES });
+      await sendPasswordResetEmail({ to: outcome.email, resetUrl: passwordResetUrl(env.APP_ORIGIN, token), expiresInMinutes: env.PASSWORD_RESET_TOKEN_TTL_MINUTES });
     } catch {
-      await query('UPDATE password_reset_challenges SET consumed_at = now() WHERE user_id = $1 AND token_hash = $2 AND consumed_at IS NULL', [challenge.userId, sha256(token)]);
+      await query('UPDATE password_reset_challenges SET consumed_at = now() WHERE user_id = $1 AND token_hash = $2 AND consumed_at IS NULL', [outcome.userId, sha256(token)]);
+      res.locals.log?.warn({ requestId: fingerprint.requestId }, 'Password reset email delivery failed');
     }
   }
+  // One response for every branch above. A status, code or body that varied by
+  // outcome would turn this endpoint into the account-enumeration oracle the
+  // whole flow is shaped to avoid.
   return ok(res, { accepted: true }, 202);
 }
 
 export async function resetPassword(req: Request, res: Response) {
   const input = parse(resetPasswordSchema, req.body);
-  await withTransaction(async (client) => {
-    const challenge = await client.query<{ password_reset_challenge_id: string; user_id: string }>(`SELECT password_reset_challenge_id, user_id
-      FROM password_reset_challenges WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > now() FOR UPDATE`, [sha256(input.token)]);
-    if (!challenge.rowCount) throw new ApiError(400, 'PASSWORD_RESET_TOKEN_INVALID', 'The password reset link is invalid or has expired.');
-    const current = challenge.rows[0];
+  const fingerprint = securityContext(req, res);
+  const tokenHash = sha256(input.token);
+
+  // Phase 1: confirm the token is redeemable without consuming it. Gating on
+  // this first also stops an anonymous caller using the endpoint as a free
+  // relay to the breach API in phase 2.
+  const candidate = await query<{ user_id: string; email: string; full_name: string | null }>(
+    `SELECT c.user_id, u.email::text AS email, u.full_name
+       FROM password_reset_challenges c
+       JOIN users u ON u.user_id = c.user_id
+      WHERE c.token_hash = $1 AND c.consumed_at IS NULL AND c.expires_at > now()
+        AND u.account_status = 'active'`,
+    [tokenHash],
+  );
+  if (!candidate.rowCount) {
+    await recordSecurityEvent(fingerprint, {
+      type: 'auth.reset_token_rejected', decision: 'deny', context: { reason: 'not_redeemable' },
+    }, res);
+    throw new ApiError(400, 'PASSWORD_RESET_TOKEN_INVALID', 'The password reset link is invalid or has expired.');
+  }
+  const subject = candidate.rows[0];
+
+  // Phase 2: policy. Running it before the token is consumed means a weak
+  // choice costs the user a retry rather than their only reset link. Routed
+  // through the shared gate so registration and reset cannot diverge -- a
+  // policy enforced on sign-up but not on reset is one an attacker simply
+  // resets around.
+  await assertPasswordAcceptable(
+    input.password,
+    { email: subject.email, displayName: subject.full_name ?? undefined },
+    'reset', fingerprint, res, subject.user_id,
+  );
+
+  // Phase 3: redeem and rotate atomically. The conditional UPDATE is what
+  // enforces single use: two requests racing on one token produce one affected
+  // row and one zero.
+  const revokedSessions = await withTransaction(async (client) => {
+    const consumed = await client.query(
+      `UPDATE password_reset_challenges SET consumed_at = now()
+        WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > now()`,
+      [tokenHash],
+    );
+    if (!consumed.rowCount) throw new ApiError(409, 'PASSWORD_RESET_TOKEN_CONSUMED', 'This reset link has already been used.');
+
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
-    await client.query('UPDATE users SET password_hash = $2, updated_at = now() WHERE user_id = $1', [current.user_id, passwordHash]);
-    await client.query('UPDATE password_reset_challenges SET consumed_at = now() WHERE password_reset_challenge_id = $1', [current.password_reset_challenge_id]);
-    await client.query(`UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = 'password-reset'
-      WHERE user_id = $1 AND revoked_at IS NULL`, [current.user_id]);
+    await client.query('UPDATE users SET password_hash = $2, password_changed_at = now(), updated_at = now() WHERE user_id = $1', [subject.user_id, passwordHash]);
+    const sessions = await client.query(`UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = 'password-reset'
+      WHERE user_id = $1 AND revoked_at IS NULL`, [subject.user_id]);
+
+    // Gives a locked-out victim a way back in without support intervention,
+    // which is what keeps the lockout ladder from being a usable denial of
+    // service against a known address.
+    await client.query(`UPDATE auth_failure_counters
+        SET consecutive_failures = 0, locked_until = NULL, updated_at = now()
+      WHERE user_id = $1`, [subject.user_id]);
+
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
-      VALUES ($1, 'auth.password_reset_completed', 'users', $1, jsonb_build_object('outcome', 'success'), $2)`,
-    [current.user_id, res.locals.requestId]);
+      VALUES ($1, 'auth.password_reset_completed', 'users', $1, jsonb_build_object('outcome', 'success', 'sessionsRevoked', $3::int), $2)`,
+    [subject.user_id, res.locals.requestId, sessions.rowCount ?? 0]);
+    return sessions.rowCount ?? 0;
   });
+
+  await recordSecurityEvent(fingerprint, {
+    type: 'auth.reset_completed', actorUserId: subject.user_id, context: { sessionsRevoked: revokedSessions },
+  }, res);
+  await recordSecurityEvent(fingerprint, {
+    type: 'session.revoked_all', actorUserId: subject.user_id,
+    context: { reason: 'password-reset', count: revokedSessions },
+  }, res);
+
+  // ASVS 2.2.3. For an account holder who did not do this, the notification is
+  // the only signal they will get. Detached: a mail outage must not fail a
+  // reset that already succeeded.
+  sendPasswordChangedEmail({ to: subject.email }).catch(() => {
+    res.locals.log?.warn({ requestId: fingerprint.requestId }, 'Password change notification failed');
+  });
+
   res.clearCookie(refreshCookieName, refreshCookieOptions());
-  return ok(res, { reset: true });
+  // No session is issued. The token arrived in a URL, and URLs leak -- into
+  // history, into shared screens. Trading one directly for a session would
+  // make every such leak an account takeover.
+  return ok(res, { reset: true, signInRequired: true });
 }
 
 export async function login(req: Request, res: Response) {
-  const input = parse(credentialsSchema, req.body);
-  const user = await query<{ id: string; password_hash: string }>('SELECT user_id AS id, password_hash FROM users WHERE lower(email::text) = lower($1)', [input.email]);
-  const valid = user.rowCount ? await argon2.verify(user.rows[0].password_hash, input.password) : false;
-  const actor = valid ? await loadActor(user.rows[0].id) : null;
-  if (!valid || !actor || actor.status !== 'active') throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
-  if (actorNeedsEmailVerification(actor)) throw new ApiError(403, 'EMAIL_VERIFICATION_REQUIRED', 'Verify your email address before signing in.');
+  const input = parse(loginSchema, req.body);
+  const fingerprint = securityContext(req, res);
+  const found = await query<{ id: string; password_hash: string }>('SELECT user_id AS id, password_hash FROM users WHERE lower(email::text) = lower($1)', [input.email]);
+  const record = found.rows[0] ?? null;
+  const lock = record ? await readLockState(record.id) : null;
+
+  // One argon2 verification is always spent, whether or not the address
+  // resolved and whether or not the account is locked. Short-circuiting either
+  // case reopens the timing oracle: argon2id costs tens to hundreds of
+  // milliseconds, so "no such account" used to return an order of magnitude
+  // faster than "wrong password" and made this endpoint a user-enumeration
+  // oracle regardless of how the error message was worded.
+  const passwordMatches = await verifyPasswordConstantWork(record?.password_hash ?? null, input.password);
+
+  if (record && lock?.locked) {
+    await recordSecurityEvent(fingerprint, {
+      type: 'auth.login_blocked', actorUserId: record.id, decision: 'lock',
+      context: {
+        lockedUntil: lock.lockedUntil,
+        consecutiveFailures: lock.consecutiveFailures,
+        // A correct password arriving during a lock means the guessing already
+        // succeeded and only the cooldown is holding the attacker off. It is
+        // the most actionable signal this endpoint produces.
+        passwordMatched: passwordMatches,
+      },
+    }, res);
+    // Same status, code and message as a wrong password: a distinguishable
+    // "locked" response would confirm the address exists.
+    throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
+  }
+
+  if (!record || !passwordMatches) {
+    if (record) {
+      const outcome = await registerFailure(record.id, env.LOGIN_FAILURE_DECAY_HOURS * 3600);
+      await recordSecurityEvent(fingerprint, {
+        type: 'auth.login_failed', actorUserId: record.id,
+        context: { consecutiveFailures: outcome.consecutiveFailures },
+      }, res);
+      if (outcome.newlyLocked) {
+        await recordSecurityEvent(fingerprint, {
+          type: outcome.consecutiveFailures >= lockoutAlertThreshold ? 'auth.account_lock_escalated' : 'auth.account_locked',
+          actorUserId: record.id, decision: 'lock',
+          context: { consecutiveFailures: outcome.consecutiveFailures, lockedUntil: outcome.lockedUntil },
+        }, res);
+      }
+    } else {
+      await recordSecurityEvent(fingerprint, {
+        type: 'auth.login_failed',
+        context: { subject: emailFingerprint(input.email, env.SECURITY_HASH_PEPPER), accountExists: false },
+      }, res);
+    }
+    throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
+  }
+
+  const actor = await loadActor(record.id);
+  if (!actor || actor.status !== 'active') {
+    // Correct credentials against a suspended or deleted account. Not a
+    // guessing failure, so it must not advance the ladder, but worth recording:
+    // it usually means a credential dump is being replayed.
+    await recordSecurityEvent(fingerprint, {
+      type: 'auth.login_denied_status', actorUserId: record.id, decision: 'deny',
+      context: { status: actor?.status ?? 'unknown' },
+    }, res);
+    throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
+  }
+  if (actorNeedsEmailVerification(actor)) {
+    await recordSecurityEvent(fingerprint, {
+      type: 'auth.unverified_login_attempt', actorUserId: actor.id, decision: 'deny',
+    }, res);
+    throw new ApiError(403, 'EMAIL_VERIFICATION_REQUIRED', 'Verify your email address before signing in.');
+  }
+
+  await clearFailures(actor.id);
   const refreshToken = await createRefreshSession(actor, req, res);
+  await recordSecurityEvent(fingerprint, {
+    type: 'auth.login_succeeded', actorUserId: actor.id,
+    context: { clearedFailures: lock?.consecutiveFailures ?? 0 },
+  }, res);
   return ok(res, { user: actor, accessToken: signAccessToken(actor), csrfToken: createCsrfToken(refreshToken) });
 }
 
@@ -471,7 +662,19 @@ export async function refresh(req: Request, res: Response) {
   if (!session.rowCount) throw new ApiError(401, 'REFRESH_TOKEN_INVALID', 'Refresh session is invalid.');
   const current = session.rows[0];
   if (current.revoked_at) {
-    await query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2 WHERE user_id = $1 AND revoked_at IS NULL', [current.user_id, 'refresh-token-reuse']);
+    const revoked = await query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2 WHERE user_id = $1 AND revoked_at IS NULL', [current.user_id, 'refresh-token-reuse']);
+    // Critical severity: replay of a rotated token is either stolen session
+    // material or a broken client, and the two are indistinguishable here. It
+    // pages an operator by design.
+    const reuseFingerprint = securityContext(req, res);
+    await recordSecurityEvent(reuseFingerprint, {
+      type: 'session.refresh_reused', actorUserId: current.user_id, decision: 'deny',
+      context: { sessionsRevoked: revoked.rowCount ?? 0 },
+    }, res);
+    await recordSecurityEvent(reuseFingerprint, {
+      type: 'session.revoked_all', actorUserId: current.user_id,
+      context: { reason: 'refresh-token-reuse', count: revoked.rowCount ?? 0 },
+    }, res);
     throw new ApiError(401, 'REFRESH_TOKEN_REUSED', 'Refresh session is no longer valid.');
   }
   if (current.expires_at <= new Date()) throw new ApiError(401, 'REFRESH_TOKEN_EXPIRED', 'Refresh session has expired.');
