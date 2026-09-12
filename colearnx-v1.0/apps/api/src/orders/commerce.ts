@@ -8,6 +8,7 @@ import { sha256 } from '../lib/crypto.js';
 import { ApiError, ok } from '../lib/http.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 import { loadSystemPointAccount, postPointTransaction } from '../points/ledger.js';
+import { refundPolicySnapshot } from '../refunds/purchase-policy.js';
 
 const checkoutSchema = z.object({
   items: z.array(z.object({ kind: z.enum(['course', 'content']), id: uuid })).min(1).max(20),
@@ -47,13 +48,6 @@ function points(value: string, field: string) {
     throw new ApiError(409, 'INVALID_PRICE', `${field} is not a supported points amount.`);
   }
   return valueAsNumber;
-}
-
-function refundPolicySnapshot(product: Product, purchasedAt: Date) {
-  const base = { purchasedAt: purchasedAt.toISOString(), deliveryModes: product.deliveryModes };
-  const selfArranged = product.kind === 'course' && product.deliveryModes.some((mode) => mode === 'local' || mode === 'live');
-  if (selfArranged) return { ...base, rule: 'self-arranged-72h-v1', startsAt: product.startsAt?.toISOString() ?? null, noticeHours: 72, summary: 'Self-arranged online or offline courses may be refunded only when requested at least 72 hours before the course starts.' };
-  return { ...base, rule: 'recorded-media-10pct-no-download-v1', watchedRatioMaximum: 0.1, totalDurationSeconds: product.totalDurationSeconds, requiresNoDownload: true, summary: 'Recorded video or file refunds require viewing at or below 10% and no protected file download.' };
 }
 
 function refundDeadline(product: Product, _purchasedAt: Date) {

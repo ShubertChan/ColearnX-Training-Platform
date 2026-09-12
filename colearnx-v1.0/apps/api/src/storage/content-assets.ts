@@ -17,7 +17,7 @@ import {
   type HeadedObject,
   type UploadMetadata,
 } from './r2.js';
-import { storageQuotaViolation } from './storage-quota.js';
+import { assertAccountStorageQuota, lockStorageAccount } from './storage-quota.js';
 import { REPLACEMENT_ASSET_ORDER_BY_SQL } from './storage-asset-order.js';
 import { canFinalizeStorageAssetDeletion, remainingSignedUploadTtlSeconds } from './storage-deletion.js';
 import { env } from '../config/env.js';
@@ -151,32 +151,6 @@ function readIntentRecord(value: unknown): UploadIntentRecord | undefined {
     : undefined;
 }
 
-type StorageUsage = {
-  used_bytes: string;
-  pending_uploads: string;
-};
-
-async function assertCreatorStorageQuota(client: PoolClient, ownerUserId: string, requestedBytes: number) {
-  // Serialize quota checks for one creator. Without this lock, two browser tabs
-  // could both pass the check and exceed the account cap.
-  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [ownerUserId]);
-  const usage = await client.query<StorageUsage>(`SELECT
-      COALESCE(sum(COALESCE(verified_byte_size, declared_byte_size)), 0)::text AS used_bytes,
-      count(*) FILTER (
-        WHERE asset_status IN ('pending', 'uploaded') AND upload_expires_at > now()
-      )::text AS pending_uploads
-    FROM storage_assets
-    WHERE owner_user_id = $1 AND asset_status <> 'deleted'`, [ownerUserId]);
-  const current = usage.rows[0];
-  const violation = storageQuotaViolation({
-    usedBytes: Number(current.used_bytes),
-    pendingUploads: Number(current.pending_uploads),
-    requestedBytes,
-    maxBytes: env.CONTENT_STORAGE_QUOTA_BYTES,
-    maxPendingUploads: env.CONTENT_PENDING_UPLOAD_LIMIT,
-  });
-  if (violation) throw new ApiError(violation.status, violation.code, violation.message);
-}
 export async function createUploadIntent(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   requireCreator(actor);
@@ -186,6 +160,7 @@ export async function createUploadIntent(req: Request, res: Response) {
   const requestFingerprint = fingerprint({ contentVersionId, ...metadata });
 
   const outcome = await withTransaction(async (client) => {
+    await lockStorageAccount(client, actor.id);
     await lockOwnedDraftVersion(client, actor.id, contentVersionId);
     const existing = await client.query<{ request_fingerprint: string; response_body: unknown }>(`SELECT request_fingerprint, response_body
       FROM idempotency_records
@@ -207,7 +182,9 @@ export async function createUploadIntent(req: Request, res: Response) {
     // A browser tab may close after receiving a presigned URL. A new upload for
     // this draft replaces only incomplete records, never a verified attachment.
     const discarded = await discardIncompleteDraftAssets(client, contentVersionId, actor.id);
-    await assertCreatorStorageQuota(client, actor.id, metadata.sizeBytes);
+    await assertAccountStorageQuota(client, actor.id, metadata.sizeBytes, {
+      maxBytes: env.CONTENT_STORAGE_QUOTA_BYTES, maxPendingUploads: env.CONTENT_PENDING_UPLOAD_LIMIT,
+    });
 
     const uploadExpiresAt = new Date(Date.now() + env.R2_SIGNED_UPLOAD_TTL_SECONDS * 1000);
     const objectKey = createContentObjectKey(actor.id, contentVersionId, metadata.filename);

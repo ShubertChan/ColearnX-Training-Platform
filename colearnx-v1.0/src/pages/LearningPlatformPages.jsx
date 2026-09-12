@@ -6,6 +6,7 @@ import { listContentAssets, requestContentDownloadUrl } from "../api/uploads";
 import { getCourseDelivery, requestCourseDownloadUrl } from "../api/courseDelivery";
 import CourseVideoPlayer from "../components/CourseVideoPlayer";
 import { cartItemKey, deliveryDisclosures, hasPurchasePolicy, refundDisclosure } from "../utils/purchaseDisclosure";
+import { createKeyedRequestGuard } from "../utils/keyedRequestGuard";
 import { Badge, Button, Card, EmptyState, FormField, Modal, Progress } from "../components/ui";
 
 const deliveryLabel = (modes = []) => modes.map((mode) => `${mode[0].toUpperCase()}${mode.slice(1)}`).join(" + ") || "Not specified";
@@ -73,10 +74,11 @@ export function OrderHistoryPage() {
 }
 
 function ContentDownloadButton({ contentVersionId }) {
-  const panelId = useId(); const [expanded, setExpanded] = useState(false); const [assets, setAssets] = useState(null); const [loading, setLoading] = useState(false); const [pending, setPending] = useState(""); const [error, setError] = useState("");
+  const panelId = useId(); const [expanded, setExpanded] = useState(false); const [assets, setAssets] = useState(null); const [loading, setLoading] = useState(false); const [pending, setPending] = useState(() => new Set()); const [error, setError] = useState("");
+  const downloadRequests = useMemo(() => createKeyedRequestGuard(setPending), []);
   const load = async () => { setLoading(true); setError(""); try { const result = await listContentAssets(contentVersionId); setAssets(result.filter((asset) => asset.status === "ready")); } catch (loadError) { setError(loadError.message); } finally { setLoading(false); } };
-  const download = async (asset) => { setPending(asset.assetId); setError(""); try { const result = await requestContentDownloadUrl(contentVersionId, asset.assetId, { filename: asset.filename, mediaType: asset.mediaType }); const url = result.demoObjectUrl ? result.downloadUrl : safeHttpUrl(result.downloadUrl); if (!url) throw new Error("The delivery service returned an unsafe URL."); const link = document.createElement("a"); link.href = url; link.download = result.filename || asset.filename; link.rel = "noopener"; document.body.appendChild(link); link.click(); link.remove(); if (result.demoObjectUrl) window.setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (downloadError) { setError(downloadError.message); } finally { setPending(""); } };
-  return <div className="learning-actions"><Button variant="secondary" size="sm" onClick={() => { const next = !expanded; setExpanded(next); if (next && assets === null) void load(); }} aria-expanded={expanded} aria-controls={panelId}>{expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}{expanded ? "Hide files" : "Show files"}</Button><div id={panelId} hidden={!expanded} className="delivery-panel">{loading && <span role="status">Loading purchased files…</span>}{(assets || []).map((asset) => <div className="asset-download-row" key={asset.assetId}><FileText size={15} /><span>{asset.filename}</span><Button variant="secondary" size="sm" disabled={pending === asset.assetId} onClick={() => void download(asset)}><Download size={15} />{pending === asset.assetId ? "Requesting…" : "Download"}</Button></div>)}{assets !== null && !assets.length && <small>No verified files are available yet.</small>}{error && <p className="form-error">{error}</p>}<Button variant="ghost" size="sm" disabled={loading} onClick={() => void load()}>Refresh files</Button></div></div>;
+  const download = (asset) => downloadRequests.run(asset.assetId, async () => { setError(""); try { const result = await requestContentDownloadUrl(contentVersionId, asset.assetId, { filename: asset.filename, mediaType: asset.mediaType }); const url = result.demoObjectUrl ? result.downloadUrl : safeHttpUrl(result.downloadUrl); if (!url) throw new Error("The delivery service returned an unsafe URL."); const link = document.createElement("a"); link.href = url; link.download = result.filename || asset.filename; link.rel = "noopener"; document.body.appendChild(link); link.click(); link.remove(); if (result.demoObjectUrl) window.setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (downloadError) { setError(downloadError.message); } });
+  return <div className="learning-actions"><Button variant="secondary" size="sm" onClick={() => { const next = !expanded; setExpanded(next); if (next && assets === null) void load(); }} aria-expanded={expanded} aria-controls={panelId}>{expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}{expanded ? "Hide files" : "Show files"}</Button><div id={panelId} hidden={!expanded} className="delivery-panel">{loading && <span role="status">Loading purchased files…</span>}{(assets || []).map((asset) => <div className="asset-download-row" key={asset.assetId}><FileText size={15} /><span>{asset.filename}</span><Button variant="secondary" size="sm" disabled={pending.has(asset.assetId)} onClick={() => void download(asset)}><Download size={15} />{pending.has(asset.assetId) ? "Requesting…" : "Download"}</Button></div>)}{assets !== null && !assets.length && <small>No verified files are available yet.</small>}{error && <p className="form-error">{error}</p>}<Button variant="ghost" size="sm" disabled={loading} onClick={() => void load()}>Refresh files</Button></div></div>;
 }
 
 function CourseDeliveryPanel({ item }) {
@@ -85,7 +87,8 @@ function CourseDeliveryPanel({ item }) {
   const [delivery, setDelivery] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [downloading, setDownloading] = useState("");
+  const [downloading, setDownloading] = useState(() => new Set());
+  const downloadRequests = useMemo(() => createKeyedRequestGuard(setDownloading), []);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const modes = item.deliveryModes.map((mode) => String(mode).toLowerCase());
@@ -95,8 +98,8 @@ function CourseDeliveryPanel({ item }) {
     catch (loadError) { if (mounted.current) setError(loadError.message || "Could not load protected delivery."); }
     finally { if (mounted.current) setLoading(false); }
   };
-  const download = async (asset) => {
-    setDownloading(asset.assetId); setError("");
+  const download = (asset) => downloadRequests.run(asset.assetId, async () => {
+    setError("");
     try {
       const result = await requestCourseDownloadUrl(item.id, asset.assetId);
       const url = safeHttpUrl(result.downloadUrl);
@@ -106,8 +109,7 @@ function CourseDeliveryPanel({ item }) {
       link.target = "_blank"; link.rel = "noopener noreferrer";
       document.body.appendChild(link); link.click(); link.remove();
     } catch (downloadError) { setError(downloadError.message); }
-    finally { setDownloading(""); }
-  };
+  });
   const joinUrl = safeHttpUrl(delivery?.joinUrl);
   return <div className="learning-actions">
     <Button variant="secondary" size="sm" onClick={() => {
@@ -119,7 +121,7 @@ function CourseDeliveryPanel({ item }) {
         {modes.includes("cloud") && <section><b>Cloud course files</b>
           {(delivery.assets || []).filter((asset) => !asset.status || asset.status === "ready").map((asset) =>
             <div className="asset-download-row" key={asset.assetId}><FileText size={15} /><span>{asset.filename}</span>
-              <Button variant="secondary" size="sm" disabled={Boolean(downloading)} onClick={() => void download(asset)}>{downloading === asset.assetId ? "Requesting…" : "Download"}</Button></div>)}
+              <Button variant="secondary" size="sm" disabled={downloading.has(asset.assetId)} onClick={() => void download(asset)}>{downloading.has(asset.assetId) ? "Requesting…" : "Download"}</Button></div>)}
           {!(delivery.assets || []).length && <p>No authorised course file is available yet.</p>}
         </section>}
         {(modes.includes("local") || modes.includes("live")) && <section><b>Buyer-only coordination</b>

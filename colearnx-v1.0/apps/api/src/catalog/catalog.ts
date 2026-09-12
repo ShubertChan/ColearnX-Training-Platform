@@ -8,6 +8,8 @@ import { deleteStoredObject } from '../storage/r2.js';
 import { canFinalizeStorageAssetDeletion } from '../storage/storage-deletion.js';
 import { parse, uuid } from '../lib/validation.js';
 import { assertCourseReadyForSubmission, assertTrainerOperational } from '../storage/course-delivery.js';
+import { purchaseRefundPolicyPreview } from '../refunds/purchase-policy.js';
+import { contentResponse } from './content-response.js';
 
 const listQuery = z.object({ q: z.string().trim().max(120).optional(), category: z.string().trim().max(80).optional(), cursor: z.string().datetime().optional(), limit: z.coerce.number().int().min(1).max(100).default(20) });
 const courseInput = z.object({
@@ -70,14 +72,6 @@ async function bestEffortDeleteArchivedDraftAsset(asset: PendingStorageAsset) {
     // Retain delete_pending for the scheduled R2 reconciliation task.
   }
 }
-function courseRefundPolicyPreview(deliveryModes: unknown) {
-  const modes = Array.isArray(deliveryModes) ? deliveryModes : [];
-  if (modes.some((mode) => mode === 'local' || mode === 'live')) {
-    return { rule: 'self-arranged-72h-v1', noticeHours: 72, summary: 'Self-arranged online or offline courses may be refunded only when requested at least 72 hours before the course starts.' };
-  }
-  return { rule: 'recorded-media-10pct-no-download-v1', watchedRatioMaximum: 0.1, requiresNoDownload: true, summary: 'Recorded video or file refunds require viewing at or below 10% and no protected file download.' };
-}
-
 function courseResponse(row: Record<string, unknown>) {
   const progressTrackingType = row.progress_tracking_type === 'online_video' ? 'online_video' : 'none';
   return {
@@ -88,7 +82,7 @@ function courseResponse(row: Record<string, unknown>) {
     category: row.category_id ? { id: row.category_id, name: row.category_name } : null,
     deliveryModes: row.delivery_modes ?? [], progressTrackingType, onlineVideo: progressTrackingType === 'online_video',
     totalDurationSeconds: progressTrackingType === 'online_video' ? Number(row.total_duration_seconds ?? 0) : null,
-    refundPolicyPreview: courseRefundPolicyPreview(row.delivery_modes),
+    refundPolicyPreview: purchaseRefundPolicyPreview('course', row.delivery_modes),
   };
 }
 
@@ -128,7 +122,7 @@ export async function listContent(req: Request, res: Response) {
     WHERE c.publication_status = 'published' AND ($1::text IS NULL OR c.search_vector @@ websearch_to_tsquery('simple', $1))
       AND ($2::text IS NULL OR cat.category_name = $2) AND ($3::timestamptz IS NULL OR cv.published_at < $3::timestamptz)
     ORDER BY cv.published_at DESC, cv.content_version_id DESC LIMIT $4`, [input.q || null, input.category || null, input.cursor ?? null, input.limit]);
-  const items = result.rows.map((row) => ({ id: row.content_version_id, contentId: row.content_id, title: row.title, description: row.description, contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status, publishedAt: row.published_at, owner: { id: row.creator_user_id, displayName: row.owner_name }, category: row.category_id ? { id: row.category_id, name: row.category_name } : null }));
+  const items = result.rows.map(contentResponse);
   return ok(res, items, 200, { nextCursor: items.length === input.limit ? items.at(-1)?.publishedAt : null });
 }
 
@@ -139,7 +133,7 @@ export async function getContent(req: Request, res: Response) {
     LEFT JOIN categories cat ON cat.category_id = c.category_id WHERE cv.content_version_id = $1 AND c.publication_status = 'published'`, [id]);
   if (!result.rowCount) throw new ApiError(404, 'CONTENT_NOT_FOUND', 'Content version was not found.');
   const row = result.rows[0];
-  return ok(res, { id: row.content_version_id, contentId: row.content_id, title: row.title, description: row.description, contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status, publishedAt: row.published_at, owner: { id: row.creator_user_id, displayName: row.owner_name }, category: row.category_id ? { id: row.category_id, name: row.category_name } : null });
+  return ok(res, contentResponse(row));
 }
 
 export async function createCourse(req: Request, res: Response) {
@@ -179,7 +173,7 @@ export async function updateCourse(req: Request, res: Response) {
       (course_run_id, delivery_type, access_mode, is_primary, option_status, fulfilment_instructions, trainer_contact, join_url)
       SELECT $1, type, CASE WHEN type = 'live' THEN 'attendance' ELSE 'on_demand' END, ordinal = 1, 'draft',
         CASE WHEN type IN ('local', 'live') THEN $3 ELSE NULL END, CASE WHEN type IN ('local', 'live') THEN $4 ELSE NULL END,
-        CASE WHEN type = 'live' THEN $5 ELSE NULL END
+        CASE WHEN type IN ('local', 'live') THEN $5 ELSE NULL END
       FROM unnest($2::text[]) WITH ORDINALITY AS delivery(type, ordinal)`,
     [id, input.deliveryModes, input.fulfilmentInstructions ?? null, input.trainerContact ?? null, input.joinUrl ?? null]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
@@ -346,11 +340,11 @@ export async function listMyListings(req: Request, res: Response) {
   const [courseResult, contentResult] = await Promise.all([
     query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity,
       cr.starts_at, cr.ends_at, cr.run_status, c.publication_status, c.updated_at, cr.progress_tracking_type,
-      cr.total_duration_seconds,
-      COALESCE(jsonb_agg(cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
+      cr.total_duration_seconds, cr.timezone, c.category_id,
+      COALESCE(jsonb_agg(cdo.delivery_type ORDER BY cdo.is_primary DESC, cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
       , MAX(cdo.fulfilment_instructions) FILTER (WHERE cdo.delivery_type IN ('local', 'live')) AS fulfilment_instructions
       , MAX(cdo.trainer_contact) FILTER (WHERE cdo.delivery_type IN ('local', 'live')) AS trainer_contact
-      , MAX(cdo.join_url) FILTER (WHERE cdo.delivery_type = 'live') AS join_url
+      , MAX(cdo.join_url) FILTER (WHERE cdo.delivery_type IN ('local', 'live')) AS join_url
       FROM courses c JOIN course_runs cr ON cr.course_id = c.course_id
       LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id
       WHERE c.owner_user_id = $1
@@ -372,7 +366,7 @@ export async function listMyListings(req: Request, res: Response) {
   const courses = courseResult.rows.map((row) => ({
     kind: 'course', id: row.course_run_id, courseId: row.course_id, title: row.title,
     description: row.description, pricePoints: Number(row.price_points), capacity: row.capacity,
-    startsAt: row.starts_at, endsAt: row.ends_at, status: row.run_status,
+    startsAt: row.starts_at, endsAt: row.ends_at, timezone: row.timezone, categoryId: row.category_id, status: row.run_status,
     publicationStatus: row.publication_status, deliveryModes: row.delivery_modes ?? [],
     fulfilmentInstructions: row.fulfilment_instructions, trainerContact: row.trainer_contact, joinUrl: row.join_url,
     progressTrackingType: row.progress_tracking_type, totalDurationSeconds: row.total_duration_seconds ? Number(row.total_duration_seconds) : null,
