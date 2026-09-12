@@ -20,13 +20,13 @@ Read [the data model](docs/DATA_MODEL.md), [API contract](docs/API.md) and [loca
 
 For the deployed staging topology (Cloudflare Pages + Render Express API + Neon PostgreSQL), follow the [Render + Neon staging runbook](docs/STAGING_RENDER_NEON.md). It keeps production-style secrets out of the repository and does not require Docker, Cloudflare Workers, or Hyperdrive.
 
-The current web client uses the API as the source of truth for identity, roles, profile edits, wallet balances, ledger history, top-up packages, catalogue listings, points checkout, orders, refund requests, role applications, creator drafts/submissions and administrator review queues. The cart is only an in-memory selection before checkout; it is not an order or entitlement record.
+The API is the source of truth for identity, roles, profile edits, wallet balances, ledger history, top-up packages, catalogue listings, points checkout, orders, refund requests, role applications, drafts/submissions, private course delivery, hosted-video progress, privacy requests and administrator review queues. The server-cart endpoint is a durable draft aid only; it is never an entitlement, price or ledger source of truth.
 
 ## Current platform limitations
 
-- Cloud purchases are refundable only within 72 hours and at or below 10% recorded progress; Live, Local and Record rules are enforced by the API from the purchase-time snapshot.
-- Private R2 object storage is implemented in the backend as a deployment-gated, single-file flow. It requires the `005_object_storage.sql` migration, R2 secrets and bucket CORS before use; the current web client still needs the separate upload/download UI integration. Confirmed Local-download evidence, hosted-video progress capture, public creator profiles, Google OAuth and password-reset email remain out of scope.
-- Course and content submissions remain unpublished until an administrator approves them. Content metadata can be submitted, but paid-file delivery must wait for the private storage adapter.
+- Self-arranged Local/Live purchases must be requested at least 72 hours before the scheduled start. Recorded-video/file purchases require server-recorded viewing at or below 10% and no protected-file download; each new order freezes its rule as a policy snapshot.
+- Private R2 object storage is deployment-gated. Course and content flows require the object-storage migrations, R2 secrets and bucket CORS before use. Course Cloud is an authorised download, while Local/Live instructions and contact data are buyer-only order snapshots; hosted-video progress is server-clamped and auditable.
+- Course and content submissions remain unpublished until an administrator approves them. Publication rejects a draft with required protected files or private Local/Live fulfilment data missing.
 
 ## Test
 

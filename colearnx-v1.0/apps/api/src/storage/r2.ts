@@ -78,6 +78,11 @@ export function createContentObjectKey(ownerUserId: string, contentVersionId: st
   return `content/${ownerUserId}/${contentVersionId}/${randomUUID()}.${extension}`;
 }
 
+export function createCourseObjectKey(ownerUserId: string, courseRunId: string, filename: string) {
+  const extension = extensionOf(filename);
+  return `course/${ownerUserId}/${courseRunId}/${randomUUID()}.${extension}`;
+}
+
 export function contentTypeMatches(expected: string, actual: string | undefined) {
   if (!actual) return false;
   return normalizedMediaType(actual) === normalizedMediaType(expected);

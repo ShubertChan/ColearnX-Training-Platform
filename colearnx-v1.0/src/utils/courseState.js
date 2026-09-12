@@ -1,5 +1,4 @@
 export const WATCH_REFUND_LIMIT = 0.1;
-export const HOSTED_REFUND_WINDOW_HOURS = 72;
 export const LIVE_REFUND_NOTICE_HOURS = 72;
 
 const deliveryLabels = {
@@ -42,56 +41,26 @@ export function getLiveStatus(course, now = new Date()) {
   return "Ended";
 }
 
-function hostedPolicyDetail() {
-  return `Cloud and eligible Record purchases may be refunded within ${HOSTED_REFUND_WINDOW_HOURS} hours of purchase when viewing progress is ${WATCH_REFUND_LIMIT * 100}% or less.`;
+function recordedMediaPolicyDetail() {
+  return `Recorded video or file refunds require viewing of ${WATCH_REFUND_LIMIT * 100}% or less and no protected-file download.`;
 }
 
-function livePolicyDetail() {
-  return `Live purchases may be refunded at or before ${LIVE_REFUND_NOTICE_HOURS} hours before the scheduled start. Any included Record follows the Live package policy.`;
-}
-
-function localPolicyDetail(delivered) {
-  return delivered
-    ? "Local delivery is non-refundable. The completed download/access event is recorded as service-delivery evidence."
-    : "Local delivery is non-refundable in V1. A completed download/access event is treated as service delivered.";
+function selfArrangedPolicyDetail() {
+  return `Self-arranged online or offline courses may be refunded only at or before ${LIVE_REFUND_NOTICE_HOURS} hours before the scheduled start.`;
 }
 
 export function getRefundInfo(course, now = new Date()) {
   const modes = getDeliveryModes(course);
-  const isLivePackage = modes.includes("live");
-  const isLocal = modes.includes("local");
-  const recordOnly = modes.length === 1 && modes[0] === "record";
+  const isSelfArranged = modes.includes("local") || modes.includes("live");
 
-  if (recordOnly) {
-    return {
-      eligible: false,
-      policyPreview: !course.purchased,
-      summary: "Independent Record sale disabled",
-      detail:
-        "Record replay access is available only through its associated Live product until OPEN-016 is resolved.",
-    };
-  }
-
-  if (isLocal) {
-    return {
-      eligible: false,
-      policyPreview: !course.purchased,
-      delivered: Boolean(course.downloaded),
-      summary: course.downloaded
-        ? "Delivered · non-refundable"
-        : "Local · non-refundable",
-      detail: localPolicyDetail(Boolean(course.downloaded)),
-    };
-  }
-
-  if (isLivePackage) {
+  if (isSelfArranged) {
     if (!course.startsAt) {
       return {
         eligible: false,
         policyPreview: !course.purchased,
         summary: "Schedule required",
         detail:
-          "A Live course needs a confirmed start time before enrolment or refund eligibility can be evaluated.",
+          "A self-arranged course needs a confirmed start time before refund eligibility can be evaluated.",
       };
     }
     const deadline = new Date(
@@ -104,26 +73,18 @@ export function getRefundInfo(course, now = new Date()) {
       policyPreview: !course.purchased,
       deadline,
       summary: !course.purchased
-        ? `${LIVE_REFUND_NOTICE_HOURS}-hour Live refund boundary`
+        ? `${LIVE_REFUND_NOTICE_HOURS}-hour self-arranged refund boundary`
         : beforeOrAtDeadline
           ? `Refund by ${deadline.toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" })}`
-          : `${LIVE_REFUND_NOTICE_HOURS}-hour refund deadline passed`,
-      detail: livePolicyDetail(),
+          : `${LIVE_REFUND_NOTICE_HOURS}-hour self-arranged refund deadline passed`,
+      detail: selfArrangedPolicyDetail(),
     };
   }
 
   const duration = Math.max(1, Number(course.duration) || 1);
   const progress = Math.round(((Number(course.watched) || 0) / duration) * 100);
   const limitPercent = WATCH_REFUND_LIMIT * 100;
-  const purchaseDeadline = course.purchasedAt
-    ? new Date(
-        new Date(course.purchasedAt).getTime() +
-          HOSTED_REFUND_WINDOW_HOURS * 60 * 60 * 1000,
-      )
-    : null;
-  const withinPurchaseWindow = purchaseDeadline
-    ? now <= purchaseDeadline
-    : false;
+  const downloaded = Boolean(course.downloaded);
   const withinProgressLimit = progress <= limitPercent;
 
   if (!course.purchased) {
@@ -131,34 +92,22 @@ export function getRefundInfo(course, now = new Date()) {
       eligible: false,
       policyPreview: true,
       progress,
-      purchaseDeadline: null,
-      summary: `${HOSTED_REFUND_WINDOW_HOURS} hours · up to ${limitPercent}% watched`,
-      detail: hostedPolicyDetail(),
-    };
-  }
-
-  if (!purchaseDeadline) {
-    return {
-      eligible: false,
-      policyPreview: false,
-      progress,
-      purchaseDeadline: null,
-      summary: "Purchase timestamp unavailable",
-      detail:
-        "Refund eligibility must be calculated by the API from the policy snapshot and authoritative purchase timestamp.",
+      downloaded,
+      summary: `Recorded media · up to ${limitPercent}% watched · no download`,
+      detail: recordedMediaPolicyDetail(),
     };
   }
 
   return {
-    eligible: withinPurchaseWindow && withinProgressLimit,
+    eligible: !downloaded && withinProgressLimit,
     policyPreview: false,
     progress,
-    purchaseDeadline,
-    summary: !withinPurchaseWindow
-      ? `${HOSTED_REFUND_WINDOW_HOURS}-hour purchase window passed`
+    downloaded,
+    summary: downloaded
+      ? "Protected file downloaded · refund unavailable"
       : !withinProgressLimit
         ? `${progress}% watched · ${limitPercent}% limit`
-        : `Eligible until ${purchaseDeadline.toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" })}`,
-    detail: hostedPolicyDetail(),
+        : `Eligible · ${progress}% watched · no download`,
+    detail: recordedMediaPolicyDetail(),
   };
 }

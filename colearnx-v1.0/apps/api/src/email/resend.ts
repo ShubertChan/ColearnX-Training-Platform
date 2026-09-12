@@ -11,6 +11,11 @@ type VerificationEmail = {
   code: string;
   expiresInMinutes: number;
 };
+type PasswordResetEmail = {
+  to: string;
+  resetUrl: string;
+  expiresInMinutes: number;
+};
 
 export async function sendVerificationEmail({ to, code, expiresInMinutes }: VerificationEmail) {
   if (env.EMAIL_PROVIDER !== 'resend') throw new EmailDeliveryError();
@@ -36,5 +41,27 @@ export async function sendVerificationEmail({ to, code, expiresInMinutes }: Veri
     throw new EmailDeliveryError();
   }
 
+  if (!response.ok) throw new EmailDeliveryError();
+}
+
+export async function sendPasswordResetEmail({ to, resetUrl, expiresInMinutes }: PasswordResetEmail) {
+  if (env.EMAIL_PROVIDER !== 'resend') throw new EmailDeliveryError();
+  let response: Response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: env.EMAIL_FROM,
+        to: [to],
+        subject: 'Reset your CoLearnX password',
+        text: `Use this one-time link to reset your CoLearnX password: ${resetUrl}\n\nThe link expires in ${expiresInMinutes} minutes. If you did not request this, you can ignore this email.`,
+        html: `<p>Use this one-time link to reset your CoLearnX password:</p><p><a href="${resetUrl}">Reset password</a></p><p>This link expires in ${expiresInMinutes} minutes. If you did not request this, you can ignore this email.</p>`,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new EmailDeliveryError();
+  }
   if (!response.ok) throw new EmailDeliveryError();
 }

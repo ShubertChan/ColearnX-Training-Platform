@@ -152,6 +152,7 @@ const mapOrder = (order) => ({
     refundPolicy: item.refundPolicy?.summary || "Refund policy is recorded with this order.",
     refundDeadlineAt: item.refundDeadlineAt,
     fulfilmentStatus: item.fulfilmentStatus,
+    downloaded: Boolean(item.downloadCompletedAt),
   })),
 });
 

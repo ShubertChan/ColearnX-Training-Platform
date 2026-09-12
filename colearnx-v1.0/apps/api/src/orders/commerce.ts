@@ -28,6 +28,9 @@ type Product = {
   startsAt: Date | null;
   capacity: number | null;
   refundPolicyId: string | null;
+  progressTrackingType: 'none' | 'online_video';
+  totalDurationSeconds: number | null;
+  deliverySnapshot: { instructions: string; trainerContact: string; joinUrl: string };
 };
 
 type RevenuePolicy = {
@@ -47,20 +50,15 @@ function points(value: string, field: string) {
 }
 
 function refundPolicySnapshot(product: Product, purchasedAt: Date) {
-  if (product.deliveryModes.includes('local')) return { rule: 'local-v1', refundable: false };
-  if (product.deliveryModes.includes('live')) {
-    return { rule: 'live-72h', refundDeadlineHoursBeforeStart: 72, startsAt: product.startsAt?.toISOString() ?? null };
-  }
-  if (product.deliveryModes.includes('cloud') || product.deliveryModes.includes('record')) {
-    return { rule: 'hosted-72h-progress-10', refundWindowHours: 72, maxProgressPercent: 10, purchasedAt: purchasedAt.toISOString() };
-  }
-  return { rule: 'content-policy-required', refundable: false };
+  const base = { purchasedAt: purchasedAt.toISOString(), deliveryModes: product.deliveryModes };
+  const selfArranged = product.kind === 'course' && product.deliveryModes.some((mode) => mode === 'local' || mode === 'live');
+  if (selfArranged) return { ...base, rule: 'self-arranged-72h-v1', startsAt: product.startsAt?.toISOString() ?? null, noticeHours: 72, summary: 'Self-arranged online or offline courses may be refunded only when requested at least 72 hours before the course starts.' };
+  return { ...base, rule: 'recorded-media-10pct-no-download-v1', watchedRatioMaximum: 0.1, totalDurationSeconds: product.totalDurationSeconds, requiresNoDownload: true, summary: 'Recorded video or file refunds require viewing at or below 10% and no protected file download.' };
 }
 
-function refundDeadline(product: Product, purchasedAt: Date) {
-  if (product.deliveryModes.includes('live') && product.startsAt) return new Date(product.startsAt.getTime() - 72 * 60 * 60 * 1000);
-  if (product.deliveryModes.includes('cloud') || product.deliveryModes.includes('record')) return new Date(purchasedAt.getTime() + 72 * 60 * 60 * 1000);
-  return null;
+function refundDeadline(product: Product, _purchasedAt: Date) {
+  const selfArranged = product.kind === 'course' && product.deliveryModes.some((mode) => mode === 'local' || mode === 'live');
+  return selfArranged && product.startsAt ? new Date(product.startsAt.getTime() - 72 * 60 * 60 * 1000) : null;
 }
 
 async function claimIdempotency(client: PoolClient, actorId: string, key: string, fingerprint: string) {
@@ -90,23 +88,29 @@ async function lockProduct(client: PoolClient, item: { kind: 'course' | 'content
       starts_at: Date | null;
       capacity: number | null;
       refund_policy_id: string | null;
-    }>(`SELECT cr.course_run_id, c.owner_user_id, c.title, cr.price_points, cr.starts_at, cr.capacity, cr.refund_policy_id
+      progress_tracking_type: 'none' | 'online_video';
+      total_duration_seconds: number | null;
+    }>(`SELECT cr.course_run_id, c.owner_user_id, c.title, cr.price_points, cr.starts_at, cr.capacity, cr.refund_policy_id, cr.progress_tracking_type, cr.total_duration_seconds
       FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id
       WHERE cr.course_run_id = $1 AND cr.run_status = 'published' AND c.publication_status = 'published'
       FOR UPDATE OF cr, c`, [item.id]);
     if (!course.rowCount) throw new ApiError(404, 'COURSE_NOT_AVAILABLE', 'One or more courses are not available.');
-    const delivery = await client.query<{ delivery_type: string }>(`SELECT delivery_type FROM course_delivery_options
+    const delivery = await client.query<{ delivery_type: string; fulfilment_instructions: string | null; trainer_contact: string | null; join_url: string | null }>(`SELECT delivery_type, fulfilment_instructions, trainer_contact, join_url FROM course_delivery_options
       WHERE course_run_id = $1 AND option_status = 'active' ORDER BY delivery_type`, [item.id]);
     const deliveryModes = delivery.rows.map((row) => row.delivery_type);
     if (!deliveryModes.length) throw new ApiError(409, 'COURSE_DELIVERY_UNAVAILABLE', 'This course has no active delivery option.');
-    if (deliveryModes.length === 1 && deliveryModes[0] === 'record') {
-      throw new ApiError(409, 'RECORD_SALE_DISABLED', 'Independent Record replay sale is not enabled.');
-    }
+    const coordination = delivery.rows.find((option) => option.delivery_type === 'local' || option.delivery_type === 'live');
+    const deliverySnapshot = {
+      instructions: coordination?.fulfilment_instructions ?? '',
+      trainerContact: coordination?.trainer_contact ?? '',
+      joinUrl: coordination?.join_url ?? '',
+    };
     const row = course.rows[0];
     return {
       kind: 'course', id: row.course_run_id, sellerUserId: row.owner_user_id, title: row.title,
       pricePoints: points(row.price_points, 'Course price'), deliveryModes, startsAt: row.starts_at,
-      capacity: row.capacity, refundPolicyId: row.refund_policy_id,
+      capacity: row.capacity, refundPolicyId: row.refund_policy_id, progressTrackingType: row.progress_tracking_type,
+      totalDurationSeconds: row.total_duration_seconds, deliverySnapshot,
     };
   }
 
@@ -125,7 +129,8 @@ async function lockProduct(client: PoolClient, item: { kind: 'course' | 'content
   return {
     kind: 'content', id: row.content_version_id, sellerUserId: row.creator_user_id, title: row.title,
     pricePoints: points(row.price_points, 'Content price'), deliveryModes: [], startsAt: null,
-    capacity: null, refundPolicyId: row.refund_policy_id,
+    capacity: null, refundPolicyId: row.refund_policy_id, progressTrackingType: 'none', totalDurationSeconds: null,
+    deliverySnapshot: { instructions: '', trainerContact: '', joinUrl: '' },
   };
 }
 
@@ -190,6 +195,9 @@ type CheckoutResponse = {
 export async function checkout(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const input = parse(checkoutSchema, req.body);
+  if (!actor.roles.includes('member') || actor.roles.includes('admin')) {
+    throw new ApiError(403, 'MEMBER_PURCHASE_REQUIRED', 'A non-administrator Member account is required for checkout.');
+  }
   const key = parse(idempotencyKey, req.get('idempotency-key'));
   const fingerprint = sha256(JSON.stringify(input));
   const response = await withTransaction(async (client) => {
@@ -221,9 +229,9 @@ export async function checkout(req: Request, res: Response) {
       const policySnapshot = refundPolicySnapshot(product, purchasedAt);
       const orderItem = await client.query<{ order_item_id: string }>(`INSERT INTO order_items
         (order_id, item_type, course_run_id, content_version_id, seller_user_id, item_title_snapshot, points_amount,
-         refund_policy_id, refund_policy_snapshot_json, refund_deadline_at, fulfilment_status,
-         delivery_modes_snapshot_json, revenue_share_bps, revenue_share_snapshot_json)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12::jsonb, 10000, $13::jsonb)
+         refund_policy_id, refund_policy_snapshot_json, refund_deadline_at, fulfilment_status, delivery_modes_snapshot_json,
+         delivery_snapshot_json, revenue_share_bps, revenue_share_snapshot_json)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12::jsonb, $13::jsonb, 10000, $14::jsonb)
         RETURNING order_item_id`, [
         order.rows[0].order_id,
         product.kind === 'course' ? 'course_run' : 'content_version',
@@ -231,7 +239,8 @@ export async function checkout(req: Request, res: Response) {
         product.kind === 'content' ? product.id : null,
         product.sellerUserId, product.title, product.pricePoints, product.refundPolicyId,
         JSON.stringify(policySnapshot), refundDeadline(product, purchasedAt), isLiveReservation ? 'reserved' : 'fulfilled',
-        JSON.stringify(product.deliveryModes), JSON.stringify({ policyCode: revenuePolicy.policy_code, platformShareBps: revenuePolicy.platform_share_bps,
+        JSON.stringify(product.deliveryModes), JSON.stringify(product.deliverySnapshot),
+        JSON.stringify({ policyCode: revenuePolicy.policy_code, platformShareBps: revenuePolicy.platform_share_bps,
           trainerShareBps: revenuePolicy.trainer_share_bps, creatorShareBps: revenuePolicy.creator_share_bps }),
       ]);
       const orderItemId = orderItem.rows[0].order_item_id;
@@ -314,16 +323,42 @@ export async function getOrder(req: Request, res: Response) {
   if (!order.rowCount) throw new ApiError(404, 'ORDER_NOT_FOUND', 'Order was not found.');
   const itemRows = await query(`SELECT order_item_id, item_type, course_run_id, content_version_id, item_title_snapshot,
       points_amount, delivery_modes_snapshot_json, refund_policy_snapshot_json, refund_deadline_at, fulfilment_status,
-      revenue_share_snapshot_json
-    FROM order_items WHERE order_id = $1 ORDER BY order_item_id`, [orderId]);
+      delivery_snapshot_json, revenue_share_snapshot_json, seller.user_id AS seller_user_id, seller.full_name AS seller_name,
+      COALESCE(course_download.download_completed_at, content_download.download_completed_at) AS download_completed_at
+    FROM order_items oi JOIN users seller ON seller.user_id = oi.seller_user_id
+    LEFT JOIN LATERAL (
+      SELECT MAX(cap.download_completed_at) AS download_completed_at
+      FROM course_enrolments ce JOIN course_access_progress cap ON cap.enrolment_id = ce.enrolment_id
+      WHERE ce.order_item_id = oi.order_item_id
+    ) course_download ON true
+    LEFT JOIN LATERAL (
+      SELECT MAX(cag.first_accessed_at) AS download_completed_at
+      FROM content_access_grants cag WHERE cag.order_item_id = oi.order_item_id
+    ) content_download ON true
+    WHERE oi.order_id = $1 ORDER BY oi.order_item_id`, [orderId]);
   const row = order.rows[0];
+  const refunds = await query(`SELECT refund_request_id, order_item_id, refund_status, requested_points, requested_at,
+      reviewed_at, decision_note, eligibility_code
+    FROM refund_requests WHERE order_item_id = ANY($1::uuid[]) ORDER BY requested_at DESC`,
+  [itemRows.rows.map((item) => item.order_item_id)]);
+  const refundsByItem = new Map<string, Array<Record<string, unknown>>>();
+  for (const refund of refunds.rows) {
+    const records = refundsByItem.get(refund.order_item_id) ?? [];
+    records.push({ id: refund.refund_request_id, status: refund.refund_status, requestedPoints: Number(refund.requested_points),
+      requestedAt: refund.requested_at, decidedAt: refund.reviewed_at, decisionReason: refund.decision_note, policyCode: refund.eligibility_code });
+    refundsByItem.set(refund.order_item_id, records);
+  }
   return ok(res, {
     id: row.order_id, orderNo: row.order_no, status: row.order_status, totalPoints: Number(row.total_points),
     receipt: row.receipt_snapshot_json, createdAt: row.created_at, paidAt: row.paid_at,
     items: itemRows.rows.map((item) => ({ id: item.order_item_id, kind: item.item_type === 'course_run' ? 'course' : 'content',
       productId: item.course_run_id ?? item.content_version_id, title: item.item_title_snapshot, pricePoints: Number(item.points_amount),
+      seller: { id: item.seller_user_id, displayName: item.seller_name }, transactionReference: row.order_no,
+      delivery: item.delivery_snapshot_json, fulfilmentInstructions: item.delivery_snapshot_json?.instructions ?? '',
+      trainerContact: item.delivery_snapshot_json?.trainerContact ?? '', joinUrl: item.delivery_snapshot_json?.joinUrl ?? '',
+      refundRecords: refundsByItem.get(item.order_item_id) ?? [],
       deliveryModes: item.delivery_modes_snapshot_json, refundPolicy: item.refund_policy_snapshot_json,
-      refundDeadlineAt: item.refund_deadline_at, fulfilmentStatus: item.fulfilment_status,
+      refundDeadlineAt: item.refund_deadline_at, fulfilmentStatus: item.fulfilment_status, downloadCompletedAt: item.download_completed_at,
       revenueShare: item.revenue_share_snapshot_json })),
   });
 }
