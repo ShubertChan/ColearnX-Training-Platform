@@ -27,6 +27,7 @@ const schema = z.object({
   EMAIL_VERIFICATION_CODE_PEPPER: z.string().optional().default(''),
   EMAIL_VERIFICATION_CODE_TTL_MINUTES: z.coerce.number().int().min(5).max(30).default(10),
   EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(3600).default(60),
+  PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().min(5).max(60).default(30),
   EMAIL_VERIFICATION_MAX_ATTEMPTS: z.coerce.number().int().min(3).max(10).default(5),
   OBJECT_STORAGE_PROVIDER: z.enum(['disabled', 'r2']).default('disabled'),
   R2_ACCOUNT_ID: z.string().trim().optional().default(''),

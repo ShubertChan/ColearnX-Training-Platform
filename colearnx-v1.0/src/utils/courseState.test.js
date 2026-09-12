@@ -16,9 +16,9 @@ const hosted = {
   watched: 10,
 };
 
-test("hosted refund includes exactly 10 percent within 72 hours", () => {
+test("recorded media allows exactly 10 percent without a protected-file download", () => {
   assert.equal(
-    getRefundInfo(hosted, new Date("2026-08-31T23:59:59.000Z")).eligible,
+    getRefundInfo(hosted, new Date("2026-09-30T00:00:00.000Z")).eligible,
     true,
   );
 });
@@ -33,32 +33,34 @@ test("hosted refund rejects progress above 10 percent", () => {
   );
 });
 
-test("hosted refund includes exactly 72 hours and rejects later requests", () => {
+test("recorded media rejects a protected-file download", () => {
   assert.equal(
-    getRefundInfo(hosted, new Date("2026-09-01T00:00:00.000Z")).eligible,
-    true,
-  );
-  assert.equal(
-    getRefundInfo(hosted, new Date("2026-09-01T00:00:00.001Z")).eligible,
+    getRefundInfo({ ...hosted, downloaded: true }).eligible,
     false,
   );
 });
 
-test("local delivery is non-refundable before and after delivery", () => {
+test("Local delivery uses the self-arranged 72-hour boundary", () => {
   const local = {
     purchased: true,
     deliveryModes: ["local"],
-    downloaded: false,
+    startsAt: "2026-09-10T12:00:00.000Z",
   };
-  assert.equal(getRefundInfo(local).eligible, false);
-  assert.equal(getRefundInfo({ ...local, downloaded: true }).eligible, false);
+  assert.equal(
+    getRefundInfo(local, new Date("2026-09-07T12:00:00.000Z")).eligible,
+    true,
+  );
+  assert.equal(
+    getRefundInfo(local, new Date("2026-09-07T12:00:00.001Z")).eligible,
+    false,
+  );
 });
 
-test("unowned hosted course exposes a policy preview", () => {
+test("unowned recorded media exposes the 10-percent, no-download policy preview", () => {
   const info = getRefundInfo({ ...hosted, purchased: false });
   assert.equal(info.eligible, false);
   assert.equal(info.policyPreview, true);
-  assert.match(info.detail, /72 hours/);
+  assert.match(info.detail, /no protected-file download/);
   assert.match(info.detail, /10%/);
 });
 
