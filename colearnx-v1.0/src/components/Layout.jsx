@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   BadgeCheck,
@@ -21,8 +21,11 @@ import {
   UserCheck,
   WalletCards,
   X,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { usePlatform } from "../context/PlatformContext";
+import nextLogo from "../../assets/next-logo.jpg";
 
 const baseNavigation = [
   ["/home", "Home", Home],
@@ -39,14 +42,17 @@ const baseNavigation = [
 const roleNavigation = {
   Trainer: [
     ["/trainer/course-editor", "Course Editor", BookOpen],
+    ["/publishing-tools", "Publishing tools", BriefcaseBusiness],
     ["/published", "Published Items", BriefcaseBusiness],
   ],
   Creator: [
     ["/creator/content-editor", "Content Editor", FileText],
+    ["/publishing-tools", "Publishing tools", BriefcaseBusiness],
     ["/published", "Published Items", BriefcaseBusiness],
   ],
   Admin: [
     ["/admin", "Admin Dashboard", LayoutDashboard],
+    ["/admin/operations", "Reports & Operations", ClipboardCheck],
     ["/admin/applications", "Role Applications", BadgeCheck],
     ["/admin/refunds", "Refund Review", ClipboardCheck],
     ["/admin/users", "Users & Roles", UserCheck],
@@ -55,6 +61,8 @@ const roleNavigation = {
 };
 
 const titleMap = {
+  "/publishing-tools": ["Publishing tools", "Manage listings, licences, versions and usage"],
+  "/admin/operations": ["Reports & Operations", "Review moderation, wallet adjustments and audit records"],
   "/home": ["Home", "Your learning activity at a glance"],
   "/profile": [
     "My Profile",
@@ -145,38 +153,98 @@ export default function Layout({ children }) {
     toast,
     profile,
     signOut,
+    dataErrors,
+    retryAccountData,
   } = usePlatform();
   const [open, setOpen] = useState(false);
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 900px)").matches);
+  const sidebarRef = useRef(null);
+  const menuRef = useRef(null);
+  const closeRef = useRef(null);
+  const mainRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
   const [title, subtitle] = titleFor(location.pathname);
-  const nav = [...baseNavigation, ...(roleNavigation[role] || [])];
+  const nav = role === "Admin" ? roleNavigation.Admin : [...baseNavigation, ...(roleNavigation[role] || [])];
 
   useEffect(() => setOpen(false), [location.pathname]);
 
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 900px)");
+    const onChange = () => { setMobile(query.matches); setOpen(false); };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!mobile || !open) return;
+    const sidebar = sidebarRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const focusable = () => [...sidebar.querySelectorAll(
+      'a[href], button:not(:disabled), select:not(:disabled), [tabindex="0"]',
+    )].filter((element) => element.getClientRects().length > 0);
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); setOpen(false); }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first?.focus();
+      }
+    };
+    const onFocus = (event) => {
+      if (!sidebar.contains(event.target)) closeRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("focusin", onFocus);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("focusin", onFocus);
+      queueMicrotask(() => {
+        const target = window.matchMedia("(max-width: 900px)").matches
+          ? menuRef.current : mainRef.current;
+        if (target?.isConnected) target.focus();
+      });
+    };
+  }, [mobile, open]);
+
   return (
     <div className="app-shell">
-      {open && (
-        <button
+      <a className="skip-link" href="#main-content" inert={mobile && open}
+        onClick={(event) => { event.preventDefault(); mainRef.current?.focus(); }}>
+        Skip to main content
+      </a>
+      {mobile && open && (
+        <div
           className="sidebar-scrim"
-          aria-label="Close navigation"
+          aria-hidden="true"
           onClick={() => setOpen(false)}
         />
       )}
-      <aside className={`sidebar ${open ? "open" : ""}`}>
+      <aside ref={sidebarRef} id="workspace-navigation"
+        className={`sidebar ${open ? "open" : ""}`}
+        inert={mobile && !open} aria-hidden={mobile && !open ? true : undefined}
+        role={mobile && open ? "dialog" : undefined}
+        aria-modal={mobile && open ? true : undefined} aria-label="Workspace navigation">
         <button
           type="button"
           className="brand"
-          onClick={() => navigate("/home")}
+          onClick={() => navigate(role === "Admin" ? "/admin" : "/home")}
           aria-label="Go to CoLearnX home"
         >
-          <img src="./assets/next-logo.jpg" alt="neXt" />
+          <img src={nextLogo} alt="neXt" />
           <div>
             <strong>CoLearnX</strong>
             <span>Learning Platform</span>
           </div>
         </button>
         <button
+          ref={closeRef}
           className="mobile-close"
           onClick={() => setOpen(false)}
           aria-label="Close menu"
@@ -244,23 +312,26 @@ export default function Layout({ children }) {
           </button>
         </div>
       </aside>
-      <main>
+      <main ref={mainRef} id="main-content" tabIndex={-1} inert={mobile && open}>
         <header className="topbar">
           <div className="topbar-title">
             <button
+              ref={menuRef}
               className="menu-button"
               onClick={() => setOpen(true)}
               aria-label="Open menu"
+              aria-expanded={mobile && open}
+              aria-controls="workspace-navigation"
             >
               <Menu size={21} />
             </button>
             <div>
-              <span className="eyebrow">Workspace</span>
               <h1>{title}</h1>
               <p>{subtitle}</p>
             </div>
           </div>
           <div className="topbar-actions">
+            {role !== "Admin" && <>
             <button
               className="balance-pill"
               onClick={() => navigate("/wallet")}
@@ -277,9 +348,13 @@ export default function Layout({ children }) {
             >
               <ReceiptText size={19} />
             </button>
+            </>}
           </div>
         </header>
-        <div className="page-content">{children}</div>
+        <div className="page-content">
+          {Object.keys(dataErrors).length > 0 && <div className="data-warning" role="status"><AlertTriangle size={18} /><div><b>Some workspace data could not be refreshed.</b><span>{Object.keys(dataErrors).join(", ")} · your signed-in session remains active.</span></div><button className="button secondary sm" onClick={() => void retryAccountData()}><RotateCcw size={14} /> Retry</button></div>}
+          {children}
+        </div>
       </main>
       {toast && (
         <div className="toast" role="status">

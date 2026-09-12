@@ -322,6 +322,8 @@ function TopUpModal({ onClose }) {
 }
 
 function TransactionTable({ transactions }) {
+  const bucketLines = (values = {}) => Object.entries(values).filter(([, value]) => Number(value) !== 0).map(([bucket, value]) => `${bucket}: ${Number(value) > 0 ? "+" : ""}${value}`);
+  const balanceLines = (values = {}) => Object.entries(values).filter(([, value]) => value !== null && value !== undefined).map(([bucket, value]) => `${bucket}: ${value}`);
   return (
     <div className="responsive-table">
       <table>
@@ -330,8 +332,8 @@ function TransactionTable({ transactions }) {
             <th>Date</th>
             <th>Transaction</th>
             <th>Category</th>
-            <th>Amount</th>
-            <th>Balance</th>
+            <th>Bucket changes</th>
+            <th>Balances after</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -349,6 +351,7 @@ function TransactionTable({ transactions }) {
               <td>
                 <b>{tx.type}</b>
                 <small className="table-subtitle">{tx.item}</small>
+                {(tx.orderReference || tx.refundReference) && <small className="table-subtitle">{tx.orderReference && `Order: ${tx.orderReference}`}{tx.orderReference && tx.refundReference ? " · " : ""}{tx.refundReference && `Refund: ${tx.refundReference}`}</small>}
               </td>
               <td>
                 <Badge
@@ -367,21 +370,8 @@ function TransactionTable({ transactions }) {
                   {tx.category}
                 </Badge>
               </td>
-              <td
-                className={
-                  tx.amount > 0
-                    ? "text-success"
-                    : tx.amount < 0
-                      ? "text-danger"
-                      : ""
-                }
-              >
-                <b>
-                  {tx.amount > 0 ? "+" : ""}
-                  {tx.amount}
-                </b>
-              </td>
-              <td>{tx.balance}</td>
+              <td><div className="ledger-buckets">{bucketLines(tx.deltas).map((line) => <span key={line}>{line}</span>)}{!bucketLines(tx.deltas).length && <span>No point change</span>}</div></td>
+              <td><div className="ledger-buckets">{balanceLines(tx.balancesAfter).map((line) => <span key={line}>{line}</span>)}{!balanceLines(tx.balancesAfter).length && <span>Not supplied</span>}</div></td>
               <td>
                 <span className="status-text">
                   <CheckCircle2 size={14} /> {tx.status}

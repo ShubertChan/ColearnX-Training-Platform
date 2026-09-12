@@ -5,12 +5,12 @@ const idempotencyKey = () =>
   globalThis.crypto?.randomUUID?.() ||
   `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-export const createCheckout = (items) =>
+export const createCheckout = (items, requestKey = idempotencyKey()) =>
   apiClient
     .post(
       "/checkout",
       { items },
-      { headers: { "Idempotency-Key": idempotencyKey() } },
+      { headers: { "Idempotency-Key": requestKey } },
     )
     .then(unwrap);
 

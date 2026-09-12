@@ -2,6 +2,8 @@
 
 Base URL: `http://localhost:3001/api/v1`. Every successful response is `{ "data": ..., "meta": { "requestId": "UUID" } }`; errors are `{ "error": { "code", "message", "details", "requestId" } }`.
 
+> This archive contains the React frontend only. This document records the baseline API contract; the routes and fields newly required by the repaired UI are listed in [`FRONTEND_BACKEND_HANDOFF.md`](./FRONTEND_BACKEND_HANDOFF.md).
+
 Authenticated routes require `Authorization: Bearer <access-token>`. The refresh token is an HTTP-only cookie. Value-changing routes shown below require an `Idempotency-Key` header of 8–200 characters.
 
 ## Public and identity

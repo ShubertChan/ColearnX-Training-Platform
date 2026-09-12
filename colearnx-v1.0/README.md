@@ -1,42 +1,37 @@
-# CoLearnX MVP
+# CoLearnX frontend
 
-This directory contains a React/Vite web client and an Express/TypeScript + PostgreSQL backend for the CoLearnX MVP. The backend follows the team ERD and implements the core identity, catalogue review, wallet, order, refund, revenue-policy and Stripe-test paths.
+This archive contains the React/Vite frontend only. It does **not** contain `apps/api`, a database, migrations or a mail/storage service. The browser expects a compatible API at `/api/v1`; during Vite development that path is proxied to `http://localhost:3001`.
 
 ## Run locally
 
-```bash
-npm install
-docker compose up -d
-npm run db:migrate
-npm run db:seed
-npm run api:typecheck
-npm run api:build
-npm --prefix apps/api run start
+Open a terminal in the directory that contains this `package.json`, then run:
+
+```powershell
+npm.cmd install
+npm.cmd run dev
 ```
 
-Then check `http://localhost:3001/health/ready`. Frontend-only development remains `npm run dev`.
+Open the URL printed by Vite (normally `http://localhost:5173`). Public course/resource browsing can render without a session, but sign-in, wallets, checkout, protected downloads and account workflows require the API.
 
-Read [the data model](docs/DATA_MODEL.md), [API contract](docs/API.md) and [local/Stripe runbook](docs/LOCAL_RUNBOOK.md) before connecting the browser client. The backend does not accept client-supplied point amounts or prices for top-ups.
+To point at a separately running backend, copy `.env.example` to `.env.local` and set `VITE_API_BASE_URL`. Do not put database, R2, email or payment secrets in a `VITE_` variable.
 
-For the deployed staging topology (Cloudflare Pages + Render Express API + Neon PostgreSQL), follow the [Render + Neon staging runbook](docs/STAGING_RENDER_NEON.md). It keeps production-style secrets out of the repository and does not require Docker, Cloudflare Workers, or Hyperdrive.
+## Product rules represented in this UI
 
-The API is the source of truth for identity, roles, profile edits, wallet balances, ledger history, top-up packages, catalogue listings, points checkout, orders, refund requests, role applications, drafts/submissions, private course delivery, hosted-video progress, privacy requests and administrator review queues. The server-cart endpoint is a durable draft aid only; it is never an entitlement, price or ledger source of truth.
+- Cloud course delivery is a purchase-authorised file download.
+- Local and Live delivery are arranged by the Trainer and learner. Buyer-only instructions, contact details and optional meeting/group links are shown after purchase; CoLearnX does not organise the later meeting or attendance.
+- Delivery channel and progress tracking are separate. Only a product explicitly marked as online video uses server-recorded `watchedSeconds / totalDurationSeconds`; its viewing-progress refund condition is met at 10% or less.
+- Checkout uses a final order confirmation, mixed course/resource items and an idempotent server mutation. A successful order is preserved even if later wallet/catalog refreshes fail.
+- Administrator workspaces do not expose buyer checkout navigation.
 
-## Current platform limitations
+## Test and build
 
-- Self-arranged Local/Live purchases must be requested at least 72 hours before the scheduled start. Recorded-video/file purchases require server-recorded viewing at or below 10% and no protected-file download; each new order freezes its rule as a policy snapshot.
-- Private R2 object storage is deployment-gated. Course and content flows require the object-storage migrations, R2 secrets and bucket CORS before use. Course Cloud is an authorised download, while Local/Live instructions and contact data are buyer-only order snapshots; hosted-video progress is server-clamped and auditable.
-- Course and content submissions remain unpublished until an administrator approves them. Publication rejects a draft with required protected files or private Local/Live fulfilment data missing.
-
-## Test
-
-```bash
-npm test
-npm run api:test
+```powershell
+npm.cmd test
+npm.cmd run build
 ```
 
-`VITE_PAYMENTS_API_ENABLED` is an explicit deployment gate. Leave it `false`
-until the Stripe test key and webhook secret are configured in the API
-environment; the wallet then disables the top-up entry and explains why. Set
-it to `true` and rebuild the Vite client to enable the authenticated,
-package-ID-based Stripe sandbox checkout.
+The frontend/backend boundary and the server work still required for the reported issues are documented in [docs/FRONTEND_BACKEND_HANDOFF.md](docs/FRONTEND_BACKEND_HANDOFF.md).
+
+## Backend integration
+
+The repository also includes the backend delivery and refund workflows. Apply migration 008_frontend_delivery_backend.sql and configure the deployment secrets before using the protected delivery, video-progress, profile, privacy and password-reset endpoints. See [API contract](docs/API.md), [local runbook](docs/LOCAL_RUNBOOK.md), and [staging runbook](docs/STAGING_RENDER_NEON.md). The frontend treats server-recorded refund eligibility as authoritative.

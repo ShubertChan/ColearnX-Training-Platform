@@ -1,117 +1,38 @@
 import { apiClient } from "./client.js";
 import { getPrivateAssetMediaType } from "../utils/uploadPolicy.js";
 
-const env = import.meta.env || {};
-export const usingLocalUploadDemo = Boolean(env.DEV && !env.VITE_API_BASE_URL);
-const demoIntents = new Map();
+const key = () => globalThis.crypto.randomUUID();
+const unwrap = (response) => response.data.data;
+const options = () => ({ headers: { "Idempotency-Key": key() } });
+// Uploads and downloads always use the configured API, including Vite's proxy.
+// No simulated files, credentials, or permanent private object URLs are stored.
+export const usingLocalUploadDemo = false;
 
-const id = (prefix) =>
-  `${prefix}-${globalThis.crypto?.randomUUID?.() || Date.now().toString(36)}`;
-
-export async function requestUploadIntent(contentVersionId, file) {
-  const payload = {
-    filename: file.name,
-    mediaType: getPrivateAssetMediaType(file),
-    sizeBytes: file.size,
+function assetApi(prefix) {
+  const base = (id) => `${prefix}/${encodeURIComponent(id)}`;
+  return {
+    list: async (id) => {
+      const data = await apiClient.get(`${base(id)}/assets`).then(unwrap);
+      const assets = Array.isArray(data) ? data : data?.assets;
+      if (!Array.isArray(assets)) throw new Error("The file service returned an incomplete list.");
+      return assets;
+    },
+    request: (id, file) => apiClient.post(`${base(id)}/upload-intents`, {
+      filename: file.name, mediaType: getPrivateAssetMediaType(file), sizeBytes: file.size,
+    }, options()).then(unwrap),
+    complete: (id, assetId) => apiClient.post(`${base(id)}/upload-intents/${encodeURIComponent(assetId)}/complete`, {}, options()).then(unwrap),
+    remove: (id, assetId) => apiClient.delete(`${base(id)}/upload-intents/${encodeURIComponent(assetId)}`, options()),
   };
-  if (usingLocalUploadDemo) {
-    const assetId = id("asset");
-    const intent = {
-      assetId,
-      contentVersionId,
-      method: "PUT",
-      uploadUrl: `demo://private-r2/${assetId}`,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      requiredHeaders: { "Content-Type": payload.mediaType },
-      status: "pending",
-      ...payload,
-    };
-    demoIntents.set(assetId, intent);
-    return intent;
-  }
-  const response = await apiClient.post(
-    `/content-versions/${contentVersionId}/upload-intents`,
-    payload,
-    { headers: { "Idempotency-Key": id("upload-intent") } },
-  );
-  return response.data.data;
 }
-
-export async function completeUploadIntent(contentVersionId, assetId) {
-  if (usingLocalUploadDemo) {
-    const intent = demoIntents.get(assetId);
-    if (!intent) {
-      const error = new Error("The upload attempt expired. Choose the file and retry.");
-      error.code = "UPLOAD_INTENT_NOT_FOUND";
-      throw error;
-    }
-    intent.status = "ready";
-    return {
-      assetId,
-      filename: intent.filename,
-      mediaType: intent.mediaType,
-      sizeBytes: intent.sizeBytes,
-      status: "ready",
-      uploadedAt: new Date().toISOString(),
-    };
-  }
-  const response = await apiClient.post(
-    `/content-versions/${contentVersionId}/upload-intents/${assetId}/complete`,
-    {},
-    { headers: { "Idempotency-Key": id("upload-complete") } },
-  );
-  return response.data.data;
-}
-
-export async function listContentAssets(contentVersionId) {
-  if (usingLocalUploadDemo) {
-    return [...demoIntents.values()]
-      .filter((intent) => intent.contentVersionId === contentVersionId && intent.status !== "deleted")
-      .map(({ assetId, filename, mediaType, sizeBytes, status }) => ({
-        assetId, filename, mediaType, sizeBytes, status,
-      }));
-  }
-  const response = await apiClient.get(`/content-versions/${contentVersionId}/assets`);
-  return response.data.data.assets || [];
-}
-
-export async function removeUploadIntent(contentVersionId, assetId) {
-  if (!assetId) return;
-  if (usingLocalUploadDemo) {
-    demoIntents.delete(assetId);
-    return;
-  }
-  await apiClient.delete(
-    `/content-versions/${contentVersionId}/upload-intents/${assetId}`,
-    { headers: { "Idempotency-Key": id("upload-delete") } },
-  );
-}
-
-export async function requestContentDownloadUrl(contentVersionId, assetIdOrFallback, fallbackInput = {}) {
-  const assetId = typeof assetIdOrFallback === "string" ? assetIdOrFallback : undefined;
-  const fallback = assetId ? fallbackInput : assetIdOrFallback || {};
-  if (usingLocalUploadDemo) {
-    const filename = fallback.filename || "colearnx-private-content.txt";
-    const blob = new Blob(
-      [`CoLearnX private content demo\nVersion: ${contentVersionId}\nGenerated: ${new Date().toISOString()}\n`],
-      { type: fallback.mediaType || "text/plain" },
-    );
-    return {
-      downloadUrl: URL.createObjectURL(blob),
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-      filename,
-      mediaType: fallback.mediaType || "text/plain",
-      sizeBytes: blob.size,
-      demoObjectUrl: true,
-    };
-  }
-  const response = await apiClient.post(
-    `/content-versions/${contentVersionId}/download-url`,
-    assetId ? { assetId } : {},
-    { headers: { "Idempotency-Key": id("content-download") } },
-  );
-  return response.data.data;
-}
+export const contentAssetApi = assetApi("/content-versions");
+export const courseAssetApi = assetApi("/courses");
+export const listContentAssets = contentAssetApi.list;
+export const requestUploadIntent = contentAssetApi.request;
+export const completeUploadIntent = contentAssetApi.complete;
+export const removeUploadIntent = contentAssetApi.remove;
+export const requestContentDownloadUrl = (contentVersionId, assetId) =>
+  apiClient.post(`/content-versions/${encodeURIComponent(contentVersionId)}/download-url`,
+    typeof assetId === "string" ? { assetId } : {}, options()).then(unwrap);
 
 export function getSafeUploadError(error) {
   const code = error.code || "UPLOAD_FAILED";

@@ -25,13 +25,17 @@ export function AdminUsersPage() {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, hasNext: false });
 
-  const load = async () => {
+  const load = async (nextPage = page) => {
     setLoading(true);
     setError("");
     try {
-      const response = await getAdminUsers({ search: search || undefined, status: status || undefined });
+      const response = await getAdminUsers({ search: search || undefined, status: status || undefined, page: nextPage, limit: 50 });
       setUsers(response.items);
+      setPage(nextPage);
+      setPagination({ total: response.total, hasNext: response.hasNext });
     } catch (loadError) {
       setError(loadError.message);
     } finally {
@@ -39,12 +43,12 @@ export function AdminUsersPage() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(1); }, []);
 
   return <Card>
     <div className="card-heading">
       <div><span className="eyebrow">User administration</span><h2>Platform users</h2></div>
-      <Button variant="secondary" onClick={load} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>
+      <Button variant="secondary" onClick={() => void load(page)} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>
     </div>
     <p className="muted">Select a user to inspect their profile, roles and account controls. Delete is available only on the account-detail page.</p>
     <div className="queue-actions">
@@ -54,17 +58,17 @@ export function AdminUsersPage() {
         <option value="active">Active</option>
         <option value="suspended">Suspended</option>
       </select>
-      <Button className="sm" onClick={load} disabled={loading}>Apply filter</Button>
+      <Button className="sm" onClick={() => void load(1)} disabled={loading}>Apply filter</Button>
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}
-    {users.length ? <div className="admin-user-list">{users.map((user) => <div key={user.id} className="admin-user-row">
+    {users.length ? <><div className="result-bar"><span><b>{pagination.total || users.length}</b> accounts · page {page}</span><small>{users.length} accounts loaded on this page</small></div><div className="admin-user-list">{users.map((user) => <div key={user.id} className="admin-user-row">
       <button type="button" className="admin-user-row-main" onClick={() => navigate(`/admin/users/${user.id}`)}>
         <span className="admin-user-avatar">{user.displayName.slice(0, 1).toUpperCase()}</span>
         <span><b>{user.displayName}</b><small>{user.email}</small><em>{user.roles.length ? user.roles.map(roleLabel).join(", ") : "No active role"} · joined {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}</em></span>
         <AccountStatus status={user.status} />
         <ChevronRight size={18} />
       </button>
-    </div>)}</div> : <EmptyState icon={Users} title="No accounts match" description="Adjust the search or status filter to view another account." />}
+    </div>)}</div><nav className="pagination" aria-label="User pages"><Button variant="secondary" size="sm" disabled={loading || page <= 1} onClick={() => void load(page - 1)}>Previous</Button><span>Page {page}</span><Button variant="secondary" size="sm" disabled={loading || !pagination.hasNext} onClick={() => void load(page + 1)}>Next</Button></nav></> : <EmptyState icon={Users} title="No accounts match" description="Adjust the search or status filter to view another account." />}
   </Card>;
 }
 export function AdminUserDetailPage() {

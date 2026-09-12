@@ -10,12 +10,8 @@ import {
   X,
 } from "lucide-react";
 import {
-  completeUploadIntent,
+  contentAssetApi,
   getSafeUploadError,
-  listContentAssets,
-  removeUploadIntent,
-  requestUploadIntent,
-  usingLocalUploadDemo,
 } from "../../api/uploads";
 import {
   formatBytes,
@@ -23,7 +19,6 @@ import {
   validatePrivateAsset,
 } from "../../utils/uploadPolicy";
 import {
-  uploadFileInLocalDemo,
   uploadFileToPresignedUrl,
 } from "../../utils/uploadFile";
 
@@ -59,7 +54,7 @@ function remoteItem(asset) {
 
 function itemMessage(item, contentVersionId) {
   if (item.status === "queued") {
-    return contentVersionId ? "Waiting to upload." : "Will upload automatically after you create the content.";
+    return contentVersionId ? "Waiting to upload." : "Create the draft to start uploading.";
   }
   if (item.status === "preparing") return "Preparing upload…";
   if (item.status === "uploading") return `Uploading ${item.progress}%`;
@@ -81,9 +76,14 @@ export default function PrivateAssetUploader({
   contentVersionId,
   onAssetsChange = () => {},
   disabled = false,
+  assetApi = contentAssetApi,
+  label = "Content files",
 }) {
   const [items, setItems] = useState([]);
   const [dragActive, setDragActive] = useState(false);
+  const [listError, setListError] = useState("");
+  const [listAttempt, setListAttempt] = useState(0);
+  const [listing, setListing] = useState(false);
   const itemsRef = useRef(items);
   const activeTransfer = useRef(null);
   const cancelledIds = useRef(new Set());
@@ -92,11 +92,13 @@ export default function PrivateAssetUploader({
     itemsRef.current = items;
     const readyCount = items.filter((item) => item.status === "ready").length;
     const activeCount = items.filter((item) => activeStatuses.has(item.status)).length;
-    onAssetsChange({ readyCount, activeCount });
-  }, [items, onAssetsChange]);
+    const unresolvedCount = items.filter((item) => item.status !== "ready").length;
+    onAssetsChange({ readyCount, activeCount, unresolvedCount, loading: listing, error: listError });
+  }, [items, onAssetsChange, listing, listError]);
 
   useEffect(
     () => () => {
+      if (activeTransfer.current) cancelledIds.current.add(activeTransfer.current.id);
       activeTransfer.current?.transfer?.abort?.();
     },
     [],
@@ -105,7 +107,8 @@ export default function PrivateAssetUploader({
   useEffect(() => {
     if (!contentVersionId) return undefined;
     let current = true;
-    listContentAssets(contentVersionId)
+    setListError(""); setListing(true);
+    assetApi.list(contentVersionId)
       .then((assets) => {
         if (!current) return;
         setItems((existing) => {
@@ -114,17 +117,17 @@ export default function PrivateAssetUploader({
             const local = byAssetId.get(asset.assetId);
             return local && activeStatuses.has(local.status) ? local : remoteItem(asset);
           });
-          const staged = existing.filter((item) => !item.assetId);
+          const restoredIds = new Set(assets.map((asset) => asset.assetId));
+          const staged = existing.filter((item) => !restoredIds.has(item.assetId) && item.status !== "ready");
           return [...restored, ...staged];
         });
       })
-      .catch(() => {
-        // The upload itself will surface a clear error if the service remains unavailable.
-      });
+      .catch((error) => { if (current) setListError(getSafeUploadError(error).message); })
+      .finally(() => { if (current) setListing(false); });
     return () => {
       current = false;
     };
-  }, [contentVersionId]);
+  }, [contentVersionId, assetApi, listAttempt]);
 
   const patchItem = (id, patch) => {
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -133,7 +136,7 @@ export default function PrivateAssetUploader({
   const cleanupIntent = async (assetId) => {
     if (!contentVersionId || !assetId) return;
     try {
-      await removeUploadIntent(contentVersionId, assetId);
+      await assetApi.remove(contentVersionId, assetId);
     } catch {
       // The server-side reconciler will retry a deletion that cannot complete now.
     }
@@ -148,21 +151,14 @@ export default function PrivateAssetUploader({
     activeTransfer.current = active;
     patchItem(id, { status: "preparing", error: "", progress: 0 });
     try {
-      const intent = await requestUploadIntent(contentVersionId, item.file);
+      const intent = await assetApi.request(contentVersionId, item.file);
       active.intent = intent;
       if (cancelledIds.current.has(id)) {
         await cleanupIntent(intent.assetId);
         return;
       }
       patchItem(id, { assetId: intent.assetId, status: "uploading" });
-      const transfer = usingLocalUploadDemo
-        ? uploadFileInLocalDemo({
-            file: item.file,
-            onProgress: ({ loaded, total }) => patchItem(id, {
-              progress: total ? Math.round((loaded / total) * 100) : 0,
-            }),
-          })
-        : uploadFileToPresignedUrl({
+      const transfer = uploadFileToPresignedUrl({
             uploadUrl: intent.uploadUrl,
             file: item.file,
             requiredHeaders: intent.requiredHeaders,
@@ -174,7 +170,8 @@ export default function PrivateAssetUploader({
       await transfer.promise;
       if (cancelledIds.current.has(id)) return;
       patchItem(id, { status: "verifying", progress: 100 });
-      const asset = await completeUploadIntent(contentVersionId, intent.assetId);
+      const asset = await assetApi.complete(contentVersionId, intent.assetId);
+      if (cancelledIds.current.has(id)) return;
       if (asset.status !== "ready") throw new Error("The file could not be verified. Choose it again and retry.");
       patchItem(id, {
         file: null,
@@ -239,7 +236,7 @@ export default function PrivateAssetUploader({
     }
     patchItem(id, { status: "deleting", error: "" });
     try {
-      await removeUploadIntent(contentVersionId, item.assetId);
+      await assetApi.remove(contentVersionId, item.assetId);
       setItems((current) => current.filter((candidate) => candidate.id !== id));
     } catch (error) {
       patchItem(id, { status: "error", error: getSafeUploadError(error).message });
@@ -253,7 +250,9 @@ export default function PrivateAssetUploader({
   const hasQueuedFiles = items.some((item) => item.status === "queued");
 
   return (
-    <section className="private-uploader" aria-label="Content files">
+    <section className="private-uploader" aria-label={label}>
+      {listing && <p role="status">Loading private files…</p>}
+      {listError && <div className="form-error" role="alert">{listError} <button className="button secondary sm" type="button" onClick={() => setListAttempt((value) => value + 1)}>Retry file list</button></div>}
       <label
         className={`upload-zone private ${dragActive ? "drag-active" : ""} ${disabled ? "disabled" : ""}`}
         onDragEnter={(event) => {
@@ -279,6 +278,7 @@ export default function PrivateAssetUploader({
         <span className="button secondary">Choose files</span>
         <input
           className="visually-hidden"
+          aria-label={`Choose ${label.toLowerCase()}`}
           type="file"
           accept={PRIVATE_ASSET_ACCEPT}
           multiple
@@ -291,7 +291,7 @@ export default function PrivateAssetUploader({
       </label>
 
       {!contentVersionId && hasQueuedFiles && (
-        <small className="upload-gate-note">Files will start uploading automatically when you create the content.</small>
+        <small className="upload-gate-note">Files start uploading after the draft is created.</small>
       )}
 
       <div className="upload-file-list" aria-live="polite">

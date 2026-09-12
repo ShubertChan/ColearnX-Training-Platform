@@ -1,7 +1,11 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, Link, useLocation } from "react-router-dom";
+import { ShieldCheck } from "lucide-react";
 import Layout from "./components/Layout";
+import PublicLayout from "./components/PublicLayout";
+import { EmptyState } from "./components/ui";
 import { usePlatform } from "./context/PlatformContext";
-import { AuthPage, ForgotPasswordPage } from "./pages/AuthPages";
+import { AuthPage, ForgotPasswordPage, ResetPasswordPage } from "./pages/AuthPages";
+import { PrivacyPage, TermsPage } from "./pages/LegalPages";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { HomePage, ProfilePage, PublicProfilePage } from "./pages/AccountPlatformPages";
 import {
@@ -31,6 +35,13 @@ import {
   AdminRoleApplicationsPage,
 } from "./pages/AdminPlatformPages";
 import { AdminUserDetailPage, AdminUsersPage } from "./pages/AdminUserManagementPages";
+import { intendedPath } from "./utils/frontendState";
+import { PublishingToolsPage, AdminOperationsPage } from "./pages/WorkflowPages";
+
+function PublishingAccess() {
+  const { role } = usePlatform();
+  return role === "Trainer" ? <TrainerOperational><PublishingToolsPage /></TrainerOperational> : <PublishingToolsPage />;
+}
 
 function Protected({ roles, children }) {
   const { role, approvedRoles } = usePlatform();
@@ -45,21 +56,60 @@ function Protected({ roles, children }) {
 }
 
 function Workspace({ children }) {
-  const { authenticated } = usePlatform();
+  const { authenticated, accountLoading, accountError, retrySession, dataStates, retryAccountData, orders, courseCatalogState, contentCatalogState } = usePlatform();
+  const location = useLocation();
+  if (accountLoading) return <div className="session-loading" role="status"><span className="session-spinner" /><b>Restoring your secure session…</b></div>;
+  if (accountError) return <EmptyState title="Session temporarily unavailable" description={accountError} action={<button className="button primary" onClick={() => void retrySession()}>Retry session</button>} />;
+  const required = location.pathname === "/home" ? ["wallet", "orders", "applications"]
+    : ["/wallet", "/transactions"].includes(location.pathname) ? ["wallet"]
+    : ["/orders", "/purchases"].includes(location.pathname) ? ["orders"]
+    : location.pathname === "/cart" ? ["wallet", "catalog"]
+    : location.pathname === "/role-application" ? ["applications", "certification"]
+    : location.pathname.startsWith("/checkout-success") && !orders.length ? ["orders"] : [];
+  const states = { ...dataStates, catalog: [courseCatalogState, contentCatalogState].some((state) => state.status === "error") ? "error" : [courseCatalogState, contentCatalogState].some((state) => state.status === "loading") ? "loading" : "ready" };
+  const loading = required.some((name) => states[name] === "loading");
+  const failed = required.some((name) => states[name] === "error");
   return authenticated ? (
-    <Layout>{children}</Layout>
+    <Layout>{loading ? <p role="status">Loading account data…</p> : failed ? <EmptyState title="Account data unavailable" description="We could not load this section. Your session is still active." action={<button className="button primary" onClick={() => void retryAccountData()}>Retry account data</button>} /> : children}</Layout>
   ) : (
-    <Navigate to="/login" replace />
+    <Navigate to="/login" replace state={{ from: location }} />
   );
+}
+
+function MarketplaceShell({ children }) {
+  const { authenticated } = usePlatform();
+  return authenticated ? <Layout>{children}</Layout> : <PublicLayout>{children}</PublicLayout>;
+}
+
+function AnonymousOnly({ children }) {
+  const { authenticated, accountLoading, accountError, retrySession, role } = usePlatform();
+  const location = useLocation();
+  if (accountLoading) return <div className="session-loading" role="status"><span className="session-spinner" /><b>Checking your session…</b></div>;
+  if (accountError) return <EmptyState title="Session temporarily unavailable" description={accountError} action={<button className="button primary" onClick={() => void retrySession()}>Retry session</button>} />;
+  if (!authenticated) return children;
+  return <Navigate to={intendedPath(location.state?.from, role === "Admin" ? "/admin" : "/home")} replace />;
+}
+
+function BuyerOnly({ children }) {
+  const { canPurchase, role } = usePlatform();
+  return canPurchase ? children : <Navigate to={role === "Admin" ? "/admin" : "/home"} replace />;
+}
+
+function TrainerOperational({ children }) {
+  const { trainerOperational } = usePlatform();
+  return trainerOperational ? children : <EmptyState icon={ShieldCheck} title="Trainer certification required" description="Your Trainer role is not operational until an administrator approves the certification prerequisite." action={<Link className="button primary" to="/role-application">View certification status</Link>} />;
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<AuthPage />} />
-      <Route path="/register" element={<AuthPage mode="register" />} />
+      <Route path="/login" element={<AnonymousOnly><AuthPage /></AnonymousOnly>} />
+      <Route path="/register" element={<AnonymousOnly><AuthPage mode="register" /></AnonymousOnly>} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
       <Route
         path="/home"
         element={
@@ -79,48 +129,48 @@ export default function App() {
       <Route
         path="/public-profile/:id"
         element={
-          <Workspace>
+          <MarketplaceShell>
             <PublicProfilePage />
-          </Workspace>
+          </MarketplaceShell>
         }
       />
       <Route
         path="/courses"
         element={
-          <Workspace>
+          <MarketplaceShell>
             <CourseMarketplacePage />
-          </Workspace>
+          </MarketplaceShell>
         }
       />
       <Route
         path="/courses/:id"
         element={
-          <Workspace>
+          <MarketplaceShell>
             <CourseDetailPage />
-          </Workspace>
+          </MarketplaceShell>
         }
       />
       <Route
         path="/contents"
         element={
-          <Workspace>
+          <MarketplaceShell>
             <ContentMarketplacePage />
-          </Workspace>
+          </MarketplaceShell>
         }
       />
       <Route
         path="/contents/:id"
         element={
-          <Workspace>
+          <MarketplaceShell>
             <ContentDetailPage />
-          </Workspace>
+          </MarketplaceShell>
         }
       />
       <Route
         path="/cart"
         element={
           <Workspace>
-            <CartPage />
+            <BuyerOnly><CartPage /></BuyerOnly>
           </Workspace>
         }
       />
@@ -128,7 +178,7 @@ export default function App() {
         path="/checkout-success"
         element={
           <Workspace>
-            <CheckoutSuccessPage />
+            <BuyerOnly><CheckoutSuccessPage /></BuyerOnly>
           </Workspace>
         }
       />
@@ -136,7 +186,7 @@ export default function App() {
         path="/checkout-success/:orderId"
         element={
           <Workspace>
-            <CheckoutSuccessPage />
+            <BuyerOnly><CheckoutSuccessPage /></BuyerOnly>
           </Workspace>
         }
       />
@@ -144,7 +194,7 @@ export default function App() {
         path="/orders"
         element={
           <Workspace>
-            <OrderHistoryPage />
+            <BuyerOnly><OrderHistoryPage /></BuyerOnly>
           </Workspace>
         }
       />
@@ -152,7 +202,7 @@ export default function App() {
         path="/purchases"
         element={
           <Workspace>
-            <PurchasesPage />
+            <BuyerOnly><PurchasesPage /></BuyerOnly>
           </Workspace>
         }
       />
@@ -160,7 +210,7 @@ export default function App() {
         path="/refund/:id"
         element={
           <Workspace>
-            <RefundPage />
+            <BuyerOnly><RefundPage /></BuyerOnly>
           </Workspace>
         }
       />
@@ -168,7 +218,7 @@ export default function App() {
         path="/role-application"
         element={
           <Workspace>
-            <RoleApplicationPage />
+            <BuyerOnly><RoleApplicationPage /></BuyerOnly>
           </Workspace>
         }
       />
@@ -177,7 +227,7 @@ export default function App() {
         element={
           <Workspace>
             <Protected roles={["Trainer"]}>
-              <CourseEditorPage />
+              <TrainerOperational><CourseEditorPage /></TrainerOperational>
             </Protected>
           </Workspace>
         }
@@ -206,7 +256,7 @@ export default function App() {
         path="/wallet"
         element={
           <Workspace>
-            <WalletPage />
+            <BuyerOnly><WalletPage /></BuyerOnly>
           </Workspace>
         }
       />
@@ -214,7 +264,7 @@ export default function App() {
         path="/transactions"
         element={
           <Workspace>
-            <TransactionHistoryPage />
+            <BuyerOnly><TransactionHistoryPage /></BuyerOnly>
           </Workspace>
         }
       />
@@ -278,8 +328,10 @@ export default function App() {
           </Workspace>
         }
       />
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/home" replace />} />
+      <Route path="/publishing-tools" element={<Workspace><Protected roles={["Trainer", "Creator"]}><PublishingAccess /></Protected></Workspace>} />
+      <Route path="/admin/operations" element={<Workspace><Protected roles={["Admin"]}><AdminOperationsPage /></Protected></Workspace>} />
+      <Route path="/" element={<Navigate to="/courses" replace />} />
+      <Route path="*" element={<Navigate to="/courses" replace />} />
     </Routes>
   );
 }
