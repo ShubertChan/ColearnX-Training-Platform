@@ -8,7 +8,8 @@ import pino from 'pino';
 import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
 import { query } from './db/database.js';
-import { errorHandler, notFound, ok } from './lib/http.js';
+import { ApiError, errorHandler, notFound, ok } from './lib/http.js';
+import { recordAccessDecision } from './security/access-log.js';
 import { authenticate, csrf, forgotPassword, login, logout, me, refresh, register, resendEmailVerification, requireRole, resetPassword, updateMe, verifyEmail } from './auth/auth.js';
 import { createCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
@@ -27,7 +28,12 @@ import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUpload
 const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'req.body.token', 'res.headers.set-cookie'] });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many authentication attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
 const verificationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many verification attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
-const mutationLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
+const mutationLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many requests.'), { status: 429, code: 'RATE_LIMITED' })) });
+// Password reset is the highest-value unauthenticated endpoint here and is
+// also an outbound email amplifier, so it gets its own budget rather than
+// sharing the general auth one. The per-account cooldown in auth.ts is the
+// other half: this bounds one source, that bounds one inbox.
+const passwordResetLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many password reset attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
 
 export function createApp() {
   const app = express();
@@ -43,7 +49,11 @@ export function createApp() {
   } }));
   app.use((req, res, next) => { res.locals.requestId ||= req.id || randomUUID(); res.locals.log = req.log; next(); });
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
-  app.use(cors({ origin(origin, callback) { if (!origin || origin === env.APP_ORIGIN) return callback(null, true); return callback(new Error('Origin not allowed by CORS.')); }, credentials: true, maxAge: 600 }));
+  // A rejected origin used to be a bare Error, which reached errorHandler's
+  // fallback branch and became a 500 plus an error-level log line -- letting
+  // any external party generate error-severity log volume for free. It is a
+  // client error, so it is typed as one.
+  app.use(cors({ origin(origin, callback) { if (!origin || origin === env.APP_ORIGIN) return callback(null, true); return callback(new ApiError(403, 'ORIGIN_NOT_ALLOWED', 'The request origin is not allowed.')); }, credentials: true, maxAge: 600 }));
 
   // This route deliberately precedes JSON parsing: Stripe signature verification needs the untouched body bytes.
   app.post('/api/v1/payments/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), stripeWebhook);
@@ -59,8 +69,8 @@ export function createApp() {
   const api = express.Router();
   api.get('/auth/csrf', csrf);
   api.post('/auth/register', authLimiter, register);
-  api.post('/auth/forgot-password', authLimiter, forgotPassword);
-  api.post('/auth/reset-password', authLimiter, resetPassword);
+  api.post('/auth/forgot-password', passwordResetLimiter, forgotPassword);
+  api.post('/auth/reset-password', passwordResetLimiter, resetPassword);
   api.post('/auth/verify-email', verificationLimiter, verifyEmail);
   api.post('/auth/resend-verification', verificationLimiter, resendEmailVerification);
   api.post('/auth/login', authLimiter, login);
@@ -141,6 +151,9 @@ export function createApp() {
   api.post('/admin/course-runs/:id/cancel', authenticate, requireRole('admin'), mutationLimiter, cancelLiveCourseRun);
   app.use('/api/v1', api);
   app.use(notFound);
+  // Observes 403/429 for the security ledger, then hands the error to the
+  // responder below. Ordering matters: errorHandler terminates the chain.
+  app.use(recordAccessDecision);
   app.use(errorHandler);
   return app;
 }
