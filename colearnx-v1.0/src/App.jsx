@@ -330,8 +330,8 @@ export default function App() {
       />
       <Route path="/publishing-tools" element={<Workspace><Protected roles={["Trainer", "Creator"]}><PublishingAccess /></Protected></Workspace>} />
       <Route path="/admin/operations" element={<Workspace><Protected roles={["Admin"]}><AdminOperationsPage /></Protected></Workspace>} />
-      <Route path="/" element={<Navigate to="/courses" replace />} />
-      <Route path="*" element={<Navigate to="/courses" replace />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
