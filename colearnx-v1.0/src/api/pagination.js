@@ -4,7 +4,7 @@ export async function listAllPages(path, filters = {}) {
   const items = [], seen = new Set(), cursors = new Set();
   let cursor;
   for (let page = 1; page <= 10000; page++) {
-    const response = await apiClient.get(path, { params: { ...filters, page, limit: 100, ...(cursor ? { cursor } : {}) } });
+    const response = await apiClient.get(path, { params: { ...filters, limit: 100, ...(cursor ? { cursor } : {}) } });
     const data = response.data.data;
     const batch = Array.isArray(data) ? data : data?.items;
     if (!Array.isArray(batch)) throw new Error("The list response is incomplete. Please retry.");

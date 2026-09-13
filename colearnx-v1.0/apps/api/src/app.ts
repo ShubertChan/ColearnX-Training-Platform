@@ -21,6 +21,9 @@ import { getPublicProfile, requestAccountDeletion, requestDataExport } from './a
 import { addCartItem, listCart, removeCartItem } from './cart/cart.js';
 import { adjustPoints, cancelLiveCourseRun, completeLiveCourseRun, createTopUpPackage, retireTopUpPackage, setRevenueSharePolicy } from './admin/operations.js';
 import { changeUserRole, deleteUser, getUser, listUsers, reinstateUser, suspendUser } from './admin/users.js';
+import { listAuditLogs } from './admin/audit-logs.js';
+import { activityReport } from './admin/activity-report.js';
+import { createReport, decideReport, listReports } from './reports/reports.js';
 import { completeUploadIntent, createContentDownloadUrl, createUploadIntent, deleteUploadIntent, listContentAssets, previewContentAsset } from './storage/content-assets.js';
 import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUploadIntent, deleteCourseUploadIntent, getCourseDelivery, listCourseAssets, recordCourseProgress } from './storage/course-delivery.js';
 
@@ -94,6 +97,7 @@ export function createApp() {
   api.post('/content', authenticate, mutationLimiter, createContent);
   api.post('/content/:id/submit', authenticate, mutationLimiter, submitContent);
   api.delete('/content/:id/draft', authenticate, mutationLimiter, deleteContentDraft);
+  api.post('/reports', authenticate, mutationLimiter, createReport);
   api.get('/content-versions/:contentVersionId/assets', authenticate, listContentAssets);
   api.post('/content-versions/:contentVersionId/upload-intents', authenticate, mutationLimiter, createUploadIntent);
   api.post('/content-versions/:contentVersionId/upload-intents/:assetId/complete', authenticate, mutationLimiter, completeUploadIntent);
@@ -147,6 +151,10 @@ export function createApp() {
   api.post('/admin/top-up-packages', authenticate, requireRole('admin'), mutationLimiter, createTopUpPackage);
   api.post('/admin/top-up-packages/:id/retire', authenticate, requireRole('admin'), mutationLimiter, retireTopUpPackage);
   api.post('/admin/points/adjustments', authenticate, requireRole('admin'), mutationLimiter, adjustPoints);
+  api.get('/admin/reports', authenticate, requireRole('admin'), listReports);
+  api.post('/admin/reports/:id/decision', authenticate, requireRole('admin'), mutationLimiter, decideReport);
+  api.get('/admin/audit-logs', authenticate, requireRole('admin'), listAuditLogs);
+  api.get('/admin/activity-report', authenticate, requireRole('admin'), activityReport);
   api.post('/admin/course-runs/:id/complete', authenticate, requireRole('admin'), mutationLimiter, completeLiveCourseRun);
   api.post('/admin/course-runs/:id/cancel', authenticate, requireRole('admin'), mutationLimiter, cancelLiveCourseRun);
   app.use('/api/v1', api);
