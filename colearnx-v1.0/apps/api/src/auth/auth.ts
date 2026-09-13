@@ -20,6 +20,7 @@ import { assertPasswordAcceptable } from './password-gate.js';
 import {
   createVerificationCode,
   hashVerificationCode,
+  requiresEmailVerification,
   verificationCodeLength,
   verificationCodeMatches,
   verificationWindow,
@@ -109,7 +110,7 @@ async function loadActor(userId: string): Promise<Actor | null> {
 }
 
 function actorNeedsEmailVerification(actor: Actor) {
-  return Boolean(actor.emailVerificationRequiredAt && !actor.emailVerifiedAt);
+  return requiresEmailVerification(actor.emailVerificationRequiredAt, actor.emailVerifiedAt);
 }
 
 function authCookieBaseOptions() {
@@ -421,17 +422,19 @@ export async function forgotPassword(req: Request, res: Response) {
   const fingerprint = securityContext(req, res);
   const token = createOpaqueToken();
   const outcome = await withTransaction(async (client) => {
-    const user = await client.query<{ user_id: string; email: string; email_verified_at: Date | null }>(`SELECT user_id, email::text AS email, email_verified_at FROM users
+    const user = await client.query<{
+      user_id: string; email: string; email_verified_at: Date | null; email_verification_required_at: Date | null;
+    }>(`SELECT user_id, email::text AS email, email_verified_at, email_verification_required_at FROM users
       WHERE lower(email::text) = lower($1) AND account_status = 'active' FOR UPDATE`, [input.email]);
     if (!user.rowCount) return { status: 'no_account' as const };
     const account = user.rows[0];
 
-    // An address whose control was never proven must not receive a reset link:
-    // whoever registered it first would otherwise keep a foothold on someone
-    // else's address. Such accounts belong on the verification resend path,
-    // and sign-in would reject them afterwards anyway, so issuing a link here
-    // only produces a dead end the user cannot diagnose.
-    if (!account.email_verified_at) return { status: 'unverified' as const, userId: account.user_id };
+    // Pending registrations must finish verification first. Legacy accounts
+    // grandfathered by migration 004 can still sign in and must retain their
+    // existing recovery path; they cannot enter the verification resend flow.
+    if (requiresEmailVerification(account.email_verification_required_at, account.email_verified_at)) {
+      return { status: 'unverified' as const, userId: account.user_id };
+    }
 
     // Per-account cooldown. The per-IP limiter in app.ts bounds one source;
     // without this, one source within its budget can still send a link to many
@@ -450,8 +453,8 @@ export async function forgotPassword(req: Request, res: Response) {
     await client.query(`INSERT INTO password_reset_challenges (user_id, token_hash, expires_at, requested_ip_hash)
       VALUES ($1, $2, $3, $4)`, [account.user_id, sha256(token), expiresAt, fingerprint.ipHash]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
-      VALUES ($1, 'auth.password_reset_requested', 'users', $1, jsonb_build_object('outcome', 'pending'), $2)`,
-    [account.user_id, res.locals.requestId]);
+      VALUES ($1, 'auth.password_reset_requested', 'users', $2, jsonb_build_object('outcome', 'pending'), $3)`,
+    [account.user_id, account.user_id, res.locals.requestId]);
     return { status: 'issued' as const, userId: account.user_id, email: account.email };
   });
 
@@ -538,8 +541,8 @@ export async function resetPassword(req: Request, res: Response) {
       WHERE user_id = $1`, [subject.user_id]);
 
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
-      VALUES ($1, 'auth.password_reset_completed', 'users', $1, jsonb_build_object('outcome', 'success', 'sessionsRevoked', $3::int), $2)`,
-    [subject.user_id, res.locals.requestId, sessions.rowCount ?? 0]);
+      VALUES ($1, 'auth.password_reset_completed', 'users', $2, jsonb_build_object('outcome', 'success', 'sessionsRevoked', $4::int), $3)`,
+    [subject.user_id, subject.user_id, res.locals.requestId, sessions.rowCount ?? 0]);
     return sessions.rowCount ?? 0;
   });
 

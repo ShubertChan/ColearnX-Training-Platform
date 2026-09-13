@@ -7,7 +7,7 @@
  * calls are used. Test rows/databases are left in the disposable container.
  */
 import assert from 'node:assert/strict';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +32,9 @@ const owner = new Pool({ connectionString: ownerUrl.href, max: 2 });
 let apiPool;
 let freshPool;
 let checks = 0;
+let blockedHttpCalls = 0;
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async () => { blockedHttpCalls += 1; throw new Error('External HTTP is prohibited in release integration checks.'); };
 function passed(message) { checks += 1; process.stdout.write(`PASS ${message}\n`); }
 function quoteIdentifier(value) { return `"${value.replaceAll('"', '""')}"`; }
 
@@ -47,13 +50,20 @@ function testEnvironment(databaseUrl) {
     DATABASE_URL: databaseUrl,
     MIGRATION_DATABASE_URL: databaseUrl,
     DATABASE_SSL: 'false',
-    DB_POOL_MAX: '2',
+    DB_POOL_MAX: '10',
     DOTENV_CONFIG_PATH: join(apiRoot, 'scripts', '__release_check_no_dotenv__'),
     APP_ORIGIN: 'http://localhost:5173',
     API_ORIGIN: 'http://localhost:3001',
     ACCESS_TOKEN_SECRET: randomBytes(32).toString('hex'),
     REFRESH_TOKEN_SECRET: randomBytes(32).toString('hex'),
     CSRF_SECRET: randomBytes(32).toString('hex'),
+    SECURITY_HASH_PEPPER: randomBytes(32).toString('hex'),
+    SECURITY_ALERT_WEBHOOK_URL: '',
+    SECURITY_EVENT_RETENTION_DAYS: '180',
+    PWNED_PASSWORDS_ENABLED: 'false',
+    PWNED_PASSWORDS_API_BASE: 'http://127.0.0.1:1',
+    PASSWORD_RESET_COOLDOWN_SECONDS: '60',
+    REDIS_URL: '',
     EMAIL_PROVIDER: 'disabled',
     OBJECT_STORAGE_PROVIDER: 'disabled',
     STRIPE_MODE: 'test',
@@ -63,18 +73,23 @@ function testEnvironment(databaseUrl) {
   };
 }
 
-async function migrate(databaseUrl) {
-  const output = await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--import', 'tsx', 'src/db/migrate.ts'], {
-      cwd: apiRoot, env: testEnvironment(databaseUrl), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+async function ownerCommand(script, databaseUrl, extraEnvironment = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['--import', 'tsx', script], {
+      cwd: apiRoot, env: { ...testEnvironment(databaseUrl), ...extraEnvironment }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
     });
     let stdout = ''; let stderr = '';
     child.stdout.on('data', (value) => { stdout += value; });
     child.stderr.on('data', (value) => { stderr += value; });
     child.on('error', reject);
-    child.on('close', (code) => code === 0 ? resolve(stdout) : reject(new Error(`Migration failed (${code}): ${stderr}`)));
+    child.on('close', (code) => resolve({ code, stdout: stdout.trim(), stderr: stderr.trim() }));
   });
-  return output.trim().split('\n').map((line) => line.trim()).filter(Boolean);
+}
+
+async function migrate(databaseUrl) {
+  const output = await ownerCommand('src/db/migrate.ts', databaseUrl);
+  assert.equal(output.code, 0, `Migration failed: ${output.stderr}`);
+  return output.stdout.split('\n').map((line) => line.trim()).filter(Boolean);
 }
 
 async function snapshotOldTables(client) {
@@ -106,10 +121,14 @@ try {
   await owner.query(`CREATE TABLE schema_migrations (filename text PRIMARY KEY, checksum text NOT NULL,
     applied_at timestamptz NOT NULL DEFAULT now())`);
   const migrationFiles = (await readdir(migrationDirectory)).filter((file) => file.endsWith('.sql')).sort();
-  assert.deepEqual(migrationFiles.map((file) => file.slice(0, 3)), ['001', '002', '003', '004', '005', '006', '007', '008']);
+  assert.deepEqual(migrationFiles.map((file) => file.slice(0, 3)),
+    Array.from({ length: migrationFiles.length }, (_, index) => String(index + 1).padStart(3, '0')));
+  // Keep the pre-008 cart fixture so forward upgrades retain legacy prices.
+  const baselineCount = 7;
+  assert.ok(migrationFiles.length >= 10, 'Security-release migrations 009 and 010 must be present.');
   const connection = await owner.connect();
   try {
-    for (const filename of migrationFiles.slice(0, 7)) {
+    for (const filename of migrationFiles.slice(0, baselineCount)) {
       const sql = await readFile(join(migrationDirectory, filename), 'utf8');
       await connection.query('BEGIN');
       try {
@@ -145,16 +164,17 @@ try {
     VALUES ($1, $2, 'content_version', $3, 125)`, [oldCartItemId, cartId, versionId]);
   const oldSnapshot = await snapshotOldTables(owner);
   const ledgerBefore = await owner.query('SELECT * FROM schema_migrations ORDER BY filename');
-  assert.deepEqual(await migrate(ownerUrl.href), ['Applied 008_frontend_delivery_backend.sql']);
+  assert.deepEqual(await migrate(ownerUrl.href), migrationFiles.slice(baselineCount).map((file) => `Applied ${file}`));
   for (const snapshot of oldSnapshot) {
     if (snapshot.sql.includes('"schema_migrations"')) continue;
     const rows = await owner.query(snapshot.sql);
     assert.deepEqual(rows.rows.map((row) => JSON.stringify(row)).sort(), snapshot.rows, `Existing rows changed: ${snapshot.sql}`);
   }
   const ledgerAfter = await owner.query('SELECT * FROM schema_migrations ORDER BY filename');
-  assert.equal(ledgerAfter.rowCount, 8);
-  assert.deepEqual(ledgerAfter.rows.slice(0, 7), ledgerBefore.rows);
-  passed('008 through the real migration runner preserved all pre-existing table rows and old migration records');
+  assert.equal(ledgerAfter.rowCount, migrationFiles.length);
+  assert.deepEqual(ledgerAfter.rows.slice(0, baselineCount), ledgerBefore.rows);
+  assert.equal((await owner.query('SELECT count(*)::int AS count FROM users WHERE password_changed_at IS NOT NULL')).rows[0].count, 0);
+  passed('all forward migrations through the real runner preserve existing rows and migration records; legacy passwords remain grandfathered');
   assert.deepEqual(await migrate(ownerUrl.href), []);
   assert.deepEqual((await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows, ledgerAfter.rows);
   passed('second migration invocation is a no-op, including applied timestamps/checksums');
@@ -164,8 +184,8 @@ try {
   const freshUrl = new URL(ownerUrl.href); freshUrl.pathname = `/${freshName}`;
   assert.deepEqual(await migrate(freshUrl.href), migrationFiles.map((file) => `Applied ${file}`));
   freshPool = new Pool({ connectionString: freshUrl.href, max: 1 });
-  assert.equal((await freshPool.query('SELECT count(*)::int AS count FROM schema_migrations')).rows[0].count, 8);
-  passed('complete 001–008 fresh installation through the real migration runner');
+  assert.equal((await freshPool.query('SELECT count(*)::int AS count FROM schema_migrations')).rows[0].count, migrationFiles.length);
+  passed(`complete fresh installation through all ${migrationFiles.length} migrations using the real runner`);
 
   // A dedicated pool defaults every connection to SET ROLE colearnx_app. The
   // SQL checks therefore exercise the real runtime role's object privileges.
@@ -173,7 +193,7 @@ try {
   runtimeUrl.searchParams.set('options', '-c role=colearnx_app');
   const environment = testEnvironment(runtimeUrl.href);
   for (const key of Object.keys(process.env)) {
-    if (/^(DATABASE_|MIGRATION_|STRIPE_|R2_|RESEND_|EMAIL_|OBJECT_STORAGE_|ENABLE_|COOKIE_|APP_ORIGIN|API_ORIGIN|NODE_ENV|DOTENV_|.*_TOKEN_SECRET|CSRF_SECRET|LOG_LEVEL)/.test(key)) delete process.env[key];
+    if (/^(DATABASE_|MIGRATION_|STRIPE_|R2_|RESEND_|EMAIL_|OBJECT_STORAGE_|ENABLE_|COOKIE_|SECURITY_|PWNED_|PASSWORD_|LOGIN_|REDIS_|APP_ORIGIN|API_ORIGIN|NODE_ENV|DOTENV_|.*_TOKEN_SECRET|CSRF_SECRET|LOG_LEVEL)/.test(key)) delete process.env[key];
   }
   Object.assign(process.env, environment);
   const database = await import('../src/db/database.ts'); apiPool = database.pool;
@@ -187,8 +207,134 @@ try {
   }
   passed('colearnx_app can access new operational tables but cannot create schema objects/read migration ledger/mutate immutable ledgers');
 
+  await apiPool.query("INSERT INTO security_events (event_type, severity, actor_user_id) VALUES ('auth.login_failed', 1, $1)", [buyerId]);
+  await apiPool.query('SELECT * FROM security_events LIMIT 1');
+  for (const sql of ['UPDATE security_events SET severity = severity', 'DELETE FROM security_events', 'TRUNCATE security_events']) {
+    await assert.rejects(apiPool.query(sql), (error) => error.code === '42501');
+  }
+  await apiPool.query('INSERT INTO auth_failure_counters (user_id) VALUES ($1)', [buyerId]);
+  await apiPool.query('UPDATE auth_failure_counters SET consecutive_failures = 1 WHERE user_id = $1', [buyerId]);
+  await apiPool.query('SELECT * FROM auth_failure_counters WHERE user_id = $1', [buyerId]);
+  await apiPool.query('DELETE FROM auth_failure_counters WHERE user_id = $1', [buyerId]);
+  await apiPool.query('UPDATE users SET password_changed_at = now() WHERE user_id = $1', [buyerId]);
+  for (const role of ['colearnx_readonly', 'colearnx_migrator']) {
+    const roleUrl = new URL(ownerUrl.href); roleUrl.searchParams.set('options', `-c role=${role}`);
+    const rolePool = new Pool({ connectionString: roleUrl.href, max: 1 });
+    try {
+      for (const table of ['security_events', 'auth_failure_counters']) {
+        await assert.rejects(rolePool.query(`SELECT * FROM ${table}`), (error) => error.code === '42501');
+      }
+    } finally { await rolePool.end(); }
+  }
+  passed('009/010 runtime telemetry is append-only, counter CRUD/password timestamp updates work, and legacy roles cannot read security data');
+
+  const { registerFailure, clearFailures } = await import('../src/auth/lockout.ts');
+  const connectNormally = apiPool.connect.bind(apiPool);
+  let emptyReads = 0; let releaseEmptyReads;
+  const emptyReadBarrier = new Promise((resolve) => { releaseEmptyReads = resolve; });
+  // Only synchronize absent-row reads. The previous implementation reaches
+  // this barrier five times and loses four increments; the fixed initializer
+  // always reads an existing locked row, so it needs no artificial scheduling.
+  apiPool.connect = async (...args) => {
+    const client = await connectNormally(...args);
+    const queryNormally = client.query; const releaseNormally = client.release;
+    client.query = async (...queryArgs) => {
+      const result = await queryNormally.apply(client, queryArgs);
+      if (typeof queryArgs[0] === 'string' && /FROM auth_failure_counters WHERE user_id = \$1 FOR UPDATE/.test(queryArgs[0]) && result.rowCount === 0) {
+        emptyReads += 1; if (emptyReads === 5) releaseEmptyReads();
+        await emptyReadBarrier;
+      }
+      return result;
+    };
+    client.release = (...args) => {
+      client.query = queryNormally; client.release = releaseNormally;
+      return releaseNormally.apply(client, args);
+    };
+    return client;
+  };
+  let concurrentFailures;
+  try { concurrentFailures = await Promise.all(Array.from({ length: 5 }, () => registerFailure(buyerId, 43200))); }
+  finally { releaseEmptyReads(); apiPool.connect = connectNormally; }
+  assert.deepEqual(concurrentFailures.map((result) => result.consecutiveFailures).sort((a, b) => a - b), [1, 2, 3, 4, 5]);
+  const lockedCounter = (await owner.query('SELECT consecutive_failures, locked_until, lockout_count FROM auth_failure_counters WHERE user_id = $1', [buyerId])).rows[0];
+  assert.equal(lockedCounter.consecutive_failures, 5); assert.equal(lockedCounter.lockout_count, 1);
+  assert.ok(lockedCounter.locked_until > new Date());
+  await clearFailures(buyerId);
+  const clearedCounter = (await owner.query('SELECT consecutive_failures, locked_until, lockout_count FROM auth_failure_counters WHERE user_id = $1', [buyerId])).rows[0];
+  assert.deepEqual(clearedCounter, { consecutive_failures: 0, locked_until: null, lockout_count: 1 });
+  await owner.query("UPDATE auth_failure_counters SET consecutive_failures = 4, last_failure_at = now() - interval '13 hours' WHERE user_id = $1", [buyerId]);
+  assert.equal((await registerFailure(buyerId, 43200)).consecutiveFailures, 1);
+  passed('five concurrent first failures are counted exactly once each and trigger one lock; clearing/decay preserve lifetime history');
+
   const { createApp } = await import('../src/app.ts');
   const app = createApp();
+
+  const resetSubjects = [
+    { label: 'legacy', id: randomUUID(), verified: false, required: false, status: 'active', issued: true },
+    { label: 'verified', id: randomUUID(), verified: true, required: true, status: 'active', issued: true },
+    { label: 'pending', id: randomUUID(), verified: false, required: true, status: 'active', issued: false },
+    { label: 'suspended', id: randomUUID(), verified: true, required: true, status: 'suspended', issued: false },
+  ];
+  const resetResponses = [];
+  for (const [index, subject] of resetSubjects.entries()) {
+    await owner.query(`INSERT INTO users (user_id, full_name, email, password_hash, email_verified_at, email_verification_required_at, account_status)
+      VALUES ($1, $2, $3, 'fixture-not-a-login-hash', CASE WHEN $4 THEN now() END, CASE WHEN $5 THEN now() END, $6)`,
+    [subject.id, subject.label, `${subject.label}@example.test`, subject.verified, subject.required, subject.status]);
+    const response = await request(app).post('/api/v1/auth/forgot-password').set('X-Forwarded-For', `192.0.2.${index + 1}`)
+      .send({ email: `${subject.label}@example.test` }).expect(202);
+    resetResponses.push(response.body.data);
+    const challenges = await owner.query('SELECT consumed_at FROM password_reset_challenges WHERE user_id = $1', [subject.id]);
+    assert.equal(challenges.rowCount, subject.issued ? 1 : 0, `Reset eligibility changed for ${subject.label}`);
+    // Disabled mail deliberately fails delivery without HTTP; the issued
+    // challenge must be consumed, while its row proves the recovery branch ran.
+    if (subject.issued) assert.ok(challenges.rows[0].consumed_at);
+  }
+  resetResponses.push((await request(app).post('/api/v1/auth/forgot-password').set('X-Forwarded-For', '192.0.2.10')
+    .send({ email: 'unknown@example.test' }).expect(202)).body.data);
+  resetResponses.push((await request(app).post('/api/v1/auth/forgot-password').set('X-Forwarded-For', '192.0.2.11')
+    .send({ email: 'legacy@example.test' }).expect(202)).body.data);
+  assert.ok(resetResponses.every((body) => JSON.stringify(body) === JSON.stringify({ accepted: true })));
+  assert.equal((await owner.query('SELECT count(*)::int AS count FROM password_reset_challenges WHERE user_id = $1', [resetSubjects[0].id])).rows[0].count, 1);
+  assert.equal((await owner.query("SELECT count(*)::int AS count FROM security_events WHERE actor_user_id = $1 AND event_type = 'auth.reset_throttled'", [resetSubjects[0].id])).rows[0].count, 1);
+  passed('real forgot-password HTTP permits legacy/verified recovery, excludes pending/inactive/unknown accounts, preserves cooldown and generic 202, and performs no email request');
+
+  const recoveringUserId = resetSubjects[0].id;
+  const resetToken = randomBytes(32).toString('hex');
+  const resetTokenHash = createHash('sha256').update(resetToken).digest('hex');
+  const newPassword = 'Copper-lanterns-drift-beyond-velvet-947!';
+  await owner.query(`INSERT INTO password_reset_challenges (user_id, token_hash, expires_at)
+    VALUES ($1, $2, now() + interval '30 minutes')`, [recoveringUserId, resetTokenHash]);
+  const activeSessionId = randomUUID(); const priorSessionId = randomUUID();
+  await owner.query(`INSERT INTO refresh_sessions (session_id, user_id, token_hash, expires_at, revoked_at, revoke_reason)
+    VALUES ($1, $2, $3, now() + interval '1 day', NULL, NULL),
+      ($4, $2, $5, now() + interval '1 day', now(), 'fixture-prior-revocation')`,
+  [activeSessionId, recoveringUserId, randomBytes(32).toString('hex'), priorSessionId, randomBytes(32).toString('hex')]);
+  await owner.query(`INSERT INTO auth_failure_counters (user_id, consecutive_failures, locked_until, lockout_count)
+    VALUES ($1, 5, now() + interval '1 minute', 3)`, [recoveringUserId]);
+  const weakReset = await request(app).post('/api/v1/auth/reset-password').set('X-Forwarded-For', '192.0.2.20')
+    .send({ token: resetToken, password: 'short', passwordConfirmation: 'short' }).expect(400);
+  assert.equal(weakReset.body.error.code, 'PASSWORD_TOO_SHORT');
+  assert.equal((await owner.query('SELECT consumed_at FROM password_reset_challenges WHERE token_hash = $1', [resetTokenHash])).rows[0].consumed_at, null);
+  const resetResponse = await request(app).post('/api/v1/auth/reset-password').set('X-Forwarded-For', '192.0.2.20')
+    .send({ token: resetToken, password: newPassword, passwordConfirmation: newPassword }).expect(200);
+  assert.deepEqual(resetResponse.body.data, { reset: true, signInRequired: true });
+  const recoveredUser = (await owner.query('SELECT password_hash, password_changed_at FROM users WHERE user_id = $1', [recoveringUserId])).rows[0];
+  const argon2 = (await import('argon2')).default;
+  assert.ok(await argon2.verify(recoveredUser.password_hash, newPassword));
+  assert.ok(recoveredUser.password_changed_at);
+  assert.ok((await owner.query('SELECT consumed_at FROM password_reset_challenges WHERE token_hash = $1', [resetTokenHash])).rows[0].consumed_at);
+  const activeSessionAfter = (await owner.query('SELECT revoked_at, revoke_reason FROM refresh_sessions WHERE session_id = $1', [activeSessionId])).rows[0];
+  assert.ok(activeSessionAfter.revoked_at); assert.equal(activeSessionAfter.revoke_reason, 'password-reset');
+  assert.equal((await owner.query('SELECT revoke_reason FROM refresh_sessions WHERE session_id = $1', [priorSessionId])).rows[0].revoke_reason, 'fixture-prior-revocation');
+  assert.deepEqual((await owner.query('SELECT consecutive_failures, locked_until, lockout_count FROM auth_failure_counters WHERE user_id = $1', [recoveringUserId])).rows[0],
+    { consecutive_failures: 0, locked_until: null, lockout_count: 3 });
+  const resetAudit = (await owner.query(`SELECT actor_user_id, target_record_id, details_json FROM admin_action_logs
+    WHERE actor_user_id = $1 AND action_type = 'auth.password_reset_completed'`, [recoveringUserId])).rows;
+  assert.deepEqual(resetAudit, [{ actor_user_id: recoveringUserId, target_record_id: recoveringUserId, details_json: { outcome: 'success', sessionsRevoked: 1 } }]);
+  const reusedReset = await request(app).post('/api/v1/auth/reset-password').set('X-Forwarded-For', '192.0.2.20')
+    .send({ token: resetToken, password: newPassword, passwordConfirmation: newPassword }).expect(400);
+  assert.equal(reusedReset.body.error.code, 'PASSWORD_RESET_TOKEN_INVALID');
+  passed('real password reset preserves weak-attempt token, rotates Argon2 hash/timestamp, revokes only active sessions, clears lock counters, writes audit, and rejects token reuse');
   const accessToken = (id) => jwt.sign({ sub: id }, environment.ACCESS_TOKEN_SECRET, { expiresIn: '5m' });
   const buyerToken = accessToken(buyerId);
   await request(app).get('/health/ready').expect(200);
@@ -345,7 +491,71 @@ try {
     assert.equal(stored.rows[0].asset_status, expectedStatus);
   }
   passed('real runtime cleanup SQL for both asset tables; no network; archived files/tombstones removed, failed delete retryable, published ready/primary-reference/active-draft/unexpired files preserved');
+
+  const { runSecurityRetention } = await import('../src/security/retention-sweep.ts');
+  const oldSecurityId = randomUUID(); const recentSecurityId = randomUUID();
+  await owner.query(`INSERT INTO security_events (security_event_id, event_type, severity, occurred_at)
+    VALUES ($1, 'auth.login_failed', 1, now() - interval '181 days'), ($2, 'auth.login_failed', 1, now())`,
+  [oldSecurityId, recentSecurityId]);
+  const retentionCases = [
+    { label: 'old-consumed', requestedDaysAgo: 40, expiresDaysFromNow: -39, consumed: true, keep: false },
+    { label: 'old-expired', requestedDaysAgo: 40, expiresDaysFromNow: -39, consumed: false, keep: false },
+    { label: 'old-active', requestedDaysAgo: 40, expiresDaysFromNow: 1, consumed: false, keep: true },
+    { label: 'recent-consumed', requestedDaysAgo: 10, expiresDaysFromNow: -9, consumed: true, keep: true },
+    { label: 'recent-expired', requestedDaysAgo: 10, expiresDaysFromNow: -9, consumed: false, keep: true },
+  ];
+  for (const row of retentionCases) {
+    row.userId = randomUUID(); row.id = randomUUID();
+    await owner.query(`INSERT INTO users (user_id, full_name, email, password_hash)
+      VALUES ($1, $2, $3, 'fixture-not-a-login-hash')`, [row.userId, row.label, `${row.label}@example.test`]);
+    await owner.query(`INSERT INTO password_reset_challenges
+      (password_reset_challenge_id, user_id, token_hash, requested_at, expires_at, consumed_at)
+      VALUES ($1, $2, $3, now() - ($4 * interval '1 day'), now() + ($5 * interval '1 day'), CASE WHEN $6 THEN now() END)`,
+    [row.id, row.userId, randomBytes(32).toString('hex'), row.requestedDaysAgo, row.expiresDaysFromNow, row.consumed]);
+  }
+  await assert.rejects(runSecurityRetention(apiPool), (error) => error.code === '42501');
+  assert.equal((await owner.query('SELECT 1 FROM security_events WHERE security_event_id = $1', [oldSecurityId])).rowCount, 1);
+  assert.deepEqual(await runSecurityRetention(owner), { eventsRemoved: 1, tokensRemoved: 2 });
+  assert.equal((await owner.query('SELECT 1 FROM security_events WHERE security_event_id = $1', [oldSecurityId])).rowCount, 0);
+  assert.equal((await owner.query('SELECT 1 FROM security_events WHERE security_event_id = $1', [recentSecurityId])).rowCount, 1);
+  for (const row of retentionCases) {
+    assert.equal((await owner.query('SELECT 1 FROM password_reset_challenges WHERE password_reset_challenge_id = $1', [row.id])).rowCount,
+      row.keep ? 1 : 0, row.label);
+  }
+  assert.deepEqual(await runSecurityRetention(owner), { eventsRemoved: 0, tokensRemoved: 0 });
+  passed('owner retention cleans only old security events and old consumed/expired reset challenges; active/recent records survive and runtime deletion is denied');
+
+  const rollbackEventId = randomUUID();
+  await owner.query(`INSERT INTO security_events (security_event_id, event_type, severity, occurred_at)
+    VALUES ($1, 'auth.login_failed', 1, now() - interval '181 days')`, [rollbackEventId]);
+  const resetRowsBeforeFailure = (await owner.query('SELECT * FROM password_reset_challenges ORDER BY password_reset_challenge_id')).rows;
+  const failingOwner = {
+    async connect() {
+      const client = await owner.connect();
+      return {
+        async query(sql, values) {
+          // Real PostgreSQL permission failure at deletion two. SET LOCAL is
+          // scoped to this transaction and is restored automatically by rollback.
+          if (sql.includes('DELETE FROM password_reset_challenges')) await client.query('SET LOCAL ROLE colearnx_readonly');
+          return client.query(sql, values);
+        },
+        release() { client.release(); },
+      };
+    },
+  };
+  await assert.rejects(runSecurityRetention(failingOwner), (error) => error.code === '42501');
+  assert.equal((await owner.query('SELECT 1 FROM security_events WHERE security_event_id = $1', [rollbackEventId])).rowCount, 1);
+  assert.deepEqual((await owner.query('SELECT * FROM password_reset_challenges ORDER BY password_reset_challenge_id')).rows, resetRowsBeforeFailure);
+  const invalidRetention = await ownerCommand('src/security/retention.ts', ownerUrl.href, { SECURITY_EVENT_RETENTION_DAYS: '30junk' });
+  assert.equal(invalidRetention.code, 1); assert.match(invalidRetention.stderr, /integer between 30 and 730/);
+  assert.equal((await owner.query('SELECT 1 FROM security_events WHERE security_event_id = $1', [rollbackEventId])).rowCount, 1);
+  const retentionCommand = await ownerCommand('src/security/retention.ts', ownerUrl.href);
+  assert.equal(retentionCommand.code, 0, retentionCommand.stderr);
+  assert.match(retentionCommand.stdout, /removed 1 security events older than 180 days, 0 closed reset tokens/);
+  passed('real second-delete failure rolls back the first deletion; CLI rejects malformed days before deletion and succeeds with the corrected schema');
+  assert.equal(blockedHttpCalls, 0, 'No email, HIBP, alert, payment, or storage HTTP request may be attempted.');
   process.stdout.write(`SUCCESS ${checks} integration check groups passed; test-only data retained in disposable local PostgreSQL cluster.\n`);
 } finally {
+  globalThis.fetch = originalFetch;
   await Promise.all([owner.end(), freshPool?.end(), apiPool?.end()]);
 }

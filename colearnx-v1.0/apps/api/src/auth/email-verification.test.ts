@@ -3,10 +3,25 @@ import test from 'node:test';
 import {
   createVerificationCode,
   hashVerificationCode,
+  requiresEmailVerification,
   verificationCodeLength,
   verificationCodeMatches,
   verificationWindow,
 } from './email-verification.js';
+
+test('legacy accounts retain sign-in and recovery eligibility without verification timestamps', () => {
+  assert.equal(requiresEmailVerification(null, null), false);
+});
+
+test('pending registrations must verify before sign-in or password recovery', () => {
+  assert.equal(requiresEmailVerification(new Date('2026-09-01T00:00:00Z'), null), true);
+});
+
+test('verified accounts can sign in and recover their passwords', () => {
+  const verifiedAt = new Date('2026-09-01T00:01:00Z');
+  assert.equal(requiresEmailVerification(new Date('2026-09-01T00:00:00Z'), verifiedAt), false);
+  assert.equal(requiresEmailVerification(null, verifiedAt), false);
+});
 
 test('verification codes are fixed-length numeric values', () => {
   for (let index = 0; index < 25; index += 1) {
