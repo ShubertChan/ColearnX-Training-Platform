@@ -5,6 +5,7 @@ import type { Actor } from '../auth/auth.js';
 import { env } from '../config/env.js';
 import { query, withTransaction } from '../db/database.js';
 import { sha256 } from '../lib/crypto.js';
+import { completeIdempotency, reserveIdempotency } from '../lib/idempotency.js';
 import { ApiError, ok } from '../lib/http.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 import { loadSystemPointAccount, postPointTransaction } from '../points/ledger.js';
@@ -106,19 +107,16 @@ export async function adjustPoints(req: Request, res: Response) {
   const admin = res.locals.actor as Actor;
   const input = parse(adjustmentInput, req.body);
   const key = parse(idempotencyKey, req.get('idempotency-key'));
-  const fingerprint = sha256(JSON.stringify(input));
+  const request = { actorUserId: admin.id, operationScope: 'admin.points.adjustment', key, fingerprint: sha256(JSON.stringify(input)) };
   const response = await withTransaction(async (client) => {
-    const existing = await client.query<{ request_fingerprint: string; response_body: { pointTransactionId: string; deltaPoints: number } | null }>(`SELECT request_fingerprint, response_body
-      FROM idempotency_records WHERE actor_user_id = $1 AND operation_scope = 'admin.points.adjustment' AND idempotency_key = $2 FOR UPDATE`, [admin.id, key]);
-    if (existing.rowCount) {
-      if (existing.rows[0].request_fingerprint !== fingerprint) throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was used for a different adjustment.');
-      if (existing.rows[0].response_body) return existing.rows[0].response_body;
-      throw new ApiError(409, 'REQUEST_IN_PROGRESS', 'The matching adjustment is still processing.');
-    }
-    await client.query(`INSERT INTO idempotency_records (actor_user_id, operation_scope, idempotency_key, request_fingerprint)
-      VALUES ($1, 'admin.points.adjustment', $2, $3)`, [admin.id, key, fingerprint]);
-    const recipient = await client.query<{ point_account_id: string }>(`SELECT point_account_id FROM point_accounts
-      WHERE user_id = $1 AND account_status IN ('active', 'restricted')`, [input.userId]);
+    const replay = await reserveIdempotency<{ pointTransactionId: string; userId: string; deltaPoints: number }>(client, request);
+    if (replay) return replay;
+    const recipient = await client.query<{ point_account_id: string }>(`SELECT pa.point_account_id FROM point_accounts pa
+      JOIN users u ON u.user_id = pa.user_id
+      WHERE pa.user_id = $1 AND pa.account_status IN ('active', 'restricted') AND u.account_status = 'active'
+        AND u.user_id <> $2
+        AND NOT EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.role_id = ur.role_id
+          WHERE ur.user_id = u.user_id AND ur.revoked_at IS NULL AND r.role_code = 'admin')`, [input.userId, admin.id]);
     if (!recipient.rowCount) throw new ApiError(404, 'POINT_ACCOUNT_NOT_FOUND', 'Recipient point account was not found.');
     const system = await loadSystemPointAccount(client);
     const delta = input.deltaPoints;
@@ -130,13 +128,11 @@ export async function adjustPoints(req: Request, res: Response) {
       ],
     });
     const body = { pointTransactionId, userId: input.userId, deltaPoints: delta };
-    await client.query(`UPDATE idempotency_records SET response_status = 201, response_body = $4::jsonb, completed_at = now()
-      WHERE actor_user_id = $1 AND operation_scope = 'admin.points.adjustment' AND idempotency_key = $2 AND request_fingerprint = $3`,
-      [admin.id, key, fingerprint, JSON.stringify(body)]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
       VALUES ($1, 'points.adjust', 'point_transactions', $2,
       jsonb_build_object('recipientUserId', $3::uuid, 'deltaPoints', $4::bigint, 'reason', $5::text, 'outcome', 'success'), $6)`,
       [admin.id, pointTransactionId, input.userId, delta, input.reason, res.locals.requestId]);
+    await completeIdempotency(client, request, 201, body);
     return body;
   });
   return ok(res, response, 201);

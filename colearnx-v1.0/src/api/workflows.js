@@ -17,12 +17,12 @@ export const cancelCourse = (id, reason) => apiClient.post(`${itemPath("course",
 export const validateCourseResources = (id, contentVersionIds) => apiClient.post(`${itemPath("course", id)}/resources/validate`, { contentVersionIds }).then(unwrap);
 export const saveCourseResources = (id, contentVersionIds, validationId) => apiClient.put(`${itemPath("course", id)}/resources`, { contentVersionIds, validationId }, writeOptions()).then(unwrap);
 export const getPublishingAnalytics = (kind, filters) => apiClient.get("/my/analytics", { params: { kind, ...filters } }).then(unwrap);
-export const submitReport = (input) => apiClient.post("/reports", input, writeOptions()).then(unwrap);
+export const submitReport = (input, requestKey) => apiClient.post("/reports", input, writeOptions(requestKey)).then(unwrap);
 export const listReports = (filters) => listAllPages("/admin/reports", filters);
-export const decideReport = (id, input) => apiClient.post(`/admin/reports/${encodeURIComponent(id)}/decision`, input, writeOptions()).then(unwrap);
+export const decideReport = (id, input, requestKey) => apiClient.post(`/admin/reports/${encodeURIComponent(id)}/decision`, input, writeOptions(requestKey)).then(unwrap);
 export const listAuditLogs = (filters) => listAllPages("/admin/audit-logs", filters);
 export const getActivityReport = (filters) => apiClient.get("/admin/activity-report", { params: filters }).then(unwrap);
-export const adjustPoints = (input, requestKey) => apiClient.post("/admin/wallet-adjustments", input, writeOptions(requestKey)).then(unwrap);
-export const serviceMessage = (error) => [404, 405, 501].includes(error?.status)
-  ? "This service is not available in the connected environment yet. No change has been saved. You can keep editing and retry after it is connected."
+export const adjustPoints = (input, requestKey) => apiClient.post("/admin/points/adjustments", input, writeOptions(requestKey)).then(unwrap);
+export const serviceMessage = (error) => error?.code === "NOT_FOUND" && /^No API route matches/.test(error?.message || "")
+  ? "The requested service is not available in the connected environment yet."
   : error?.message || "The request could not be completed. Please retry.";

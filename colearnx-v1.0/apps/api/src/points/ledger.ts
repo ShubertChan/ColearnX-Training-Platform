@@ -20,6 +20,18 @@ type PointTransactionInput = {
   entries: PointEntry[];
 };
 
+function pointInteger(value: number | string) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new ApiError(409, 'POINT_VALUE_OUT_OF_RANGE', 'Point balances must be safe integers.');
+  }
+  return parsed;
+}
+
+function pointSum(left: number, right: number) {
+  return pointInteger(left + right);
+}
+
 /**
  * Posts a balanced, append-only point transaction.  Balances are a projection
  * of immutable ledger entries and are changed under row locks in this same
@@ -53,10 +65,10 @@ export async function postPointTransaction(client: PoolClient, input: PointTrans
     throw new ApiError(409, 'POINT_ACCOUNT_NOT_FOUND', 'A required point account is unavailable.');
   }
   const balances = new Map(lockedAccounts.rows.map((account) => [account.point_account_id, {
-    available: Number(account.available_balance),
-    frozen: Number(account.frozen_balance),
-    expired: Number(account.expired_balance),
-    blocked: Number(account.blocked_balance),
+    available: pointInteger(account.available_balance),
+    frozen: pointInteger(account.frozen_balance),
+    expired: pointInteger(account.expired_balance),
+    blocked: pointInteger(account.blocked_balance),
     status: account.account_status,
   }]));
 
@@ -68,15 +80,15 @@ export async function postPointTransaction(client: PoolClient, input: PointTrans
   const pointTransactionId = transaction.rows[0].point_transaction_id;
 
   for (const entry of input.entries) {
-    const availableDelta = entry.availableDelta ?? 0;
-    const frozenDelta = entry.frozenDelta ?? 0;
-    const expiredDelta = entry.expiredDelta ?? 0;
-    const blockedDelta = entry.blockedDelta ?? 0;
+    const availableDelta = pointInteger(entry.availableDelta ?? 0);
+    const frozenDelta = pointInteger(entry.frozenDelta ?? 0);
+    const expiredDelta = pointInteger(entry.expiredDelta ?? 0);
+    const blockedDelta = pointInteger(entry.blockedDelta ?? 0);
     const account = balances.get(entry.pointAccountId)!;
-    const nextAvailable = account.available + availableDelta;
-    const nextFrozen = account.frozen + frozenDelta;
-    const nextExpired = account.expired + expiredDelta;
-    const nextBlocked = account.blocked + blockedDelta;
+    const nextAvailable = pointSum(account.available, availableDelta);
+    const nextFrozen = pointSum(account.frozen, frozenDelta);
+    const nextExpired = pointSum(account.expired, expiredDelta);
+    const nextBlocked = pointSum(account.blocked, blockedDelta);
     if (account.status !== 'system' && (nextAvailable < 0 || nextFrozen < 0 || nextExpired < 0 || nextBlocked < 0)) {
       throw new ApiError(409, 'INSUFFICIENT_POINTS', 'You do not have enough available points.');
     }
