@@ -6,6 +6,7 @@ import type { Actor } from '../auth/auth.js';
 import { query, withTransaction } from '../db/database.js';
 import { completeIdempotency, reserveIdempotency } from '../lib/idempotency.js';
 import { ApiError, ok } from '../lib/http.js';
+import { isExactUtcTimestamp, isLegacyUtcTimestamp } from '../lib/pagination-timestamps.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 
 const reportStatus = z.enum(['pending', 'resolved', 'dismissed']);
@@ -35,7 +36,7 @@ const listReportsInput = z.object({
 });
 
 type ReportCursor = {
-  v: 1;
+  v: 2;
   status: z.infer<typeof reportStatus>;
   createdAt: string | null;
   id: string;
@@ -50,6 +51,7 @@ type ReportRow = {
   report_category: string | null;
   report_status: string;
   created_at: Date | null;
+  cursor_created_at: string | null;
   reviewer_user_id: string | null;
   reviewed_at: Date | null;
   decision_reason: string | null;
@@ -82,6 +84,7 @@ const reportSelect = `SELECT ur.report_id,
   COALESCE(ur.target_course_run_id, ur.target_content_version_id, ur.target_course_id, ur.target_content_id)::text AS product_id,
   COALESCE(ur.target_title_snapshot, course.title, content.title, 'Unavailable marketplace item') AS title,
   ur.reason, ur.report_category, ur.report_status, ur.created_at,
+  to_char(ur.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
   ur.reporter_user_id, ur.reviewer_user_id, ur.reviewed_at, ur.decision_reason,
   COALESCE(reporter_profile.display_name, reporter.full_name, 'Former member') AS reporter_display_name,
   COALESCE(reviewer_profile.display_name, reviewer.full_name, 'Former administrator') AS reviewer_display_name
@@ -120,21 +123,27 @@ function fingerprint(value: unknown) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
-export function encodeReportCursor(row: ReportDto, status: z.infer<typeof reportStatus>) {
-  const cursor: ReportCursor = { v: 1, status, createdAt: row.createdAt, id: row.id };
+export function encodeReportCursor(row: Pick<ReportRow, 'report_id' | 'cursor_created_at'>, status: z.infer<typeof reportStatus>) {
+  const cursor: ReportCursor = { v: 2, status, createdAt: row.cursor_created_at, id: row.report_id };
   return Buffer.from(JSON.stringify(cursor)).toString('base64url');
 }
 
 export function decodeReportCursor(value: string | undefined, status: z.infer<typeof reportStatus>): ReportCursor | null {
   if (!value) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Partial<ReportCursor>;
-    const validTimestamp = parsed.createdAt === null || (typeof parsed.createdAt === 'string' && !Number.isNaN(Date.parse(parsed.createdAt)));
-    if (parsed.v !== 1 || parsed.status !== status || typeof parsed.id !== 'string' || !z.string().uuid().safeParse(parsed.id).success || !validTimestamp) {
+    const decoded = Buffer.from(value, 'base64url');
+    if (!/^[A-Za-z0-9_-]+$/.test(value) || decoded.toString('base64url') !== value) throw new Error('invalid cursor');
+    const parsed = JSON.parse(decoded.toString('utf8')) as Partial<Omit<ReportCursor, 'v'>> & { v?: number };
+    if (!parsed || parsed.status !== status || !z.string().uuid().safeParse(parsed.id).success) {
       throw new Error('invalid cursor');
     }
+    if (parsed.v === 1 && (parsed.createdAt === null || isLegacyUtcTimestamp(parsed.createdAt))) {
+      throw new ApiError(400, 'CURSOR_RESTART_REQUIRED', 'The list cursor is from an older version. Reload the list from the first page.');
+    }
+    if (parsed.v !== 2 || !(parsed.createdAt === null || isExactUtcTimestamp(parsed.createdAt))) throw new Error('invalid cursor');
     return parsed as ReportCursor;
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 'CURSOR_RESTART_REQUIRED') throw error;
     throw new ApiError(400, 'VALIDATION_ERROR', 'The request is invalid.', { cursor: 'Invalid report cursor.' });
   }
 }
@@ -222,9 +231,10 @@ export async function listReports(req: Request, res: Response) {
       ORDER BY ur.created_at DESC NULLS LAST, ur.report_id DESC LIMIT $${values.length}`,
     values,
   );
-  const rows = result.rows.slice(0, input.limit).map(reportDto);
+  const pageRows = result.rows.slice(0, input.limit);
+  const rows = pageRows.map(reportDto);
   const hasNext = result.rows.length > input.limit;
-  return ok(res, rows, 200, { hasNext, nextCursor: hasNext && rows.length ? encodeReportCursor(rows.at(-1)!, input.status) : null });
+  return ok(res, rows, 200, { hasNext, nextCursor: hasNext && pageRows.length ? encodeReportCursor(pageRows.at(-1)!, input.status) : null });
 }
 
 export async function decideReport(req: Request, res: Response) {

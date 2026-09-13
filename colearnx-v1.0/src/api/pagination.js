@@ -2,9 +2,18 @@ import { apiClient } from "./client.js";
 
 export async function listAllPages(path, filters = {}) {
   const items = [], seen = new Set(), cursors = new Set();
-  let cursor;
+  let cursor, restarted = false;
   for (let page = 1; page <= 10000; page++) {
-    const response = await apiClient.get(path, { params: { ...filters, limit: 100, ...(cursor ? { cursor } : {}) } });
+    let response;
+    try {
+      response = await apiClient.get(path, { params: { ...filters, limit: 100, ...(cursor ? { cursor } : {}) } });
+    } catch (error) {
+      if (cursor && !restarted && (path === "/admin/reports" || path === "/admin/audit-logs") && error?.status === 400 && error?.code === "CURSOR_RESTART_REQUIRED") {
+        items.length = 0; seen.clear(); cursors.clear(); cursor = undefined; restarted = true;
+        continue;
+      }
+      throw error;
+    }
     const data = response.data.data;
     const batch = Array.isArray(data) ? data : data?.items;
     if (!Array.isArray(batch)) throw new Error("The list response is incomplete. Please retry.");

@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../db/database.js';
 import { ApiError, ok } from '../lib/http.js';
+import { isExactUtcTimestamp, isLegacyUtcTimestamp } from '../lib/pagination-timestamps.js';
 import { resolveUtcDateRange } from '../lib/reporting-dates.js';
 import { parse } from '../lib/validation.js';
 
@@ -21,10 +22,11 @@ const auditListInput = z.object({
   if (value.cursor && value.page !== undefined) context.addIssue({ code: 'custom', message: 'cursor and page cannot be combined.' });
 });
 
-type AuditCursor = { v: 1; filter: string; createdAt: string; id: string };
+type AuditCursor = { v: 2; filter: string; createdAt: string; id: string };
 type AuditRow = {
   log_id: string;
   created_at: Date;
+  cursor_created_at: string;
   actor_user_id: string | null;
   action_type: string;
   target_table: string;
@@ -44,19 +46,28 @@ export function redactAuditReason(value: string | null) {
     .slice(0, 500);
 }
 
-function encodeAuditCursor(row: AuditRow, filter: string) {
-  return Buffer.from(JSON.stringify({ v: 1, filter, createdAt: row.created_at.toISOString(), id: row.log_id } satisfies AuditCursor)).toString('base64url');
+export function encodeAuditCursor(row: Pick<AuditRow, 'log_id' | 'cursor_created_at'>, filter: string) {
+  return Buffer.from(JSON.stringify({ v: 2, filter, createdAt: row.cursor_created_at, id: row.log_id } satisfies AuditCursor)).toString('base64url');
 }
 
-function decodeAuditCursor(value: string | undefined, filter: string): AuditCursor | null {
+export function decodeAuditCursor(value: string | undefined, filter: string): AuditCursor | null {
   if (!value) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Partial<AuditCursor>;
-    if (parsed.v !== 1 || parsed.filter !== filter || typeof parsed.createdAt !== 'string' || Number.isNaN(Date.parse(parsed.createdAt)) || !z.string().uuid().safeParse(parsed.id).success) {
+    const decoded = Buffer.from(value, 'base64url');
+    if (!/^[A-Za-z0-9_-]+$/.test(value) || decoded.toString('base64url') !== value) throw new Error('invalid cursor');
+    const parsed = JSON.parse(decoded.toString('utf8')) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || parsed.filter !== filter || !z.string().uuid().safeParse(parsed.id).success) {
+      throw new Error('invalid cursor');
+    }
+    if (parsed.v === 1 && isLegacyUtcTimestamp(parsed.createdAt)) {
+      throw new ApiError(400, 'CURSOR_RESTART_REQUIRED', 'This audit cursor has expired. Restart pagination.', { cursor: 'Restart audit pagination from the first page.' });
+    }
+    if (parsed.v !== 2 || !isExactUtcTimestamp(parsed.createdAt)) {
       throw new Error('invalid cursor');
     }
     return parsed as AuditCursor;
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
     throw new ApiError(400, 'VALIDATION_ERROR', 'The request is invalid.', { cursor: 'Invalid audit cursor.' });
   }
 }
@@ -77,7 +88,9 @@ export async function listAuditLogs(req: Request, res: Response) {
   }
   values.push(input.limit + 1);
   const result = await query<AuditRow>(
-    `SELECT aal.log_id, aal.created_at, aal.actor_user_id, aal.action_type, aal.target_table,
+    `SELECT aal.log_id, aal.created_at,
+            to_char(aal.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
+            aal.actor_user_id, aal.action_type, aal.target_table,
             aal.target_record_id, aal.request_id, aal.details_json ->> 'reason' AS reason
        FROM admin_action_logs aal
       WHERE aal.created_at >= ($1::date::timestamp AT TIME ZONE 'UTC')
