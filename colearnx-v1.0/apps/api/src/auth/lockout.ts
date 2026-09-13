@@ -67,6 +67,15 @@ export type FailureOutcome = {
  */
 export async function registerFailure(userId: string, decaySeconds: number): Promise<FailureOutcome> {
   return withTransaction(async (client) => {
+    // FOR UPDATE cannot lock a missing row. Create the zero counter first so
+    // concurrent first failures wait for the winning insert to commit, then
+    // read its latest count under the row lock instead of overwriting it.
+    await client.query(
+      `INSERT INTO auth_failure_counters (user_id) VALUES ($1)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [userId],
+    );
+
     const existing = await client.query<{
       consecutive_failures: number;
       last_failure_at: Date;

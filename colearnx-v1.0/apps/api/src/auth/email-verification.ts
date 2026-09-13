@@ -2,6 +2,12 @@ import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 
 export const verificationCodeLength = 8;
 
+// Migration 004 grandfathered existing accounts with both timestamps NULL.
+// Use the same eligibility rule for sign-in and password recovery.
+export function requiresEmailVerification(requiredAt: Date | null, verifiedAt: Date | null) {
+  return Boolean(requiredAt && !verifiedAt);
+}
+
 export function createVerificationCode() {
   return randomInt(10 ** (verificationCodeLength - 1), 10 ** verificationCodeLength).toString();
 }
