@@ -245,6 +245,12 @@ export async function checkout(req: Request, res: Response) {
       } else {
         await client.query(`INSERT INTO content_access_grants (content_version_id, user_id, order_item_id, grant_reason)
           VALUES ($1, $2, $3, 'purchase')`, [product.id, actor.id, orderItemId]);
+        // A checkout grants private access, not redistribution. A later
+        // commercial licence can explicitly set courseReuseAllowed to true.
+        await client.query(`INSERT INTO content_licenses
+          (content_version_id, order_item_id, buyer_user_id, creator_user_id, license_code, license_terms_json)
+          VALUES ($1, $2, $3, $4, $5, jsonb_build_object('courseReuseAllowed', false))`,
+        [product.id, orderItemId, actor.id, product.sellerUserId, `LIC-${orderItemId}`]);
       }
       const transactionId = product.pricePoints > 0 ? await postPointTransaction(client, isLiveReservation ? {
         type: 'live_hold', reason: 'live_course_purchase_reserve', idempotencyKey: `order-item:${orderItemId}`,

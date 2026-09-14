@@ -5,18 +5,15 @@ import { query } from '../db/database.js';
 import { ApiError, ok } from '../lib/http.js';
 import { isExactUtcTimestamp, isLegacyUtcTimestamp } from '../lib/pagination-timestamps.js';
 import { resolveUtcDateRange } from '../lib/reporting-dates.js';
+import { optionalTrimmedText } from '../lib/reporting-query.js';
 import { parse } from '../lib/validation.js';
 
-const optionalText = (max: number) => z.preprocess(
-  (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
-  z.string().trim().max(max).optional(),
-);
 const auditListInput = z.object({
-  from: optionalText(10),
-  to: optionalText(10),
-  search: optionalText(200),
+  from: optionalTrimmedText(10),
+  to: optionalTrimmedText(10),
+  search: optionalTrimmedText(200),
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  cursor: optionalText(1_500),
+  cursor: optionalTrimmedText(1_500),
   page: z.coerce.number().int().min(1).max(1).optional(),
 }).strict().superRefine((value, context) => {
   if (value.cursor && value.page !== undefined) context.addIssue({ code: 'custom', message: 'cursor and page cannot be combined.' });

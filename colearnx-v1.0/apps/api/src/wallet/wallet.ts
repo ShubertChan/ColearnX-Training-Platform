@@ -27,16 +27,29 @@ export async function wallet(req: Request, res: Response) {
 export async function walletTransactions(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const input = parse(z.object({ cursor: z.string().datetime().optional(), limit: z.coerce.number().int().min(1).max(100).default(20) }), req.query);
-  const result = await query(`SELECT pt.point_transaction_id, pt.transaction_type, pt.reason, pt.created_at, ple.entry_role,
-      ple.available_delta, ple.frozen_delta, ple.expired_delta, ple.blocked_delta
+  // The ledger already records the post-transaction balance of every bucket and
+  // the order or refund a movement belongs to. The transaction history screen
+  // shows all of it, so the response carries the recorded values instead of
+  // leaving the client to render them as unsupplied.
+  const result = await query(`SELECT pt.point_transaction_id, pt.transaction_type, pt.transaction_status, pt.reason,
+      pt.created_at, pt.refund_request_id, ple.entry_role,
+      ple.available_delta, ple.frozen_delta, ple.expired_delta, ple.blocked_delta,
+      ple.available_balance_after, ple.frozen_balance_after, ple.expired_balance_after, ple.blocked_balance_after,
+      o.order_no
     FROM point_accounts pa JOIN point_ledger_entries ple ON ple.point_account_id = pa.point_account_id
     JOIN point_transactions pt ON pt.point_transaction_id = ple.point_transaction_id
+    LEFT JOIN order_items oi ON oi.order_item_id = pt.order_item_id
+    LEFT JOIN orders o ON o.order_id = oi.order_id
     WHERE pa.user_id = $1 AND pa.account_status IN ('active', 'restricted')
       AND ($2::timestamptz IS NULL OR pt.created_at < $2::timestamptz)
     ORDER BY pt.created_at DESC, pt.point_transaction_id DESC LIMIT $3`, [actor.id, input.cursor ?? null, input.limit]);
   const items = result.rows.map((row) => ({ id: row.point_transaction_id, type: row.transaction_type, reference: row.reason,
-    createdAt: row.created_at, entryRole: row.entry_role, availableDelta: Number(row.available_delta), frozenDelta: Number(row.frozen_delta),
-    expiredDelta: Number(row.expired_delta), blockedDelta: Number(row.blocked_delta) }));
+    createdAt: row.created_at, entryRole: row.entry_role, status: row.transaction_status,
+    availableDelta: Number(row.available_delta), frozenDelta: Number(row.frozen_delta),
+    expiredDelta: Number(row.expired_delta), blockedDelta: Number(row.blocked_delta),
+    availableBalanceAfter: Number(row.available_balance_after), frozenBalanceAfter: Number(row.frozen_balance_after),
+    expiredBalanceAfter: Number(row.expired_balance_after), blockedBalanceAfter: Number(row.blocked_balance_after),
+    orderReference: row.order_no ?? '', refundRequestId: row.refund_request_id ?? '' }));
   return ok(res, items, 200, { nextCursor: items.length === input.limit ? items.at(-1)?.createdAt : null });
 }
 

@@ -438,6 +438,7 @@ export function TransactionHistoryPage() {
 export function AdminDashboardPage() {
   const {
     roleApplications,
+    adminTrainerCertifications,
     refundRequests,
     courses,
     contents,
@@ -451,11 +452,8 @@ export function AdminDashboardPage() {
   const pendingRefunds = refundRequests.filter(
     (item) => item.status === "Pending",
   );
-  const pendingCertifications = roleApplications.filter(
-    (item) =>
-      item.type === "Trainer" &&
-      item.status === "Approved" &&
-      item.certificationStatus === "Pending",
+  const pendingCertifications = adminTrainerCertifications.filter(
+    (item) => item.status === "pending",
   );
   const [selectedRoleId, setSelectedRoleId] = useState(
     pendingRoles[0]?.id || null,
@@ -465,6 +463,7 @@ export function AdminDashboardPage() {
     pendingCertifications[0]?.id || null,
   );
   const [certificationReason, setCertificationReason] = useState("");
+  const [certificationError, setCertificationError] = useState("");
   const selectedRole =
     pendingRoles.find((item) => item.id === selectedRoleId) || pendingRoles[0];
   const decideRole = (status) => {
@@ -484,17 +483,15 @@ export function AdminDashboardPage() {
     pendingCertifications.find(
       (item) => item.id === selectedCertificationId,
     ) || pendingCertifications[0];
-  const decideCertification = (status) => {
+  const decideCertification = async (status) => {
     if (!selectedCertification || certificationReason.trim().length < 5) return;
-    if (
-      decideTrainerCertification(
-        selectedCertification.id,
-        status,
-        certificationReason.trim(),
-      )
-    ) {
+    setCertificationError("");
+    try {
+      await decideTrainerCertification(selectedCertification.id, status, certificationReason.trim());
       setCertificationReason("");
       setSelectedCertificationId(null);
+    } catch (error) {
+      setCertificationError(error.message || "The certification decision could not be saved.");
     }
   };
   return (
@@ -627,15 +624,17 @@ export function AdminDashboardPage() {
                 onChange={(event) => {
                   setSelectedCertificationId(event.target.value);
                   setCertificationReason("");
+                  setCertificationError("");
                 }}
               >
                 {pendingCertifications.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.user} · {item.category} · {item.portfolio}
+                    {item.trainer?.displayName || "Trainer"} · {item.certificationName}{item.certificationReference ? ` · ${item.certificationReference}` : ""}
                   </option>
                 ))}
               </select>
             </FormField>
+            {certificationError && <p role="alert" className="form-error">{certificationError}</p>}
             <FormField label="Certification decision reason">
               <textarea
                 value={certificationReason}

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { apiClient } from "./client.js";
-import { getAdminRoleApplications } from "./governance.js";
+import { getAdminRoleApplications, getAdminTrainerCertifications } from "./governance.js";
 
 test("loads every page for a server-filtered administrator role queue", async () => {
   const originalGet = apiClient.get;
@@ -39,6 +39,23 @@ test("stops safely when an older API repeats the first page", async () => {
     const result = await getAdminRoleApplications({ limit: 2 });
     assert.deepEqual(result.map((item) => item.id), ["application-1", "application-2"]);
     assert.equal(calls, 2);
+  } finally {
+    apiClient.get = originalGet;
+  }
+});
+
+test("loads a server-filtered administrator certification queue", async () => {
+  const originalGet = apiClient.get;
+  const urls = [];
+  apiClient.get = async (url) => {
+    urls.push(url);
+    return { data: { data: [{ id: "certification-1" }] } };
+  };
+
+  try {
+    const result = await getAdminTrainerCertifications({ status: "pending", limit: 2 });
+    assert.deepEqual(result.map((item) => item.id), ["certification-1"]);
+    assert.deepEqual(urls, ["/admin/trainer-certifications?limit=2&page=1&status=pending"]);
   } finally {
     apiClient.get = originalGet;
   }
