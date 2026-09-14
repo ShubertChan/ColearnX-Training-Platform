@@ -114,16 +114,6 @@ export async function postPointTransaction(client: PoolClient, input: PointTrans
   return pointTransactionId;
 }
 
-export async function loadUserPointAccount(client: PoolClient, userId: string, lock = false) {
-  const account = await client.query<{ point_account_id: string; available_balance: string; frozen_balance: string; expired_balance: string; blocked_balance: string }>(
-    `SELECT point_account_id, available_balance, frozen_balance, expired_balance, blocked_balance
-     FROM point_accounts WHERE user_id = $1 AND account_status IN ('active', 'restricted')${lock ? ' FOR UPDATE' : ''}`,
-    [userId],
-  );
-  if (!account.rowCount) throw new ApiError(409, 'POINT_ACCOUNT_NOT_FOUND', 'Your point account is unavailable.');
-  return account.rows[0];
-}
-
 export async function loadSystemPointAccount(client: PoolClient) {
   const account = await client.query<{ point_account_id: string }>(`SELECT point_account_id FROM point_accounts WHERE account_status = 'system' ORDER BY created_at LIMIT 1 FOR UPDATE`);
   if (!account.rowCount) throw new ApiError(503, 'POINT_SYSTEM_UNAVAILABLE', 'The system point account is not configured.');

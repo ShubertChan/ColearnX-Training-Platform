@@ -30,6 +30,7 @@ import {
   decideRoleApplication as decideRoleApplicationApi,
   decideTrainerCertification as decideTrainerCertificationApi,
   getAdminRoleApplications,
+  getAdminTrainerCertifications,
   getMyTrainerCertifications,
   getMyRoleApplications,
 } from "../api/governance";
@@ -271,6 +272,7 @@ export function PlatformProvider({ children }) {
   const [refundRequests, setRefundRequests] = useState([]);
   const [publishedItems, setPublishedItems] = useState([]);
   const [trainerCertifications, setTrainerCertifications] = useState([]);
+  const [adminTrainerCertifications, setAdminTrainerCertifications] = useState([]);
   const [accountLoading, setAccountLoading] = useState(true);
   const [capabilities, setCapabilities] = useState({});
   const [dataErrors, setDataErrors] = useState({});
@@ -411,21 +413,25 @@ export function PlatformProvider({ children }) {
     const revision = sessionRevision.current;
     const roleRequestRevision = adminRoleRequestRevision.current + 1;
     adminRoleRequestRevision.current = roleRequestRevision;
-    const [rolesResult, refundsResult] = await Promise.allSettled([
+    const [rolesResult, refundsResult, certificationsResult] = await Promise.allSettled([
       getAdminRoleApplications({ status: "pending" }),
       getAdminRefundRequests(),
+      getAdminTrainerCertifications({ status: "pending" }),
     ]);
     if (rolesResult.status === "fulfilled" && roleRequestRevision === adminRoleRequestRevision.current) {
       setRoleApplications(rolesResult.value.map(mapRoleApplication));
     }
     if (refundsResult.status === "fulfilled" && revision === sessionRevision.current) setRefundRequests(refundsResult.value.map(mapRefundRequest));
-    if (rolesResult.status === "rejected" && refundsResult.status === "rejected") throw rolesResult.reason;
+    if (certificationsResult.status === "fulfilled" && revision === sessionRevision.current && roleRequestRevision === adminRoleRequestRevision.current) setAdminTrainerCertifications(certificationsResult.value);
+    if (rolesResult.status === "rejected" && refundsResult.status === "rejected" && certificationsResult.status === "rejected") throw rolesResult.reason;
     return {
       roles: rolesResult.status === "fulfilled" ? rolesResult.value : [],
       refunds: refundsResult.status === "fulfilled" ? refundsResult.value : [],
+      certifications: certificationsResult.status === "fulfilled" ? certificationsResult.value : [],
       errors: {
         roles: rolesResult.status === "rejected" ? rolesResult.reason : null,
         refunds: refundsResult.status === "rejected" ? refundsResult.reason : null,
+        certifications: certificationsResult.status === "rejected" ? certificationsResult.reason : null,
       },
     };
   }, []);
@@ -439,7 +445,7 @@ export function PlatformProvider({ children }) {
       confirmedOrders.current = [];
       pendingCheckout.current = null;
       setOrders([]); setTransactions([]); setBalance(0);
-      setPublishedItems([]); setTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
+      setPublishedItems([]); setTrainerCertifications([]); setAdminTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
       setApplications({ Trainer: "Not applied", Creator: "Not applied" });
       setDataErrors({}); setPurchaseSyncWarning("");
       let stored = [];
@@ -585,7 +591,7 @@ export function PlatformProvider({ children }) {
     accountId.current = ""; confirmedOrders.current = [];
     pendingCheckout.current = null;
     setCart([]); setCartOwner(""); setAccountError(""); setDataErrors({}); setPurchaseSyncWarning("");
-    setPublishedItems([]); setTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
+    setPublishedItems([]); setTrainerCertifications([]); setAdminTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
     setOrders([]);
     setTransactions([]);
     setBalance(0);
@@ -829,6 +835,7 @@ export function PlatformProvider({ children }) {
     refundRequests,
     publishedItems,
     trainerCertifications,
+    adminTrainerCertifications,
     orders,
     lastOrder: orders[0] || null,
     profile,
@@ -869,7 +876,7 @@ export function PlatformProvider({ children }) {
     accountLoading, accountError, dataStates, restoreSession, approvedRoles, applications, authenticated, balance, canPurchase, capabilities, cart, contents, courses, courseCatalogState, contentCatalogState, dataErrors, deleteDraftListing,
     notify, orders, profile, publishedItems, refundRequests, refreshAdminQueues, refreshAdminRoleApplications, refreshCatalog,
     refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet, role, roleApplications, serverWallet,
-    purchaseSyncWarning, purchasedContents, purchasedCourses, toast, trainerCertifications, trainerOperational, transactions,
+    purchaseSyncWarning, purchasedContents, purchasedCourses, toast, trainerCertifications, adminTrainerCertifications, trainerOperational, transactions,
   ]);
 
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;
