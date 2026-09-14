@@ -14,6 +14,7 @@ import { authenticate, csrf, forgotPassword, login, logout, me, refresh, registe
 import { createCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
 import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, deleteContentDraft, deleteCourseDraft, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse, updateCourse } from './catalog/catalog.js';
+import { listContentVersions, listCourseVersions, saveCourseResources, validateCourseResources } from './catalog/publishing-tools.js';
 import { checkout, getOrder, listOrders } from './orders/commerce.js';
 import { createRefundRequest, decideRefund, getRefundRequest, listRefundRequestsForAdmin } from './refunds/service.js';
 import { createRoleApplication, createTrainerCertification, decideRoleApplication, decideTrainerCertification, listRoleApplications, listTrainerCertifications, myRoleApplications, myTrainerCertifications } from './governance/governance.js';
@@ -24,6 +25,7 @@ import { changeUserRole, deleteUser, getUser, listUsers, reinstateUser, suspendU
 import { listAuditLogs } from './admin/audit-logs.js';
 import { activityReport } from './admin/activity-report.js';
 import { createReport, decideReport, listReports } from './reports/reports.js';
+import { publishingAnalytics } from './reports/publishing-analytics.js';
 import { completeUploadIntent, createContentDownloadUrl, createUploadIntent, deleteUploadIntent, listContentAssets, previewContentAsset } from './storage/content-assets.js';
 import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUploadIntent, deleteCourseUploadIntent, getCourseDelivery, listCourseAssets, recordCourseProgress } from './storage/course-delivery.js';
 
@@ -90,12 +92,17 @@ export function createApp() {
   api.get('/content', listContent);
   api.get('/content/:id', getContent);
   api.get('/my/listings', authenticate, listMyListings);
+  api.get('/my/analytics', authenticate, publishingAnalytics);
   api.post('/courses', authenticate, mutationLimiter, createCourse);
   api.post('/courses/:id/submit', authenticate, mutationLimiter, submitCourse);
   api.patch('/courses/:id', authenticate, mutationLimiter, updateCourse);
+  api.get('/courses/:id/versions', authenticate, listCourseVersions);
+  api.post('/courses/:id/resources/validate', authenticate, mutationLimiter, validateCourseResources);
+  api.put('/courses/:id/resources', authenticate, mutationLimiter, saveCourseResources);
   api.delete('/courses/:id/draft', authenticate, mutationLimiter, deleteCourseDraft);
   api.post('/content', authenticate, mutationLimiter, createContent);
   api.post('/content/:id/submit', authenticate, mutationLimiter, submitContent);
+  api.get('/content/:id/versions', authenticate, listContentVersions);
   api.delete('/content/:id/draft', authenticate, mutationLimiter, deleteContentDraft);
   api.post('/reports', authenticate, mutationLimiter, createReport);
   api.get('/content-versions/:contentVersionId/assets', authenticate, listContentAssets);

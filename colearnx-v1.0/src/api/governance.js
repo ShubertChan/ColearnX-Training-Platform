@@ -19,5 +19,5 @@ async function listPages(path, { status, limit = 100 } = {}) {
 
 export const getAdminRoleApplications = (input) => listPages("/admin/role-applications", input);
 export const decideRoleApplication = (applicationId, input) => apiClient.post(`/admin/role-applications/${applicationId}/decision`, input).then(unwrap);
-export const getAdminTrainerCertifications = () => listPages("/admin/trainer-certifications");
+export const getAdminTrainerCertifications = (input) => listPages("/admin/trainer-certifications", input);
 export const decideTrainerCertification = (certificationId, input) => apiClient.post(`/admin/trainer-certifications/${certificationId}/decision`, input).then(unwrap);

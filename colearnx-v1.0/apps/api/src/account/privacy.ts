@@ -32,7 +32,7 @@ export async function getPublicProfile(req: Request, res: Response) {
     LEFT JOIN user_roles ur ON ur.user_id = u.user_id AND ur.revoked_at IS NULL
     LEFT JOIN roles r ON r.role_id = ur.role_id
     WHERE u.user_id = $1 AND u.account_status = 'active'
-    GROUP BY u.user_id, p.profile_id`, [userId]);
+    GROUP BY u.user_id, u.full_name, p.display_name, p.location, p.bio`, [userId]);
   if (!result.rowCount) throw new ApiError(404, 'PROFILE_NOT_FOUND', 'Public profile was not found.');
   const profile = result.rows[0];
   return ok(res, { id: profile.user_id, displayName: profile.display_name, location: profile.location, bio: profile.bio, roles: profile.roles });

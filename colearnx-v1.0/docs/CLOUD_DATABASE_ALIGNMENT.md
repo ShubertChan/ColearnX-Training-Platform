@@ -60,3 +60,31 @@ grant only the permissions required by the API for each newly created table.
 5. Run the API health checks and the checkout, role-application, and Stripe
    test-mode smoke tests. Roll forward with a new migration if a change needs
    correction; do not restore a local database over the cloud database.
+
+## Migrations after 003
+
+`004` to `013` follow the same rule: forward-only, no destructive statements,
+and each one grants the runtime API only the privileges its new tables need,
+because `003` removed the default grant for future objects.
+
+Two of them are outstanding for the publishing tools and publisher analytics:
+
+- `012_publishing_analytics_index.sql` adds a partial index on `order_items`
+  for the publisher sales query. Schema only.
+- `013_publishing_tools_resources.sql` creates `course_run_content_resources`
+  and is the only migration since `002` that contains DML. Its single
+  `INSERT ... SELECT` backfills `content_licenses` for content purchases made
+  before the checkout path started recording licence rows. It is additive and
+  guarded by `NOT EXISTS (SELECT 1 FROM content_licenses ...)`, so it creates
+  no duplicates and changes no existing row. Every backfilled licence records
+  `courseReuseAllowed: false`, matching what a purchase actually grants.
+
+Apply them with the procedure above: owner/direct `MIGRATION_DATABASE_URL`,
+`npm run db:migrate` once, then verify the ledger and the new objects.
+
+```sql
+SELECT filename, applied_at FROM schema_migrations ORDER BY filename;
+
+SELECT to_regclass('public.course_run_content_resources') AS resources_table,
+       to_regclass('public.order_items_publisher_analytics_idx') AS analytics_index;
+```

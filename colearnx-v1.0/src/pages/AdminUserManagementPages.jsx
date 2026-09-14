@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ChevronRight, ShieldAlert, UserCog, Users } from "lucide-react";
+import { ArrowLeft, ChevronRight, ShieldAlert, ShieldCheck, UserCog, Users } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   deleteAdminUser,
@@ -9,6 +9,7 @@ import {
   setAdminUserRole,
   suspendAdminUser,
 } from "../api/admin";
+import { usePlatform } from "../context/PlatformContext";
 import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
 
 const roleLabel = (role) => role.charAt(0).toUpperCase() + role.slice(1);
@@ -16,6 +17,49 @@ const roleLabel = (role) => role.charAt(0).toUpperCase() + role.slice(1);
 function AccountStatus({ status }) {
   const tone = status === "active" ? "success" : status === "suspended" ? "warning" : "danger";
   return <Badge tone={tone}>{roleLabel(status)}</Badge>;
+}
+
+// A Trainer role stays non-operational until an administrator approves the
+// trainer certification, which blocks the course editor and the publishing
+// tools. This is the routed administrator screen, so the review queue lives
+// here rather than on an unrouted duplicate of it.
+function TrainerCertificationReview() {
+  const { adminTrainerCertifications, decideTrainerCertification, refreshAdminQueues } = usePlatform();
+  const [reasons, setReasons] = useState({});
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => { void refreshAdminQueues().catch((queueError) => setError(queueError.message)); }, [refreshAdminQueues]);
+  const pending = adminTrainerCertifications.filter((item) => item.status === "pending");
+  const decide = async (certification, decision) => {
+    const reason = (reasons[certification.id] || "").trim();
+    if (reason.length < 3) { setError("Enter a decision reason of at least 3 characters."); return; }
+    setBusy(certification.id); setError("");
+    try {
+      await decideTrainerCertification(certification.id, decision, reason);
+      setReasons((current) => ({ ...current, [certification.id]: "" }));
+    } catch (decisionError) { setError(decisionError.message); } finally { setBusy(""); }
+  };
+  return <Card>
+    <div className="card-heading">
+      <div><span className="eyebrow">Trainer certification</span><h2>Certification review</h2></div>
+      <Badge>{pending.length} pending</Badge>
+    </div>
+    <p className="muted">An approved certification is what makes a Trainer operational. Until then their course editor and publishing tools stay closed.</p>
+    {error && <p className="form-error" role="alert">{error}</p>}
+    {pending.length ? <div className="queue-list">{pending.map((certification) => <div key={certification.id}>
+      <ShieldCheck size={18} />
+      <div>
+        <b>{certification.trainer?.displayName || "Trainer"}</b>
+        <small>{certification.certificationName}{certification.certificationReference ? ' · ' + certification.certificationReference : ""}</small>
+        <span className="queue-detail">{certification.evidenceUrl ? <a href={certification.evidenceUrl} target="_blank" rel="noreferrer noopener">Supporting evidence</a> : "No evidence URL supplied"}</span>
+      </div>
+      <div className="queue-actions">
+        <input aria-label={"Decision reason for " + (certification.trainer?.displayName || "trainer")} placeholder="Decision reason" value={reasons[certification.id] || ""} onChange={(event) => setReasons((current) => ({ ...current, [certification.id]: event.target.value }))} />
+        <Button className="sm" disabled={busy === certification.id} onClick={() => void decide(certification, "Approved")}>Approve</Button>
+        <Button className="sm danger" disabled={busy === certification.id} onClick={() => void decide(certification, "Rejected")}>Reject</Button>
+      </div>
+    </div>)}</div> : <p className="empty-copy">No trainer certifications are waiting for review.</p>}
+  </Card>;
 }
 
 export function AdminUsersPage() {
@@ -45,7 +89,7 @@ export function AdminUsersPage() {
 
   useEffect(() => { void load(1); }, []);
 
-  return <Card>
+  return <div className="stack"><Card>
     <div className="card-heading">
       <div><span className="eyebrow">User administration</span><h2>Platform users</h2></div>
       <Button variant="secondary" onClick={() => void load(page)} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>
@@ -69,7 +113,7 @@ export function AdminUsersPage() {
         <ChevronRight size={18} />
       </button>
     </div>)}</div><nav className="pagination" aria-label="User pages"><Button variant="secondary" size="sm" disabled={loading || page <= 1} onClick={() => void load(page - 1)}>Previous</Button><span>Page {page}</span><Button variant="secondary" size="sm" disabled={loading || !pagination.hasNext} onClick={() => void load(page + 1)}>Next</Button></nav></> : <EmptyState icon={Users} title="No accounts match" description="Adjust the search or status filter to view another account." />}
-  </Card>;
+  </Card><TrainerCertificationReview /></div>;
 }
 export function AdminUserDetailPage() {
   const { userId } = useParams();
