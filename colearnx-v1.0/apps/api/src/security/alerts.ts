@@ -69,7 +69,3 @@ export async function dispatchSecurityAlert(alert: SecurityAlert): Promise<void>
   if (!response.ok) throw new Error(`Alert webhook responded ${response.status}`);
 }
 
-/** Test seam: lets the dedupe window be reset between cases. */
-export function resetAlertDeduplication() {
-  recentAlerts.clear();
-}

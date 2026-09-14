@@ -1,4 +1,3 @@
-import type { NextFunction, Request, Response } from 'express';
 import { z, type ZodType } from 'zod';
 import { ApiError } from './http.js';
 
@@ -11,13 +10,3 @@ export function parse<T>(schema: ZodType<T>, input: unknown): T {
   return result.data;
 }
 
-export function validateBody<T>(schema: ZodType<T>) {
-  return (req: Request, _res: Response, next: NextFunction) => {
-    try {
-      req.body = parse(schema, req.body);
-      next();
-    } catch (error) {
-      next(error);
-    }
-  };
-}
