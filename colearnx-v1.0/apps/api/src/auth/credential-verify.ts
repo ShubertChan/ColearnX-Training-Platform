@@ -27,25 +27,48 @@ import argon2 from 'argon2';
 let decoy: Promise<string> | null = null;
 
 function decoyHash(): Promise<string> {
-  decoy ??= argon2.hash(randomBytes(32).toString('hex'), { type: argon2.argon2id });
+  if (decoy) return decoy;
+  const pending = argon2.hash(randomBytes(32).toString('hex'), { type: argon2.argon2id });
+  // A rejected promise must not stay memoised. `decoy ??= ...` cached the
+  // failure permanently, so one transient argon2 error -- a native module that
+  // failed to build on the deploy target, a momentary resource limit -- made
+  // every subsequent sign-in fail for the lifetime of the process, with no
+  // retry. Clearing the slot on rejection lets the next request try again.
+  decoy = pending.catch((error) => {
+    decoy = null;
+    throw error;
+  });
   return decoy;
 }
 
 /**
  * Warms the decoy at startup so that the very first unauthenticated request of
  * a process does not pay the one-off hashing cost and stand out.
+ *
+ * Returns false rather than throwing. The caller must not let this reject:
+ * an unhandled rejection terminates the process under Node's default policy,
+ * which would turn a degraded timing defence into a total outage.
  */
-export async function primeCredentialVerifier(): Promise<void> {
-  await decoyHash();
+export async function primeCredentialVerifier(): Promise<boolean> {
+  try {
+    await decoyHash();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function verifyPasswordConstantWork(
   storedHash: string | null | undefined,
   password: string,
 ): Promise<boolean> {
-  const hash = storedHash ?? (await decoyHash());
   let matched = false;
   try {
+    // Inside the try: if the decoy cannot be produced, the timing defence is
+    // degraded but the endpoint must still answer. An exception here would
+    // become a 500 on every failed sign-in, which is both an outage and a
+    // louder oracle than the one this function exists to close.
+    const hash = storedHash ?? (await decoyHash());
     matched = await argon2.verify(hash, password);
   } catch {
     // A stored hash that argon2 cannot parse is corrupt data, not a match.
