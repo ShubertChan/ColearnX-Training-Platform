@@ -3385,3 +3385,22 @@ tbody tr[role="button"]:focus-visible {
 .password-checklist li { display: flex; align-items: center; gap: 0.4rem; }
 .password-checklist li.met { color: #2f7d54; }
 .password-checklist li.unmet { color: #6b7280; }
+
+/* Shown after repeated sign-in failures observed by this browser. Explains the
+   lockout pause without the server ever disclosing whether an account exists
+   or is locked. */
+.form-notice {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #f0d9a8;
+  border-radius: 10px;
+  background: #fdf7e9;
+  color: #6b5320;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.form-notice a {
+  color: #8a5a00;
+  font-weight: 600;
+  text-decoration: underline;
+}
