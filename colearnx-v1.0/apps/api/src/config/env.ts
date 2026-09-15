@@ -64,6 +64,25 @@ const schema = z.object({
   PASSWORD_RESET_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(3600).default(60),
   // Failures older than this no longer count toward the lockout ladder, so
   // occasional typos across weeks never accumulate into a lock.
+  // At most one lockout notification per account per window. Without a
+  // window, an attacker can relock an account repeatedly and use the platform
+  // to flood a victim's inbox.
+  // --- W4 multi-factor authentication ------------------------------------
+  // Encrypts TOTP secrets at rest (AES-256-GCM). A TOTP secret is a bearer
+  // credential with nothing to crack, so plaintext storage would mean one
+  // database dump defeats two-factor for every enrolled account. Kept out of
+  // the database on purpose.
+  MFA_SECRET_KEY: z.string().optional().default(''),
+  // Signs the two short-lived, purpose-bound challenge tokens. A dedicated
+  // secret rather than reusing the access or refresh key: reuse across
+  // purposes is finding F-16, and this control depends on purpose separation.
+  MFA_CHALLENGE_SECRET: z.string().optional().default(''),
+  // How long the second-factor step of sign-in stays open.
+  MFA_CONTINUATION_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(300),
+  // How long one step-up confirmation authorises high-risk actions.
+  STEP_UP_TTL_SECONDS: z.coerce.number().int().min(60).max(1800).default(600),
+
+  LOCK_NOTICE_COOLDOWN_HOURS: z.coerce.number().int().min(1).max(168).default(6),
   LOGIN_FAILURE_DECAY_HOURS: z.coerce.number().int().min(1).max(168).default(12),
 
   // --- W5 placeholder ------------------------------------------------------
@@ -114,6 +133,40 @@ if (parsed.data.OBJECT_STORAGE_PROVIDER === 'r2') {
 // costs every contributor a setup step they will eventually skip by weakening
 // the check. Deriving is strictly better, provided it never happens in
 // staging or production -- which the condition below enforces.
+// Same rule as SECURITY_HASH_PEPPER: a real deployment must supply these;
+// anywhere else -- local development, NODE_ENV=test, a CI runner -- they are
+// derived from an existing secret.
+//
+// The first version of this made both unconditionally required, which broke
+// six existing test files that load env.ts without them. That is the identical
+// mistake made with SECURITY_HASH_PEPPER a week earlier: demanding a new
+// variable to run the unit suite buys no security (a test key protects
+// nothing) and costs every contributor a setup step they will eventually skip
+// by weakening the check.
+const deployedEnvironment = parsed.data.NODE_ENV === 'production' || parsed.data.NODE_ENV === 'staging';
+
+for (const name of ['MFA_SECRET_KEY', 'MFA_CHALLENGE_SECRET'] as const) {
+  if (!parsed.data[name]) {
+    if (deployedEnvironment) {
+      throw new Error(`${name} is required in staging and production.`);
+    }
+    // Distinct domain labels, so the two derived values are never equal and
+    // the separation the check below enforces still holds locally.
+    parsed.data[name] = createHash('sha256')
+      .update(`colearnx-local-${name.toLowerCase()}:${parsed.data.ACCESS_TOKEN_SECRET}`)
+      .digest('hex');
+  } else if (parsed.data[name].length < 32) {
+    throw new Error(`${name} must be at least 32 characters.`);
+  }
+}
+
+if (parsed.data.MFA_SECRET_KEY === parsed.data.MFA_CHALLENGE_SECRET) {
+  // Two keys with different jobs. Sharing one would make an encryption-key
+  // rotation silently invalidate every outstanding challenge token, and vice
+  // versa -- the coupling nobody discovers until a rotation goes wrong.
+  throw new Error('MFA_SECRET_KEY and MFA_CHALLENGE_SECRET must be different values.');
+}
+
 if (!parsed.data.SECURITY_HASH_PEPPER) {
   if (parsed.data.NODE_ENV === 'production' || parsed.data.NODE_ENV === 'staging') {
     throw new Error('SECURITY_HASH_PEPPER is required in staging and production.');

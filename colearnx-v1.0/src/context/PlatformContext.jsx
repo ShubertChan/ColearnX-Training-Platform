@@ -9,6 +9,7 @@ import {
   resendVerificationEmail,
   updateCurrentUser,
   verifyEmailAddress,
+  completeMfaLogin,
 } from "../api/auth";
 import { hasAccessToken, hasCsrfToken, setAccessToken, setCsrfToken } from "../api/client";
 import {
@@ -524,8 +525,11 @@ export function PlatformProvider({ children }) {
     restoreSession();
   }, [refreshCatalog, restoreSession]);
 
-  const signIn = async ({ email, password }) => {
-    const result = await loginAccount({ email, password });
+  // Shared tail of both sign-in paths. Kept in one place so the second-factor
+  // route cannot drift from the single-factor one -- a session established by
+  // a different code path is how "MFA is enabled but somehow bypassed" bugs
+  // get written.
+  const establishSession = async (result) => {
     ordersRequestRevision.current += 1;
     setOrders([]);
     setAccessToken(result.accessToken);
@@ -533,6 +537,23 @@ export function PlatformProvider({ children }) {
     const roles = applyServerIdentity(await getCurrentUser());
     void refreshAccountData(roles);
     return { roles };
+  };
+
+  const signIn = async ({ email, password }) => {
+    const result = await loginAccount({ email, password });
+    // No session is issued yet when a second factor is enrolled. The caller
+    // must collect a code and call completeSignIn; nothing here is stored in
+    // the meantime, so abandoning the flow leaves no usable state behind.
+    if (result.mfaRequired) {
+      return { mfaRequired: true, mfaToken: result.mfaToken, expiresInSeconds: result.expiresInSeconds };
+    }
+    return establishSession(result);
+  };
+
+  const completeSignIn = async ({ mfaToken, code }) => {
+    const result = await completeMfaLogin({ mfaToken, code });
+    const session = await establishSession(result);
+    return { ...session, usedRecoveryCode: result.usedRecoveryCode, recoveryCodesRemaining: result.recoveryCodesRemaining };
   };
 
   const registerMember = async ({ name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged }) => {
@@ -842,6 +863,7 @@ export function PlatformProvider({ children }) {
     toast,
     notify,
     signIn,
+    completeSignIn,
     registerMember,
     verifyRegistrationEmail,
     resendRegistrationEmail,

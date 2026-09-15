@@ -7,6 +7,7 @@ import { usePlatform } from "./context/PlatformContext";
 import { AuthPage, ForgotPasswordPage, ResetPasswordPage } from "./pages/AuthPages";
 import { PrivacyPage, TermsPage } from "./pages/LegalPages";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
+import { SecuritySettingsPage } from "./pages/SecurityPages";
 import { HomePage, ProfilePage, PublicProfilePage } from "./pages/AccountPlatformPages";
 import {
   ContentDetailPage,
@@ -123,6 +124,14 @@ export default function App() {
         element={
           <Workspace>
             <ProfilePage />
+          </Workspace>
+        }
+      />
+      <Route
+        path="/security"
+        element={
+          <Workspace>
+            <SecuritySettingsPage />
           </Workspace>
         }
       />
