@@ -22,6 +22,30 @@ export const securityEventSeverity = {
   'auth.account_locked': 3,
   'auth.account_lock_escalated': 3,
   'auth.unverified_login_attempt': 1,
+  // The account holder was told, out of band, that their account locked.
+  'auth.lock_notice_sent': 1,
+  // A second lock inside the cooldown window. Info-level on its own, but a
+  // high rate of these is what a sustained attack on one account looks like.
+  'auth.lock_notice_suppressed': 0,
+
+  // --- multi-factor authentication ----------------------------------------
+  'auth.mfa_enrolment_started': 0,
+  'auth.mfa_enrolment_failed': 1,
+  'auth.mfa_enabled': 2,
+  // Removing a second factor is the first thing an attacker holding a session
+  // would do, so it is recorded at the same severity as enabling it.
+  'auth.mfa_disabled': 3,
+  'auth.mfa_disable_rejected': 2,
+  'auth.mfa_challenge_issued': 0,
+  // A continuation token that was forged, expired, or presented for the wrong
+  // purpose.
+  'auth.mfa_challenge_rejected': 2,
+  'auth.mfa_failed': 2,
+  'auth.recovery_codes_rotated': 2,
+
+  // --- step-up re-authentication ------------------------------------------
+  'auth.step_up_granted': 1,
+  'auth.step_up_rejected': 2,
 
   // --- credential hygiene -------------------------------------------------
   'auth.password_policy_rejected': 0,
@@ -48,6 +72,7 @@ export const securityEventSeverity = {
   // client, and it already triggers a full session revocation in auth.ts.
   'session.refresh_reused': 4,
   'session.revoked_all': 2,
+  'session.revoked_one': 1,
 
   // --- access control -----------------------------------------------------
   'access.forbidden': 2,

@@ -103,6 +103,10 @@ done
 - [ ] 第 5 次之后，即使输入**正确**口令也仍然返回 `INVALID_CREDENTIALS`。
 - [ ] 等待 60 秒后，正确口令可以登录成功。
 - [ ] 数据库中 `auth_failure_counters.locked_until` 已被写入。
+- [ ] 锁定后，账号邮箱收到一封「Sign-in to your CoLearnX account was paused」
+- [ ] 6 小时内再次触发锁定 → **不再发第二封**，`security_events` 出现
+      `auth.lock_notice_suppressed`
+- [ ] 邮件正文不含 IP、不含地理位置、不含精确解锁时间戳
 
 ```sql
 SELECT consecutive_failures, locked_until, lockout_count
@@ -242,3 +246,64 @@ taxonomy           10 项   严重度取值域、密钥类字段剔除、深度�
 这些在 `W2-asvs-gap.md` 与威胁模型的登记册里都是可查的。
 如实写"已处置 8 条、其余按周次排期、2 条书面接受风险"，
 比一句无法支撑的结论可信得多，也更经得起追问。
+
+---
+
+# W4 验收清单（二次验证、会话管理、step-up）
+
+## 部署前必做
+
+```bash
+openssl rand -hex 32   # → MFA_SECRET_KEY
+openssl rand -hex 32   # → MFA_CHALLENGE_SECRET（必须与上面不同，相同则服务拒绝启动）
+npm --prefix apps/api run db:migrate    # 应用 014、015
+```
+
+**`MFA_SECRET_KEY` 丢失 = 所有已绑定的验证器全部失效**，用户只能靠恢复码进来。
+备份它的谨慎程度应等同于数据库本身。
+
+## 绑定流程
+
+- [ ] `/security` 点开启 → 出现设置密钥与 `otpauth://` 链接
+- [ ] 用验证器扫码/手动添加，输入 6 位码 → 成功，**一次性显示 10 个恢复码**
+- [ ] 刷新页面 → **恢复码不再可见**（服务端不保留可读副本）
+- [ ] 绑定未完成时（只开启未确认）退出重进 → **仍能正常登录**，不会被锁在门外
+
+## 登录第二步
+
+- [ ] 输入正确密码 → **不发会话**，进入验证码步骤
+- [ ] 此时关闭浏览器 → 没有任何会话残留，重新登录要从密码开始
+- [ ] 输入验证器的码 → 登录成功
+- [ ] **同一个码立刻再用一次 → 拒绝**（重放保护）
+- [ ] 用恢复码登录 → 成功，且该码不能再用，剩余数减一
+- [ ] 第二步连续输错 5 次 → 触发与密码相同的锁定阶梯
+
+## 管理员强制 2FA
+
+- [ ] 未绑定 2FA 的管理员访问任意 `/admin/*` → `403 MFA_ENROLMENT_REQUIRED`
+- [ ] **读接口也被拦**（能拖走全站数据的攻击者，和能改数据的一样危险）
+
+## step-up 二次验证
+
+- [ ] 已绑定的管理员调 `/admin/content-versions/:id/preview-url`
+      不带 `X-Step-Up-Token` → `401 STEP_UP_REQUIRED`
+- [ ] 先调 `/auth/step-up` 拿到令牌，带上后 → 成功
+- [ ] 把 A 管理员的 step-up 令牌拿到 B 管理员的会话里用 → **拒绝**（绑定到账号）
+- [ ] 把登录用的 `mfaToken` 当 step-up 令牌用 → **拒绝**（用途绑定）
+- [ ] 等待超过 `STEP_UP_TTL_SECONDS` → 拒绝
+
+## 会话管理
+
+- [ ] 在两个浏览器登录，`/security` 能看到两条，当前那条标注 "this browser"
+- [ ] 结束另一条 → 那个浏览器刷新后掉线
+- [ ] 「结束其他所有会话」→ **当前浏览器仍在线**
+- [ ] 尝试结束别人的 session id → `404`（不区分"不存在"和"不属于你"）
+
+## 事件核对
+
+```sql
+SELECT event_type, severity, count(*) FROM security_events
+ WHERE event_type LIKE 'auth.mfa%' OR event_type LIKE 'auth.step_up%'
+    OR event_type LIKE 'session.%'
+ GROUP BY 1,2 ORDER BY 2 DESC;
+```

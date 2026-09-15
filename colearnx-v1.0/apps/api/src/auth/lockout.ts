@@ -128,3 +128,48 @@ export async function clearFailures(userId: string): Promise<void> {
     [userId],
   );
 }
+
+/**
+ * Claims the right to send one lockout notification, atomically.
+ *
+ * Returns the previous notification time when the claim succeeds, or the
+ * string 'suppressed' when another lock already notified inside the cooldown
+ * window. The claim IS the conditional UPDATE: two concurrent lockouts both
+ * run it, exactly one matches a row, so exactly one email is sent. Checking
+ * first and then updating would let both pass the check.
+ *
+ * The previous value is returned so that a delivery failure can put it back --
+ * see releaseLockNotification. Overwriting it with NULL instead would reset
+ * the cooldown entirely and hand back the abuse vector the window closes.
+ */
+export async function claimLockNotification(
+  userId: string,
+  cooldownSeconds: number,
+): Promise<{ claimed: true; previous: Date | null } | { claimed: false }> {
+  const result = await query<{ previous: Date | null }>(
+    `WITH prior AS (
+       SELECT last_lock_notified_at AS value FROM auth_failure_counters WHERE user_id = $1
+     )
+     UPDATE auth_failure_counters
+        SET last_lock_notified_at = now(), updated_at = now()
+      WHERE user_id = $1
+        AND (last_lock_notified_at IS NULL
+             OR last_lock_notified_at < now() - make_interval(secs => $2::double precision))
+      RETURNING (SELECT value FROM prior) AS previous`,
+    [userId, cooldownSeconds],
+  );
+  if (!result.rowCount) return { claimed: false };
+  return { claimed: true, previous: result.rows[0].previous };
+}
+
+/**
+ * Restores the prior notification time after a delivery failure, so a mail
+ * outage does not silently consume the account's notification budget for the
+ * whole cooldown window.
+ */
+export async function releaseLockNotification(userId: string, previous: Date | null): Promise<void> {
+  await query(
+    'UPDATE auth_failure_counters SET last_lock_notified_at = $2, updated_at = now() WHERE user_id = $1',
+    [userId, previous],
+  );
+}

@@ -10,13 +10,16 @@ import { sendPasswordResetEmail, sendVerificationEmail } from '../email/resend.j
 import { createOpaqueToken, sha256 } from '../lib/crypto.js';
 import { ApiError, ok } from '../lib/http.js';
 import { parse } from '../lib/validation.js';
-import { sendPasswordChangedEmail } from '../email/resend.js';
+import { sendAccountLockedEmail, sendPasswordChangedEmail } from '../email/resend.js';
 import { recordSecurityEvent, securityContext } from '../security/events.js';
 import { emailFingerprint } from '../security/fingerprint.js';
 import { passwordResetUrl } from './password-reset-url.js';
 import { verifyPasswordConstantWork } from './credential-verify.js';
-import { clearFailures, lockoutAlertThreshold, readLockState, registerFailure } from './lockout.js';
+import { claimLockNotification, clearFailures, lockoutAlertThreshold, readLockState, registerFailure, releaseLockNotification } from './lockout.js';
+import { describeLockDuration } from './lockout-policy.js';
 import { assertPasswordAcceptable } from './password-gate.js';
+import { issueChallenge, verifyChallenge } from './mfa/challenge.js';
+import { readMfaState, verifySecondFactor } from './mfa/service.js';
 import {
   createVerificationCode,
   hashVerificationCode,
@@ -93,7 +96,7 @@ const resetPasswordSchema = z.object({
   message: 'Passwords do not match.', path: ['passwordConfirmation'],
 });
 const refreshLifetimeMs = 1000 * 60 * 60 * 24 * 14;
-const refreshCookieName = 'colearnx_refresh';
+export const refreshCookieName = 'colearnx_refresh';
 const registrationContinuationCookieName = 'colearnx_registration';
 
 function signAccessToken(actor: Actor) {
@@ -568,6 +571,65 @@ export async function resetPassword(req: Request, res: Response) {
   return ok(res, { reset: true, signInRequired: true });
 }
 
+/**
+ * Sends the out-of-band lockout notice, at most once per cooldown window.
+ *
+ * Email is the only channel that can safely carry account state. The sign-in
+ * page is public: anything shown there is shown to whoever triggered the lock,
+ * so a visible countdown would tell an attacker which addresses are real and
+ * turn the lockout into the enumeration oracle it exists to prevent. A message
+ * delivered to the registered address reaches only someone who already controls
+ * that mailbox.
+ *
+ * Everything here is best-effort and must never change the sign-in response:
+ * the caller is about to throw 401 regardless, and a mail provider outage must
+ * not turn that into a 500 or a hang. Failures are logged, not propagated --
+ * including a missing migration 014, which would otherwise make every locked
+ * sign-in a server error.
+ */
+async function notifyAccountLocked(
+  userId: string,
+  lockedUntil: Date | null,
+  fingerprint: ReturnType<typeof securityContext>,
+  res: Response,
+) {
+  try {
+    const claim = await claimLockNotification(userId, env.LOCK_NOTICE_COOLDOWN_HOURS * 3600);
+    if (!claim.claimed) {
+      await recordSecurityEvent(fingerprint, {
+        type: 'auth.lock_notice_suppressed', actorUserId: userId, context: { reason: 'cooldown' },
+      }, res);
+      return;
+    }
+
+    const account = await query<{ email: string }>('SELECT email::text AS email FROM users WHERE user_id = $1', [userId]);
+    const address = account.rows[0]?.email;
+    if (!address) {
+      await releaseLockNotification(userId, claim.previous);
+      return;
+    }
+
+    const seconds = lockedUntil ? Math.max(0, Math.round((lockedUntil.getTime() - Date.now()) / 1000)) : 0;
+    try {
+      await sendAccountLockedEmail({
+        to: address,
+        duration: describeLockDuration(seconds),
+        resetUrl: `${env.APP_ORIGIN}/#/forgot-password`,
+      });
+      await recordSecurityEvent(fingerprint, {
+        type: 'auth.lock_notice_sent', actorUserId: userId, context: { lockSeconds: seconds },
+      }, res);
+    } catch {
+      // Hand the slot back, or one mail outage costs this account its
+      // notification budget for the whole cooldown window.
+      await releaseLockNotification(userId, claim.previous);
+      res.locals.log?.warn({ requestId: fingerprint.requestId }, 'Account lock notification delivery failed');
+    }
+  } catch (error) {
+    res.locals.log?.error({ err: error, requestId: fingerprint.requestId }, 'Account lock notification failed');
+  }
+}
+
 export async function login(req: Request, res: Response) {
   const input = parse(loginSchema, req.body);
   const fingerprint = securityContext(req, res);
@@ -613,6 +675,7 @@ export async function login(req: Request, res: Response) {
           actorUserId: record.id, decision: 'lock',
           context: { consecutiveFailures: outcome.consecutiveFailures, lockedUntil: outcome.lockedUntil },
         }, res);
+        await notifyAccountLocked(record.id, outcome.lockedUntil, fingerprint, res);
       }
     } else {
       await recordSecurityEvent(fingerprint, {
@@ -642,12 +705,112 @@ export async function login(req: Request, res: Response) {
   }
 
   await clearFailures(actor.id);
+
+  // The first factor is now proven. If a second is enrolled, no session is
+  // issued here -- the caller gets a short-lived, purpose-bound continuation
+  // token instead. Issuing the session first and demanding the code afterwards
+  // would leave a usable session behind for anyone who simply stopped at that
+  // point.
+  const mfa = await readMfaState(actor.id);
+  if (mfa.enrolled) {
+    await recordSecurityEvent(fingerprint, {
+      type: 'auth.mfa_challenge_issued', actorUserId: actor.id,
+    }, res);
+    return ok(res, {
+      mfaRequired: true,
+      mfaToken: issueChallenge('mfa-continuation', actor.id, env.MFA_CONTINUATION_TTL_SECONDS, env.MFA_CHALLENGE_SECRET),
+      expiresInSeconds: env.MFA_CONTINUATION_TTL_SECONDS,
+    });
+  }
+
   const refreshToken = await createRefreshSession(actor, req, res);
   await recordSecurityEvent(fingerprint, {
     type: 'auth.login_succeeded', actorUserId: actor.id,
-    context: { clearedFailures: lock?.consecutiveFailures ?? 0 },
+    context: { clearedFailures: lock?.consecutiveFailures ?? 0, mfa: false },
   }, res);
   return ok(res, { user: actor, accessToken: signAccessToken(actor), csrfToken: createCsrfToken(refreshToken) });
+}
+
+
+const mfaVerifySchema = z.object({
+  mfaToken: z.string().trim().min(16).max(512),
+  code: z.string().trim().min(6).max(32),
+});
+
+/**
+ * Completes sign-in with the second factor.
+ *
+ * The continuation token is the only thing tying this request to the password
+ * that was already proven; it is signed, expires in minutes, and is bound to
+ * the purpose 'mfa-continuation' so it cannot be presented as a step-up token.
+ *
+ * Failures advance the same lockout ladder as a wrong password. Without that,
+ * an attacker who has the password but not the device gets unlimited attempts
+ * at a six-digit code -- a million guesses is hours of work, not a meaningful
+ * barrier.
+ */
+export async function verifyMfaLogin(req: Request, res: Response) {
+  const input = parse(mfaVerifySchema, req.body);
+  const fingerprint = securityContext(req, res);
+
+  const challenge = verifyChallenge(input.mfaToken, 'mfa-continuation', env.MFA_CHALLENGE_SECRET);
+  if (!challenge.valid) {
+    await recordSecurityEvent(fingerprint, {
+      type: 'auth.mfa_challenge_rejected', decision: 'deny', context: { reason: challenge.reason },
+    }, res);
+    throw new ApiError(401, 'MFA_CHALLENGE_INVALID', 'That sign-in attempt expired. Start again.');
+  }
+
+  const lock = await readLockState(challenge.subject);
+  const factor = await verifySecondFactor(challenge.subject, input.code);
+
+  if (lock.locked) {
+    await recordSecurityEvent(fingerprint, {
+      type: 'auth.login_blocked', actorUserId: challenge.subject, decision: 'lock',
+      context: { stage: 'mfa', lockedUntil: lock.lockedUntil, factorMatched: factor.ok },
+    }, res);
+    throw new ApiError(401, 'MFA_CODE_INVALID', 'That code is not valid.');
+  }
+
+  if (!factor.ok) {
+    const outcome = await registerFailure(challenge.subject, env.LOGIN_FAILURE_DECAY_HOURS * 3600);
+    await recordSecurityEvent(fingerprint, {
+      type: 'auth.mfa_failed', actorUserId: challenge.subject,
+      context: { consecutiveFailures: outcome.consecutiveFailures, reason: factor.reason },
+    }, res);
+    if (outcome.newlyLocked) {
+      await recordSecurityEvent(fingerprint, {
+        type: outcome.consecutiveFailures >= lockoutAlertThreshold ? 'auth.account_lock_escalated' : 'auth.account_locked',
+        actorUserId: challenge.subject, decision: 'lock',
+        context: { stage: 'mfa', consecutiveFailures: outcome.consecutiveFailures, lockedUntil: outcome.lockedUntil },
+      }, res);
+      await notifyAccountLocked(challenge.subject, outcome.lockedUntil, fingerprint, res);
+    }
+    throw new ApiError(401, 'MFA_CODE_INVALID', 'That code is not valid.');
+  }
+
+  const actor = await loadActor(challenge.subject);
+  // Re-checked rather than trusted from the first step: the account may have
+  // been suspended in the seconds between the two requests.
+  if (!actor || actor.status !== 'active' || actorNeedsEmailVerification(actor)) {
+    throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
+  }
+
+  await clearFailures(actor.id);
+  const refreshToken = await createRefreshSession(actor, req, res);
+  await recordSecurityEvent(fingerprint, {
+    type: 'auth.login_succeeded', actorUserId: actor.id,
+    context: { mfa: true, viaRecoveryCode: factor.usedRecoveryCode },
+  }, res);
+  // Surfaced so the client can warn a user who is running low; a user down to
+  // their last code and unaware of it is one lost phone from a lockout.
+  return ok(res, {
+    user: actor,
+    accessToken: signAccessToken(actor),
+    csrfToken: createCsrfToken(refreshToken),
+    usedRecoveryCode: factor.usedRecoveryCode,
+    recoveryCodesRemaining: factor.recoveryCodesRemaining,
+  });
 }
 
 export async function csrf(req: Request, res: Response) {
