@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
+import { ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, UserRound, ShieldCheck } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button, FormField } from "../components/ui";
 import { usePlatform } from "../context/PlatformContext";
@@ -33,7 +33,7 @@ function AuthStory({ recovery = false }) {
 }
 
 export function AuthPage({ mode = "login" }) {
-  const register = mode === "register"; const navigate = useNavigate(); const location = useLocation(); const { signIn, registerMember } = usePlatform();
+  const register = mode === "register"; const navigate = useNavigate(); const location = useLocation(); const { signIn, completeSignIn, registerMember } = usePlatform();
   const [show, setShow] = useState(false); const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [confirmation, setConfirmation] = useState(""); const [acceptedTerms, setAcceptedTerms] = useState(false); const [ageAcknowledged, setAgeAcknowledged] = useState(false); const [error, setError] = useState(""); const [submitting, setSubmitting] = useState(false);
   // Counts sign-in failures observed *by this browser*, keyed by the address
   // that was tried. The server never discloses whether an account is locked --
@@ -43,8 +43,22 @@ export function AuthPage({ mode = "login" }) {
   // that count reveals nothing new and gives a genuine user the explanation
   // they would otherwise never get.
   const [failures, setFailures] = useState({ email: "", count: 0 });
+  const [mfa, setMfa] = useState(null);
   const attemptedEmail = email.trim().toLowerCase();
   const repeatedFailures = failures.email === attemptedEmail ? failures.count : 0;
+
+  const submitMfa = async (event) => {
+    event.preventDefault();
+    setMfa((previous) => ({ ...previous, busy: true, error: "" }));
+    try {
+      const identity = await completeSignIn({ mfaToken: mfa.token, code: mfa.code });
+      const target = intendedPath() || defaultRouteForRoles(identity.roles);
+      navigate(target, { replace: true });
+    } catch (mfaError) {
+      setMfa((previous) => ({ ...previous, busy: false, error: mfaError.message }));
+    }
+  };
+
   const submit = async (event) => {
     event.preventDefault();
     if (register && password !== confirmation) return setError("Passwords do not match.");
@@ -58,6 +72,15 @@ export function AuthPage({ mode = "login" }) {
       } else {
         const identity = await signIn({ email: email.trim(), password });
         setFailures({ email: "", count: 0 });
+        if (identity.mfaRequired) {
+          // The password is proven but no session exists yet. The token lives
+          // in component state only -- never in storage -- so closing the tab
+          // abandons the attempt rather than leaving a half-authenticated
+          // credential behind.
+          setMfa({ token: identity.mfaToken, code: "", error: "", busy: false });
+          setSubmitting(false);
+          return;
+        }
         navigate(intendedPath(location.state?.from, identity.roles.includes("Admin") ? "/admin" : "/home"), { replace: true });
       }
     } catch (authError) {
@@ -71,6 +94,10 @@ export function AuthPage({ mode = "login" }) {
       }
     } finally { setSubmitting(false); }
   };
+  if (mfa) {
+    return <div className="auth-page"><AuthStory /><section className="auth-form-wrap"><form className="auth-form" onSubmit={submitMfa}><span className="eyebrow">Two-factor authentication</span><h2>Enter your verification code</h2><p>Open your authenticator app and enter the current six-digit code. You can also use one of your recovery codes.</p><FormField label="Verification code"><div className="input-with-icon"><ShieldCheck size={18} /><input required autoFocus autoComplete="one-time-code" inputMode="text" value={mfa.code} onChange={(event) => setMfa((previous) => ({ ...previous, code: event.target.value }))} placeholder="123456 or a recovery code" /></div></FormField>{mfa.error && <div className="form-error" role="alert">{mfa.error}</div>}<Button className="wide" type="submit" disabled={mfa.busy}>{mfa.busy ? "Verifying…" : "Verify and sign in"}<ArrowRight size={17} /></Button><p className="auth-switch"><button type="button" className="link-button" onClick={() => setMfa(null)}>Use a different account</button></p></form></section></div>;
+  }
+
   return <div className="auth-page"><AuthStory /><section className="auth-form-wrap"><form className="auth-form" onSubmit={submit}><span className="eyebrow">{register ? "New member" : "Welcome back"}</span><h2>{register ? "Create your account" : "Sign in to CoLearnX"}</h2><p>{register ? "A Member profile and points wallet will be created automatically." : "Continue your learning and creator activity."}</p>{register && <FormField label="Full name"><div className="input-with-icon"><UserRound size={18} /><input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Your full name" /></div></FormField>}<FormField label="Email address"><div className="input-with-icon"><Mail size={18} /><input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" /></div></FormField><FormField label="Password"><div className="input-with-icon"><LockKeyhole size={18} /><input required autoComplete={register ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} type={show ? "text" : "password"} /><button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"}>{show ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></FormField>{register && <PasswordGuidance password={password} context={{ email, displayName: name }} />}{register && <FormField label="Confirm password"><div className="input-with-icon"><LockKeyhole size={18} /><input required autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} type={show ? "text" : "password"} /></div></FormField>}{error && <div className="form-error" role="alert">{error}</div>}{!register && repeatedFailures >= 5 && <div className="form-notice" role="status">Several sign-in attempts for this address have failed. For security, repeated failures pause sign-in for a short time, so a correct password may still be refused until the pause ends. Wait a minute and try again, or <Link to="/forgot-password">reset your password</Link> — completing a reset lifts the pause immediately.</div>}{register && <div className="auth-consents"><label className="check-label"><input required type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} /><span>I accept the <Link to="/terms" target="_blank">Terms</Link> and <Link to="/privacy" target="_blank">Privacy Notice</Link>.</span></label><label className="check-label"><input required type="checkbox" checked={ageAcknowledged} onChange={(event) => setAgeAcknowledged(event.target.checked)} /><span>I meet the configured minimum-age policy.</span></label></div>}<Button className="wide" type="submit" disabled={submitting}>{submitting ? "Connecting…" : register ? "Create Member account" : "Sign in"}<ArrowRight size={17} /></Button>{!register && <p className="auth-recovery"><Link to="/forgot-password">Forgot your password?</Link></p>}<p className="auth-switch">{register ? "Already have an account?" : "New to CoLearnX?"} <Link to={register ? "/login" : "/register"}>{register ? "Sign in" : "Create account"}</Link></p></form></section></div>;
 }
 

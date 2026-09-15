@@ -10,7 +10,10 @@ import { env } from './config/env.js';
 import { query } from './db/database.js';
 import { ApiError, errorHandler, notFound, ok } from './lib/http.js';
 import { recordAccessDecision } from './security/access-log.js';
-import { authenticate, csrf, forgotPassword, login, logout, me, refresh, register, resendEmailVerification, requireRole, resetPassword, updateMe, verifyEmail } from './auth/auth.js';
+import { confirmMfaEnrolment, disableMfaForSelf, getMfaStatus, requestStepUp, rotateRecoveryCodes, startMfaEnrolment } from './auth/mfa/routes.js';
+import { requireAdminMfa, requireStepUp } from './auth/mfa/guards.js';
+import { listSessions, revokeOtherSessions, revokeSession } from './auth/sessions.js';
+import { authenticate, csrf, forgotPassword, login, logout, me, refresh, register, resendEmailVerification, requireRole, resetPassword, updateMe, verifyEmail, verifyMfaLogin } from './auth/auth.js';
 import { createCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
 import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, deleteContentDraft, deleteCourseDraft, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse, updateCourse } from './catalog/catalog.js';
@@ -84,6 +87,21 @@ export function createApp() {
   api.post('/me/data-export', authenticate, mutationLimiter, requestDataExport);
   api.post('/me/deletion-requests', authenticate, mutationLimiter, requestAccountDeletion);
   api.post('/auth/logout', logout);
+  // Second step of sign-in. Rate limited with the auth bucket: an attacker
+  // holding the password but not the device would otherwise get unlimited
+  // attempts at a six-digit code.
+  api.post('/auth/mfa/verify', authLimiter, verifyMfaLogin);
+
+  // --- account security surface ------------------------------------------
+  api.get('/auth/mfa', authenticate, getMfaStatus);
+  api.post('/auth/mfa/enrol', authenticate, mutationLimiter, startMfaEnrolment);
+  api.post('/auth/mfa/confirm', authenticate, authLimiter, confirmMfaEnrolment);
+  api.post('/auth/mfa/disable', authenticate, authLimiter, disableMfaForSelf);
+  api.post('/auth/mfa/recovery-codes', authenticate, authLimiter, rotateRecoveryCodes);
+  api.post('/auth/step-up', authenticate, authLimiter, requestStepUp);
+  api.get('/auth/sessions', authenticate, listSessions);
+  api.delete('/auth/sessions/:id', authenticate, mutationLimiter, revokeSession);
+  api.post('/auth/sessions/revoke-others', authenticate, mutationLimiter, revokeOtherSessions);
   api.get('/me', authenticate, me);
   api.patch('/me', authenticate, mutationLimiter, updateMe);
 
@@ -137,33 +155,33 @@ export function createApp() {
   api.post('/order-items/:orderItemId/delivery/download-url', authenticate, mutationLimiter, createCourseDownloadUrl);
   api.post('/order-items/:orderItemId/progress', authenticate, mutationLimiter, recordCourseProgress);
   api.get('/refund-requests/:id', authenticate, getRefundRequest);
-  api.get('/admin/role-applications', authenticate, requireRole('admin'), listRoleApplications);
-  api.post('/admin/role-applications/:id/decision', authenticate, requireRole('admin'), mutationLimiter, decideRoleApplication);
-  api.get('/admin/trainer-certifications', authenticate, requireRole('admin'), listTrainerCertifications);
-  api.post('/admin/trainer-certifications/:id/decision', authenticate, requireRole('admin'), mutationLimiter, decideTrainerCertification);
-  api.get('/admin/course-submissions', authenticate, requireRole('admin'), listCourseSubmissions);
-  api.post('/admin/course-runs/:id/decision', authenticate, requireRole('admin'), mutationLimiter, decideCourseSubmission);
-  api.get('/admin/content-submissions', authenticate, requireRole('admin'), listContentSubmissions);
-  api.post('/admin/content-versions/:id/decision', authenticate, requireRole('admin'), mutationLimiter, decideContentSubmission);
-  api.post('/admin/content-versions/:contentVersionId/preview-url', authenticate, requireRole('admin'), mutationLimiter, previewContentAsset);
-  api.get('/admin/refund-requests', authenticate, requireRole('admin'), listRefundRequestsForAdmin);
-  api.post('/admin/refund-requests/:id/decision', authenticate, requireRole('admin'), mutationLimiter, decideRefund);
-  api.get('/admin/users', authenticate, requireRole('admin'), listUsers);
-  api.get('/admin/users/:id', authenticate, requireRole('admin'), getUser);
-  api.post('/admin/users/:id/suspend', authenticate, requireRole('admin'), mutationLimiter, suspendUser);
-  api.post('/admin/users/:id/reinstate', authenticate, requireRole('admin'), mutationLimiter, reinstateUser);
-  api.post('/admin/users/:id/roles', authenticate, requireRole('admin'), mutationLimiter, changeUserRole);
-  api.delete('/admin/users/:id', authenticate, requireRole('admin'), mutationLimiter, deleteUser);
-  api.put('/admin/revenue-share-policies/:kind', authenticate, requireRole('admin'), mutationLimiter, setRevenueSharePolicy);
-  api.post('/admin/top-up-packages', authenticate, requireRole('admin'), mutationLimiter, createTopUpPackage);
-  api.post('/admin/top-up-packages/:id/retire', authenticate, requireRole('admin'), mutationLimiter, retireTopUpPackage);
-  api.post('/admin/points/adjustments', authenticate, requireRole('admin'), mutationLimiter, adjustPoints);
-  api.get('/admin/reports', authenticate, requireRole('admin'), listReports);
-  api.post('/admin/reports/:id/decision', authenticate, requireRole('admin'), mutationLimiter, decideReport);
-  api.get('/admin/audit-logs', authenticate, requireRole('admin'), listAuditLogs);
-  api.get('/admin/activity-report', authenticate, requireRole('admin'), activityReport);
-  api.post('/admin/course-runs/:id/complete', authenticate, requireRole('admin'), mutationLimiter, completeLiveCourseRun);
-  api.post('/admin/course-runs/:id/cancel', authenticate, requireRole('admin'), mutationLimiter, cancelLiveCourseRun);
+  api.get('/admin/role-applications', authenticate, requireRole('admin'), requireAdminMfa, listRoleApplications);
+  api.post('/admin/role-applications/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, requireStepUp, decideRoleApplication);
+  api.get('/admin/trainer-certifications', authenticate, requireRole('admin'), requireAdminMfa, listTrainerCertifications);
+  api.post('/admin/trainer-certifications/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, decideTrainerCertification);
+  api.get('/admin/course-submissions', authenticate, requireRole('admin'), requireAdminMfa, listCourseSubmissions);
+  api.post('/admin/course-runs/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, decideCourseSubmission);
+  api.get('/admin/content-submissions', authenticate, requireRole('admin'), requireAdminMfa, listContentSubmissions);
+  api.post('/admin/content-versions/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, decideContentSubmission);
+  api.post('/admin/content-versions/:contentVersionId/preview-url', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, requireStepUp, previewContentAsset);
+  api.get('/admin/refund-requests', authenticate, requireRole('admin'), requireAdminMfa, listRefundRequestsForAdmin);
+  api.post('/admin/refund-requests/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, decideRefund);
+  api.get('/admin/users', authenticate, requireRole('admin'), requireAdminMfa, listUsers);
+  api.get('/admin/users/:id', authenticate, requireRole('admin'), requireAdminMfa, getUser);
+  api.post('/admin/users/:id/suspend', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, suspendUser);
+  api.post('/admin/users/:id/reinstate', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, reinstateUser);
+  api.post('/admin/users/:id/roles', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, changeUserRole);
+  api.delete('/admin/users/:id', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, deleteUser);
+  api.put('/admin/revenue-share-policies/:kind', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, setRevenueSharePolicy);
+  api.post('/admin/top-up-packages', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, createTopUpPackage);
+  api.post('/admin/top-up-packages/:id/retire', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, retireTopUpPackage);
+  api.post('/admin/points/adjustments', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, adjustPoints);
+  api.get('/admin/reports', authenticate, requireRole('admin'), requireAdminMfa, listReports);
+  api.post('/admin/reports/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, decideReport);
+  api.get('/admin/audit-logs', authenticate, requireRole('admin'), requireAdminMfa, listAuditLogs);
+  api.get('/admin/activity-report', authenticate, requireRole('admin'), requireAdminMfa, activityReport);
+  api.post('/admin/course-runs/:id/complete', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, completeLiveCourseRun);
+  api.post('/admin/course-runs/:id/cancel', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, cancelLiveCourseRun);
   app.use('/api/v1', api);
   app.use(notFound);
   // Observes 403/429 for the security ledger, then hands the error to the

@@ -3404,3 +3404,61 @@ tbody tr[role="button"]:focus-visible {
   font-weight: 600;
   text-decoration: underline;
 }
+
+/* Inline button that reads as a link (used to abandon a half-finished sign-in). */
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: #2f6fed;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Account security page: two-factor and active sessions. */
+.security-panel {
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid #e3e7ee;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.security-panel.highlight { border-color: #f0d9a8; background: #fdf7e9; }
+.security-panel h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.5rem; }
+.security-hint { font-size: 0.82rem; color: #5b6472; }
+.security-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }
+
+.recovery-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.4rem;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recovery-codes code {
+  display: block;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #e6dcc4;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
+}
+
+.session-list { margin: 0.8rem 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; }
+
+.session-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #edf0f4;
+  border-radius: 10px;
+}
+
+.session-list li div { flex: 1; display: grid; }
+.session-list li span { font-size: 0.78rem; color: #6b7280; }
