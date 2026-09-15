@@ -29,3 +29,20 @@ export function lockDurationSeconds(consecutiveFailures: number): number {
   }
   return seconds;
 }
+
+/**
+ * Renders a lock duration for the notification email.
+ *
+ * Kept here, next to the ladder it describes, so the wording can never drift
+ * from the numbers. Rounded rather than exact: the email says "about 15
+ * minutes", not a timestamp, because by the time it is read the remaining time
+ * has already changed and a stale countdown is worse than none.
+ */
+export function describeLockDuration(seconds: number): string {
+  if (seconds <= 0) return 'a short time';
+  if (seconds < 60) return `${seconds} seconds`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+  const hours = Math.round(seconds / 3600);
+  return hours === 1 ? '1 hour' : `${hours} hours`;
+}
