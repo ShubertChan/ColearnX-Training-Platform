@@ -1,3 +1,30 @@
+.inbox-button { position: relative; flex-shrink: 0; }
+.inbox-button.has-unread { color: #4057d6; background: #eef0ff; }
+.inbox-count { display: inline-flex; align-items: center; justify-content: center; min-width: 21px; height: 21px; padding: 0 5px; border-radius: 12px; background: #b42318; color: #fff; font-size: 11px; font-weight: 700; }
+.inbox-button .inbox-count { position: absolute; top: -7px; right: -7px; border: 2px solid white; }
+.inbox-arrival { display: flex; align-items: center; gap: 12px; border: 1px solid #c7ceff; border-radius: 14px; background: #eef0ff; padding: 14px 18px; margin-bottom: 20px; }
+.inbox-arrival > span { flex: 1; }
+.inbox-arrival small { display: block; color: #667085; margin-top: 4px; }
+.admin-inbox-layout { display: grid; grid-template-columns: minmax(280px, 0.95fr) minmax(300px, 1.3fr); gap: 22px; align-items: start; }
+.inbox-list-card { padding: 8px; min-width: 0; }
+.inbox-list { display: grid; gap: 5px; max-height: 660px; overflow-y: auto; }
+.inbox-message { display: flex; align-items: start; gap: 12px; padding: 18px 14px; width: 100%; text-align: left; color: #172033; border: 1px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; }
+.inbox-message > svg { flex-shrink: 0; margin-top: 3px; color: #667085; }
+.inbox-message > span:first-of-type { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.inbox-message b, .inbox-message small, .inbox-message time { display: block; }
+.inbox-message small { margin: 5px 0; }
+.inbox-message time { font-size: 11px; color: #667085; }
+.inbox-message.unread { background: #f1f3ff; }
+.inbox-message.unread > svg { color: #4057d6; }
+.inbox-message:hover, .inbox-message.selected { border-color: #9ca9f4; background: #e9edff; }
+.inbox-message:focus-visible { outline: 3px solid #4057d6; outline-offset: -3px; }
+.inbox-message-status { display: grid; justify-items: end; gap: 8px; }
+.inbox-detail { min-width: 0; min-height: 310px; }
+.inbox-summary { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; padding: 20px 0; }
+@media (max-width: 1100px) { .admin-inbox-layout { grid-template-columns: minmax(0, 1fr); } .inbox-list { max-height: 410px; } }
+@media (max-width: 600px) { .inbox-arrival { flex-wrap: wrap; padding: 12px; } .inbox-message { padding: 14px 10px; } }
+@media (max-width: 600px) { .inbox-toolbar-card > .card-heading { flex-direction: column; align-items: stretch; } }
+
 :root {
   color: #172033;
   background: #f4f6fb;
@@ -2852,7 +2879,7 @@ tbody tr[role="button"]:focus-visible {
     border-radius: 14px;
   }
   .topbar p,
-  .topbar-actions > .icon-button {
+  .topbar-actions > .icon-button:not(.inbox-button) {
     display: none;
   }
   .balance-pill span {
@@ -3370,6 +3397,30 @@ tbody tr[role="button"]:focus-visible {
     justify-self: start;
   }
 }
+/* Hosted video remains contained within its delivery/review panel on small screens. */
+.course-video-uploader { margin: 24px 0; padding: 22px; border: 1px solid #dce5e1; border-radius: 16px; background: #f8fbfa; }
+.video-file-picker { display: grid; gap: 10px; font-weight: 600; }
+.video-file-picker input { max-width: 100%; }
+.video-version { padding-top: 16px; border-top: 1px solid #dce5e1; }
+.video-metadata { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 12px; overflow-wrap: anywhere; }
+.video-metadata img { width: 132px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 9px; }
+.video-metadata small { display: block; }
+.video-player { display: grid; gap: 12px; min-width: 0; }
+.video-player video { width: 100%; max-height: 65vh; background: #132722; border-radius: 10px; }
+.session-storage-notice { margin: 0; padding: 12px 20px; background: #fff4d6; color: #594300; text-align: center; }
+.video-player video[hidden] { display: none; }
+.video-evidence { margin-top: 18px; padding: 16px; background: #f8fbfa; border-radius: 10px; overflow-wrap: anywhere; }
+.video-evidence .receipt-details { gap: 8px; }
+.admin-video-review { min-width: 0; width: 100%; }
+.admin-video-review > label { display: grid; gap: 8px; }
+@media (max-width: 640px) {
+  .course-video-uploader { padding: 14px; }
+  .video-metadata { flex-direction: column; }
+  .video-metadata img { width: 100%; max-width: 280px; }
+  .course-video-uploader .button-row, .admin-video-review .button-row { flex-wrap: wrap; }
+  .video-evidence .receipt-details > div { display: grid; gap: 4px; }
+}
+
 
 /* Password guidance (ASVS 2.1.8). Every unmet requirement is shown at once
    rather than one per submit attempt. */

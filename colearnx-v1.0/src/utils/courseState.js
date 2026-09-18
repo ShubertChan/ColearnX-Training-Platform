@@ -33,11 +33,9 @@ export function getLiveStatus(course, now = new Date()) {
 export function getRefundInfo(course) {
   const snapshot = course.refundPolicySnapshot || course.refundPolicy || course.refundPolicyPreview;
   const onlineVideo = course.onlineVideo || course.progressTrackingType === "online_video";
-  const total = Number(course.totalDurationSeconds ?? course.duration ?? 0);
-  const watched = Number(course.watchedSeconds ?? course.watched ?? 0);
-  const ratio = onlineVideo && total > 0 ? watched / total : null;
+  const ratio = onlineVideo && Number.isFinite(course.watchedRatio) ? course.watchedRatio : null;
   const progress = ratio === null ? null : Math.round(ratio * 100);
-  const progressConditionMet = ratio === null ? null : ratio <= WATCH_REFUND_LIMIT;
+  const progressConditionMet = typeof course.refundEligibility?.progressConditionMet === "boolean" ? course.refundEligibility.progressConditionMet : null;
   const serverEligible = course.refundEligibility?.eligible ?? course.refundEligible;
   const delivery = getDeliveryModes(course);
   const deliveryDetail = delivery.includes("cloud")
@@ -54,7 +52,7 @@ export function getRefundInfo(course) {
       ? `Online-video viewing condition: ${WATCH_REFUND_LIMIT * 100}% watched or less`
       : "Server-recorded purchase policy"),
     detail: `${deliveryDetail} ${onlineVideo
-      ? `The API records watchedSeconds / totalDurationSeconds; the progress condition is met at ${WATCH_REFUND_LIMIT * 100}% or less.`
+      ? `The service confirms unique viewed content and protected attachment evidence; the viewing limit is ${WATCH_REFUND_LIMIT * 100}% or less.`
       : "Delivery mode does not create a viewing-progress rule."} Final eligibility comes from the server-side purchase snapshot.`,
   };
 }

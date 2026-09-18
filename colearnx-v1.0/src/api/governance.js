@@ -1,4 +1,4 @@
-import { apiClient } from "./client.js";
+import { apiClient, mutateApi } from "./client.js";
 
 const unwrap = (response) => response.data.data;
 export const getMyRoleApplications = () => apiClient.get("/role-applications/me").then(unwrap);
@@ -18,6 +18,6 @@ async function listPages(path, { status, limit = 100 } = {}) {
 }
 
 export const getAdminRoleApplications = (input) => listPages("/admin/role-applications", input);
-export const decideRoleApplication = (applicationId, input) => apiClient.post(`/admin/role-applications/${applicationId}/decision`, input).then(unwrap);
+export const decideRoleApplication = (applicationId, input) => mutateApi("post", `/admin/role-applications/${applicationId}/decision`, input).then(unwrap);
 export const getAdminTrainerCertifications = (input) => listPages("/admin/trainer-certifications", input);
-export const decideTrainerCertification = (certificationId, input) => apiClient.post(`/admin/trainer-certifications/${certificationId}/decision`, input).then(unwrap);
+export const decideTrainerCertification = (certificationId, input) => mutateApi("post", `/admin/trainer-certifications/${certificationId}/decision`, input).then(unwrap);

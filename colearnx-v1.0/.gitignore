@@ -8,3 +8,7 @@ node_modules/
 coverage/
 apps/api/dist/
 /dist/
+/work/
+/test-results/
+/review-test-results/
+/playwright-report/
