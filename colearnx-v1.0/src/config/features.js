@@ -6,3 +6,5 @@ export function isFeatureEnabled(value) {
 export const paymentsApiEnabled = isFeatureEnabled(
   import.meta.env?.VITE_PAYMENTS_API_ENABLED,
 );
+
+export const hostedVideoEnabled = isFeatureEnabled(import.meta.env?.VITE_ENABLE_HOSTED_VIDEO);

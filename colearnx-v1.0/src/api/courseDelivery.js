@@ -1,4 +1,5 @@
 import { apiClient } from "./client.js";
+import { heartbeatBody } from "../utils/videoContract.js";
 
 const unwrap = (response) => response.data.data;
 const idempotencyKey = (prefix) =>
@@ -18,5 +19,7 @@ export const requestCourseDownloadUrl = (orderItemId, assetId) =>
 
 export const recordCourseProgress = (orderItemId, input) =>
   apiClient
-    .post(`/order-items/${orderItemId}/progress`, input)
+    .post(`/order-items/${encodeURIComponent(orderItemId)}/progress`, heartbeatBody(input), {
+      adapter: "fetch", fetchOptions: { keepalive: true }, timeout: 8000,
+    })
     .then(unwrap);

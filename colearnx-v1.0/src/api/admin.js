@@ -1,4 +1,4 @@
-import { apiClient } from "./client.js";
+import { apiClient, mutateApi } from "./client.js";
 
 const unwrap = (response) => response.data.data;
 
@@ -15,10 +15,10 @@ async function listEveryPage(path) {
 }
 
 export const getCourseSubmissions = () => listEveryPage("/admin/course-submissions");
-export const decideCourseSubmission = (courseRunId, input) => apiClient.post(`/admin/course-runs/${courseRunId}/decision`, input).then(unwrap);
+export const decideCourseSubmission = (courseRunId, input) => mutateApi("post", `/admin/course-runs/${courseRunId}/decision`, input).then(unwrap);
 export const getContentSubmissions = () => listEveryPage("/admin/content-submissions");
-export const decideContentSubmission = (contentVersionId, input) => apiClient.post(`/admin/content-versions/${contentVersionId}/decision`, input).then(unwrap);
-export const previewContentSubmission = (contentVersionId, assetId) => apiClient.post(`/admin/content-versions/${contentVersionId}/preview-url`, assetId ? { assetId } : {}).then(unwrap);
+export const decideContentSubmission = (contentVersionId, input) => mutateApi("post", `/admin/content-versions/${contentVersionId}/decision`, input).then(unwrap);
+export const previewContentSubmission = (contentVersionId, assetId) => mutateApi("post", `/admin/content-versions/${contentVersionId}/preview-url`, assetId ? { assetId } : {}).then(unwrap);
 
 export const getAdminUsers = async ({ status, search, page = 1, limit = 50 } = {}) => {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
@@ -28,7 +28,7 @@ export const getAdminUsers = async ({ status, search, page = 1, limit = 50 } = {
 };
 
 export const getAdminUser = (userId) => apiClient.get(`/admin/users/${userId}`).then(unwrap);
-export const suspendAdminUser = (userId, reason) => apiClient.post(`/admin/users/${userId}/suspend`, { reason }).then(unwrap);
-export const reinstateAdminUser = (userId, reason) => apiClient.post(`/admin/users/${userId}/reinstate`, { reason }).then(unwrap);
-export const deleteAdminUser = (userId, reason) => apiClient.delete(`/admin/users/${userId}`, { data: { reason } }).then(unwrap);
-export const setAdminUserRole = (userId, input) => apiClient.post(`/admin/users/${userId}/roles`, input).then(unwrap);
+export const suspendAdminUser = (userId, reason) => mutateApi("post", `/admin/users/${userId}/suspend`, { reason }).then(unwrap);
+export const reinstateAdminUser = (userId, reason) => mutateApi("post", `/admin/users/${userId}/reinstate`, { reason }).then(unwrap);
+export const deleteAdminUser = (userId, reason) => mutateApi("delete", `/admin/users/${userId}`, { reason }).then(unwrap);
+export const setAdminUserRole = (userId, input) => mutateApi("post", `/admin/users/${userId}/roles`, input).then(unwrap);

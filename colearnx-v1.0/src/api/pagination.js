@@ -1,12 +1,12 @@
 import { apiClient } from "./client.js";
 
-export async function listAllPages(path, filters = {}) {
+export async function listAllPages(path, filters = {}, { signal } = {}) {
   const items = [], seen = new Set(), cursors = new Set();
   let cursor, restarted = false;
   for (let page = 1; page <= 10000; page++) {
     let response;
     try {
-      response = await apiClient.get(path, { params: { ...filters, limit: 100, ...(cursor ? { cursor } : {}) } });
+      response = await apiClient.get(path, { signal, params: { ...filters, limit: 100, ...(cursor ? { cursor } : ["/admin/role-applications", "/admin/trainer-certifications"].includes(path) ? { page } : {}) } });
     } catch (error) {
       if (cursor && !restarted && (path === "/admin/reports" || path === "/admin/audit-logs") && error?.status === 400 && error?.code === "CURSOR_RESTART_REQUIRED") {
         items.length = 0; seen.clear(); cursors.clear(); cursor = undefined; restarted = true;

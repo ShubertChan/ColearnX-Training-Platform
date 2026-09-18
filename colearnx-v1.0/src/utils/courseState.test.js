@@ -9,11 +9,13 @@ test("cloud download does not imply online-video progress tracking", () => {
   assert.match(info.detail, /does not create a viewing-progress rule/);
 });
 
-test("explicit online video includes exactly 10 percent and rejects above it", () => {
+test("video refund UI never infers eligibility from locally calculated ratios", () => {
   const atLimit = getRefundInfo({ purchased: true, onlineVideo: true, totalDurationSeconds: 100, watchedSeconds: 10 });
-  const aboveLimit = getRefundInfo({ purchased: true, progressTrackingType: "online_video", totalDurationSeconds: 100, watchedSeconds: 11 });
-  assert.equal(atLimit.progressConditionMet, true);
-  assert.equal(aboveLimit.progressConditionMet, false);
+  assert.equal(atLimit.progressConditionMet, null);
+  assert.equal(atLimit.progress, null);
+  const server = getRefundInfo({ purchased: true, onlineVideo: true, watchedRatio: 0.100001, refundEligibility: { eligible: false, progressConditionMet: false } });
+  assert.equal(server.progressConditionMet, false);
+  assert.equal(server.eligible, false);
 });
 
 test("server eligibility is authoritative", () => {
