@@ -8,7 +8,7 @@ export function purchaseMetadataByProduct(orders, kind) {
   const purchases = new Map();
   orders.forEach((order) => (order.items || []).forEach((item) => {
     if (item.kind !== kind || !item.productId || !isActivePurchase(item.fulfilmentStatus)) return;
-    const candidate = { purchased: true, purchasedAt: order.paidAt || order.createdAt, orderItemId: item.id, orderId: order.id, refundStatus: null, downloaded: Boolean(item.downloaded) };
+    const candidate = { purchased: true, purchasedAt: order.paidAt || order.createdAt, orderItemId: item.id, orderId: order.id, refundStatus: null, refundPolicySnapshot: item.refundPolicySnapshot || null, courseVideoVersionId: item.courseVideoVersionId || null };
     const current = purchases.get(item.productId);
     if (!current || String(candidate.purchasedAt || "") >= String(current.purchasedAt || "")) purchases.set(item.productId, candidate);
   }));
@@ -19,7 +19,7 @@ export function decoratePurchasedItems(items, purchases) {
   return items.map((item) => {
     const purchase = purchases.get(item.id);
     if (purchase) return { ...item, ...purchase };
-    const { purchasedAt, orderItemId, orderId, refundStatus, downloaded, ...catalogItem } = item;
+    const { purchasedAt, orderItemId, orderId, refundStatus, refundPolicySnapshot, courseVideoVersionId, ...catalogItem } = item;
     return { ...catalogItem, purchased: false };
   });
 }

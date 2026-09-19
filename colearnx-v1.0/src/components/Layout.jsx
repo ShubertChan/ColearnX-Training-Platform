@@ -15,6 +15,7 @@ import {
   Library,
   LogOut,
   Menu,
+  Mail,
   ReceiptText,
   ShoppingCart,
   Store,
@@ -25,6 +26,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { usePlatform } from "../context/PlatformContext";
+import { useAdminInbox } from "../context/AdminInboxContext";
 import nextLogo from "../../assets/next-logo.jpg";
 
 const baseNavigation = [
@@ -51,9 +53,11 @@ const roleNavigation = {
     ["/published", "Published Items", BriefcaseBusiness],
   ],
   Admin: [
+    ["/admin/inbox", "Inbox", Mail],
     ["/admin", "Admin Dashboard", LayoutDashboard],
     ["/admin/operations", "Reports & Operations", ClipboardCheck],
     ["/admin/applications", "Role Applications", BadgeCheck],
+    ["/admin/certifications", "Trainer Certifications", BadgeCheck],
     ["/admin/refunds", "Refund Review", ClipboardCheck],
     ["/admin/users", "Users & Roles", UserCheck],
     ["/admin/catalog", "Catalog Control", BookOpen],
@@ -61,6 +65,8 @@ const roleNavigation = {
 };
 
 const titleMap = {
+  "/admin/inbox": ["Inbox", "Your application messages and review requests"],
+  "/admin/certifications": ["Trainer Certifications", "Review qualifications and certification evidence"],
   "/publishing-tools": ["Publishing tools", "Manage listings, licences, versions and usage"],
   "/admin/operations": ["Reports & Operations", "Review moderation, wallet adjustments and audit records"],
   "/home": ["Home", "Your learning activity at a glance"],
@@ -144,6 +150,7 @@ function titleFor(pathname) {
 }
 
 export default function Layout({ children }) {
+  const { unreadCount, errors: inboxErrors, arrivalCount, dismissArrival } = useAdminInbox();
   const {
     role,
     setRole,
@@ -261,6 +268,7 @@ export default function Layout({ children }) {
             >
               <Icon size={19} />
               <span>{label}</span>
+              {to === "/admin/inbox" && unreadCount > 0 && <b className="nav-count inbox-count">{unreadCount > 99 ? "99+" : unreadCount}</b>}
               {to === "/cart" && cart.length > 0 && (
                 <b className="nav-count">{cart.length}</b>
               )}
@@ -331,6 +339,7 @@ export default function Layout({ children }) {
             </div>
           </div>
           <div className="topbar-actions">
+            {role === "Admin" && <button className={`icon-button inbox-button ${unreadCount ? "has-unread" : ""}`} aria-label={`Admin inbox, ${unreadCount} unread${inboxErrors.length ? ", refresh unavailable" : ""}`} onClick={() => { dismissArrival(); navigate("/admin/inbox"); }}><Mail size={23} />{unreadCount > 0 ? <b className="inbox-count">{unreadCount > 99 ? "99+" : unreadCount}</b> : inboxErrors.length > 0 ? <span className="inbox-count">!</span> : null}</button>}
             {role !== "Admin" && <>
             <button
               className="balance-pill"
@@ -352,6 +361,7 @@ export default function Layout({ children }) {
           </div>
         </header>
         <div className="page-content">
+          {role === "Admin" && arrivalCount > 0 && <div className="inbox-arrival" role="status"><Mail size={21} /><span><b>{arrivalCount} new application {arrivalCount === 1 ? "message" : "messages"}</b><small>New requests are waiting in your inbox.</small></span><button className="button secondary sm" onClick={() => { dismissArrival(); navigate("/admin/inbox"); }}>Open inbox</button><button className="icon-button" aria-label="Dismiss new mail notice" onClick={dismissArrival}><X size={18} /></button></div>}
           {Object.keys(dataErrors).length > 0 && <div className="data-warning" role="status"><AlertTriangle size={18} /><div><b>Some workspace data could not be refreshed.</b><span>{Object.keys(dataErrors).join(", ")} · your signed-in session remains active.</span></div><button className="button secondary sm" onClick={() => void retryAccountData()}><RotateCcw size={14} /> Retry</button></div>}
           {children}
         </div>

@@ -27,3 +27,7 @@ test("checkout requires an exact server policy preview", () => {
   assert.equal(hasPurchasePolicy({ refundPolicyPreview: { code: "NO_REFUND" } }), false);
   assert.equal(refundDisclosure({ refundPolicyPreview: { description: "Final sale." } }), "Final sale.");
 });
+
+test("purchased items display frozen terms instead of the current catalogue policy", () => {
+  assert.equal(refundDisclosure({ purchased: true, refundPolicyPreview: { summary: "New policy" }, refundPolicySnapshot: { summary: "Purchased policy" } }), "Purchased policy");
+});

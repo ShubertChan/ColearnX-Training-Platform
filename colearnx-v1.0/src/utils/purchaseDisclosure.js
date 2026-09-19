@@ -19,7 +19,7 @@ export function deliveryDisclosures(item = {}) {
     disclosures.push("Live: you and the Trainer arrange the session yourselves. Buyer-only contact and optional meeting/group links appear after payment.");
   }
   if (item.onlineVideo || item.progressTrackingType === "online_video") {
-    disclosures.push("Online video: the server records actual watched time and total duration. The viewing-progress refund condition is met only at 10% watched or less.");
+    disclosures.push("Online video: watch in My Learning; no video download is offered. If you have watched no more than 10% of unique video content and have not downloaded protected attachments, you may request a full points refund for the order item. Exactly 10% is included. The service confirms eligibility.");
   }
   return disclosures.length
     ? disclosures
@@ -31,7 +31,7 @@ export function refundDisclosure(item = {}) {
 }
 
 export function policyText(item = {}) {
-  const policy = item.refundPolicyPreview || item.refundPolicySnapshot || item.refundPolicy || item.refundPolicySummary;
+  const policy = item.purchased ? item.refundPolicySnapshot || item.refundPolicy : item.refundPolicyPreview || item.refundPolicySnapshot || item.refundPolicy || item.refundPolicySummary;
   const text = typeof policy === "string" ? policy : policy?.summary || policy?.description;
   return typeof text === "string" ? text.trim() : "";
 }
