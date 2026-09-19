@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, Link, useLocation } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 import Layout from "./components/Layout";
 import PublicLayout from "./components/PublicLayout";
+import AdminMfaGate from "./components/AdminMfaGate";
 import { EmptyState } from "./components/ui";
 import { usePlatform } from "./context/PlatformContext";
 import { AuthPage, ForgotPasswordPage, ResetPasswordPage } from "./pages/AuthPages";
@@ -47,12 +48,12 @@ function PublishingAccess() {
 }
 
 function Protected({ roles, children }) {
-  const { role, approvedRoles } = usePlatform();
+  const { role, approvedRoles, profile } = usePlatform();
   const authorised =
     roles.includes(role) &&
     (role === "Admin" || role === "Member" || approvedRoles.includes(role));
   return authorised ? (
-    children
+    roles.includes("Admin") ? <AdminMfaGate key={profile?.id}>{children}</AdminMfaGate> : children
   ) : (
     <Navigate to={role === "Admin" ? "/admin" : "/home"} replace />
   );

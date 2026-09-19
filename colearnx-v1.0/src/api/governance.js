@@ -18,6 +18,6 @@ async function listPages(path, { status, limit = 100 } = {}) {
 }
 
 export const getAdminRoleApplications = (input) => listPages("/admin/role-applications", input);
-export const decideRoleApplication = (applicationId, input) => mutateApi("post", `/admin/role-applications/${applicationId}/decision`, input).then(unwrap);
+export const decideRoleApplication = (applicationId, input) => mutateApi("post", `/admin/role-applications/${applicationId}/decision`, input, { stepUp: true }).then(unwrap);
 export const getAdminTrainerCertifications = (input) => listPages("/admin/trainer-certifications", input);
 export const decideTrainerCertification = (certificationId, input) => mutateApi("post", `/admin/trainer-certifications/${certificationId}/decision`, input).then(unwrap);

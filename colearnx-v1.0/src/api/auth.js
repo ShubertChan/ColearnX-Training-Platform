@@ -20,7 +20,7 @@ export const startMfaEnrolment = () => apiClient.post("/auth/mfa/enrol").then(un
 export const confirmMfaEnrolment = (input) => apiClient.post("/auth/mfa/confirm", input).then(unwrap);
 export const disableMfa = (input) => apiClient.post("/auth/mfa/disable", input).then(unwrap);
 export const rotateRecoveryCodes = (input) => apiClient.post("/auth/mfa/recovery-codes", input).then(unwrap);
-export const requestStepUp = (input) => apiClient.post("/auth/step-up", input).then(unwrap);
+export const requestStepUp = (input, options) => apiClient.post("/auth/step-up", input, options).then(unwrap);
 
 // --- W4 session management --------------------------------------------------
 export const listSessions = () => apiClient.get("/auth/sessions").then(unwrap);
