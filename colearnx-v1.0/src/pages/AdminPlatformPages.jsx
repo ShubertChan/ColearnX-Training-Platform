@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
@@ -13,7 +13,10 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
+import AdminVideoReview from "../components/video/AdminVideoReview";
+import VideoEvidence from "../components/video/VideoEvidence";
 import { usePlatform } from "../context/PlatformContext";
+import { useAdminInbox } from "../context/AdminInboxContext";
 import {
   decideContentSubmission,
   decideCourseSubmission,
@@ -199,9 +202,12 @@ const applicationStatusTone = (status) => status === "Approved" ? "success" : st
 const displayValue = (value) => String(value || "").trim() || "Not supplied";
 
 export function AdminRoleApplicationsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedId = searchParams.get("application");
+  const { refresh: refreshInbox } = useAdminInbox();
   const { roleApplications, decideRoleApplication, refreshAdminRoleApplications } = usePlatform();
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState("Pending");
+  const [statusFilter, setStatusFilter] = useState(() => linkedId ? "All" : "Pending");
   const [selectedId, setSelectedId] = useState("");
   const [applicant, setApplicant] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -216,7 +222,7 @@ export function AdminRoleApplicationsPage() {
   const filteredApplications = useMemo(() => statusFilter === "All"
     ? roleApplications
     : roleApplications.filter((item) => item.status === statusFilter), [roleApplications, statusFilter]);
-  const selectedApplication = filteredApplications.find((item) => item.id === selectedId) || null;
+  const selectedApplication = filteredApplications.find((item) => item.id === (linkedId || selectedId)) || null;
   const requestedStatus = statusFilter === "All" ? "" : statusFilter.toLowerCase();
   const profileMatchesSelection = applicant?.id === selectedApplication?.userId;
   const displayedApplicant = profileMatchesSelection ? applicant : null;
@@ -270,6 +276,7 @@ export function AdminRoleApplicationsPage() {
   }, [selectedApplication?.userId, profileRevision]);
 
   const selectApplication = (id) => {
+    setSearchParams({});
     setSelectedId(id);
     setDecisionReason("");
     setError("");
@@ -282,6 +289,7 @@ export function AdminRoleApplicationsPage() {
     setError("");
     try {
       await decideRoleApplication(selectedApplication.id, decision, decisionReason.trim());
+      void refreshInbox();
       setDecisionReason("");
       setSelectedId("");
       setProfileRevision((value) => value + 1);
@@ -301,10 +309,11 @@ export function AdminRoleApplicationsPage() {
         <div className="button-row"><Badge tone={statusFilter === "Pending" ? "warning" : "neutral"}>{filteredApplications.length} {statusFilter.toLowerCase()}</Badge><Button variant="secondary" onClick={refresh} disabled={loading || Boolean(busy)}>{loading ? "Refreshing…" : "Refresh"}</Button></div>
       </div>
       <div className="role-application-toolbar">
-        <label><span>Status</span><select aria-label="Filter role applications" value={statusFilter} disabled={loading || Boolean(busy)} onChange={(event) => { setStatusFilter(event.target.value); setSelectedId(""); setDecisionReason(""); }}><option>Pending</option><option>Approved</option><option>Rejected</option><option>All</option></select></label>
+        <label><span>Status</span><select aria-label="Filter role applications" value={statusFilter} disabled={loading || Boolean(busy)} onChange={(event) => { setSearchParams({}); setStatusFilter(event.target.value); setSelectedId(""); setDecisionReason(""); }}><option>Pending</option><option>Approved</option><option>Rejected</option><option>All</option></select></label>
         <small>Decision comments are recorded and visible to the applicant.</small>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
+      {linkedId && !loading && !selectedApplication && <p role="status">This application is unavailable. Select another application or refresh the queue.</p>}
     </Card>
 
     <div className="admin-application-layout">
@@ -346,14 +355,19 @@ export function AdminRoleApplicationsPage() {
 
 export function AdminRefundPage() {
   const { refundRequests, decideRefund, refreshAdminQueues } = usePlatform();
+  const [params, setParams] = useSearchParams();
+  const linkedId = params.get("request");
+  const visibleRequests = linkedId ? refundRequests.filter((item) => item.id === linkedId) : refundRequests;
+  const { refresh: refreshInbox } = useAdminInbox();
   const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
   const decide = async (request, decision, reason) => {
     setBusy(request.id);
-    try { await decideRefund(request.id, titleCase(decision), reason); } finally { setBusy(""); }
+    try { setError(""); await decideRefund(request.id, titleCase(decision), reason); void refreshInbox(); } catch (error) { setError(error.message); } finally { setBusy(""); }
   };
-  useEffect(() => { refreshAdminQueues(); }, [refreshAdminQueues]);
-  if (!refundRequests.length) return <EmptyState icon={ClipboardCheck} title="No refund requests" description="Server-submitted refund requests will appear here for review." />;
-  return <Card><div className="card-heading"><div><span className="eyebrow">Refund review</span><h2>Policy-evaluated requests</h2></div></div><div className="queue-list">{refundRequests.map((request) => <div key={request.id}><ClipboardCheck size={18} /><div><b>{request.course}</b><small>{request.user} · {request.paid} points · {request.basis}</small><span className="queue-detail">{request.reason}</span></div>{request.status === "Pending" ? <DecisionButtons busy={busy === request.id} onDecision={(decision, reason) => decide(request, decision, reason)} /> : <Status value={request.status} />}</div>)}</div></Card>;
+  useEffect(() => { refreshAdminQueues().catch(error => setError(error.message)); }, [refreshAdminQueues]);
+  if (!refundRequests.length && !error) return <EmptyState icon={ClipboardCheck} title="No refund requests" description="Server-submitted refund requests will appear here for review." />;
+  return <Card><div className="card-heading"><div><span className="eyebrow">Refund review</span><h2>Policy-evaluated requests</h2></div>{linkedId && <Button variant="secondary" onClick={() => setParams({})}>All refund requests</Button>}</div>{linkedId && !visibleRequests.length && <p role="status">This refund request is unavailable. Return to all requests.</p>}{error && <p role="alert" className="form-error">{error}</p>}<div className="queue-list">{visibleRequests.map((request) => <div key={request.id}><ClipboardCheck size={18} /><div><b>{request.course}</b><small>{request.user} · {request.paid} points · {request.basis}</small><span className="queue-detail">{request.reason}</span><VideoEvidence evidence={request.evidence} /></div>{request.status === "Pending" ? <DecisionButtons busy={busy === request.id} approvalDisabled={request.serverEligible !== true} onDecision={(decision, reason) => decide(request, decision, reason)} /> : <Status value={request.status} />}</div>)}</div></Card>;
 }
 
 export function AdminUsersPage() {
@@ -469,7 +483,9 @@ export function AdminCatalogPage() {
         </div>
         {item.kind === "content"
           ? <ContentReviewActions item={item} busy={busy === `${item.kind}-${item.id}`} onDecision={(decision, reason) => decide(item.kind, item.id, decision, reason)} />
-          : <DecisionButtons approveValue="published" busy={busy === `${item.kind}-${item.id}`} onDecision={(decision, reason) => decide(item.kind, item.id, decision, reason)} />}
+          : item.onlineVideo || item.progressTrackingType === "online_video" || item.reviewVideoVersionId
+            ? <AdminVideoReview item={item} busy={busy === `${item.kind}-${item.id}`} onDecision={(decision, reason) => decide(item.kind, item.id, decision, reason)} />
+            : <DecisionButtons approveValue="published" busy={busy === `${item.kind}-${item.id}`} onDecision={(decision, reason) => decide(item.kind, item.id, decision, reason)} />}
       </div>)}
     </div>
   </Card>;

@@ -1,5 +1,6 @@
 import { apiClient } from "./client.js";
 import { getPrivateAssetMediaType } from "../utils/uploadPolicy.js";
+import { isVideoAsset } from "../utils/videoContract.js";
 
 const key = () => globalThis.crypto.randomUUID();
 const unwrap = (response) => response.data.data;
@@ -15,7 +16,7 @@ function assetApi(prefix) {
       const data = await apiClient.get(`${base(id)}/assets`).then(unwrap);
       const assets = Array.isArray(data) ? data : data?.assets;
       if (!Array.isArray(assets)) throw new Error("The file service returned an incomplete list.");
-      return assets;
+      return prefix === "/courses" ? assets.filter(asset => !isVideoAsset(asset)) : assets;
     },
     request: (id, file) => apiClient.post(`${base(id)}/upload-intents`, {
       filename: file.name, mediaType: getPrivateAssetMediaType(file), sizeBytes: file.size,

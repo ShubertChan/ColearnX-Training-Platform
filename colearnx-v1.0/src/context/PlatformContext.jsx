@@ -46,6 +46,7 @@ import {
 } from "../api/wallet";
 import { normalizePortfolioUrl, parseRoleApplicationSupportingText } from "../utils/roleApplication";
 import { removeListingByIdentity } from "../utils/listingWorkspace";
+import { refundReviewEvidence } from "../utils/refundPurchase";
 import { decoratePurchasedItems, purchaseMetadataByProduct } from "../utils/purchaseState";
 import { loadCatalogSection } from "../utils/catalogState";
 import { cartItemKey } from "../utils/purchaseDisclosure";
@@ -175,10 +176,12 @@ const mapOrder = (order) => ({
     trainerContact: item.trainerContact || item.fulfilment?.trainerContact || "",
     joinUrl: item.joinUrl || item.fulfilment?.joinUrl || "",
     onlineVideo: Boolean(item.onlineVideo || item.progressTrackingType === "online_video"),
-    watchedSeconds: Number(item.watchedSeconds || item.progress?.watchedSeconds || 0),
+    courseVideoVersionId: item.courseVideoVersionId || null,
+    uniqueContentWatchedSeconds: item.progress?.uniqueContentWatchedSeconds ?? null,
+    watchedRatio: item.progress?.watchedRatio ?? null,
+    durationSeconds: item.progress?.durationSeconds ?? null,
     totalDurationSeconds: Number(item.totalDurationSeconds || item.progress?.totalDurationSeconds || 0),
     refundRecords: item.refundRecords || item.refunds || [],
-    downloaded: Boolean(item.downloadCompletedAt),
   })),
 });
 
@@ -210,6 +213,7 @@ const mapRefundRequest = (request) => ({
   basis: request.eligibility?.explanation || request.policyCode || "Recorded server policy",
   paid: Number(request.requestedPoints || 0),
   eligibility: request.eligibility?.eligible ? "Eligible" : "Recorded",
+  ...refundReviewEvidence(request),
   reason: request.reason,
   status: titleCase(request.status),
   submittedAt: request.requestedAt,
@@ -227,9 +231,9 @@ const mapPublishedItem = (listing) => ({
   joinUrl: listing.joinUrl || "",
   onlineVideo: Boolean(listing.onlineVideo || listing.progressTrackingType === "online_video"),
   progressTrackingType: listing.progressTrackingType,
-  totalDurationSeconds: listing.totalDurationSeconds,
   categoryId: listing.categoryId,
   timezone: listing.timezone,
+  totalDurationSeconds: listing.totalDurationSeconds || "",
   category: "General",
   format: listing.contentType || deliveryLabel(listing.deliveryModes),
   price: Number(listing.pricePoints || 0),
@@ -463,6 +467,7 @@ export function PlatformProvider({ children }) {
           ? "Creator"
           : "Member";
     setProfile({
+      id: user.id,
       name: user.profile?.displayName || user.fullName || user.email,
       email: user.email || "",
       phone: user.profile?.phone || "",
@@ -691,14 +696,14 @@ export function PlatformProvider({ children }) {
     return result.ok;
   };
 
-  const submitRefund = async ({ course, reason }) => {
+  const submitRefund = async ({ course, reason, requestKey }) => {
     if (!course?.orderItemId) {
-      notify("The server record for this purchase is not available yet. Refresh and try again.");
-      return null;
+      throw new Error("The server record for this purchase is not available yet. Refresh and try again.");
     }
-    const result = await createRefundRequest({ orderItemId: course.orderItemId, reason });
-    await refreshOrders();
-    notify("Refund request submitted for administrator review.");
+    const result = await createRefundRequest({ orderItemId: course.orderItemId, reason }, requestKey);
+    if (!result?.id) throw new Error("The service did not confirm the refund request. Retry to check its status.");
+    try { await refreshOrders(); notify("Refund request submitted for administrator review."); }
+    catch { notify("Refund request submitted. Order history could not refresh; refresh it later."); }
     return result;
   };
 
@@ -776,7 +781,6 @@ export function PlatformProvider({ children }) {
           trainerContact: input.trainerContact || null,
           joinUrl: input.joinUrl || null,
           progressTrackingType: input.onlineVideo ? "online_video" : "none",
-          totalDurationSeconds: input.onlineVideo ? Number(input.totalDurationSeconds || 0) : null,
         }
       : {
           title: input.title,

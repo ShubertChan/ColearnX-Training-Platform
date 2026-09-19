@@ -36,6 +36,8 @@ import {
   AdminRoleApplicationsPage,
 } from "./pages/AdminPlatformPages";
 import { AdminUserDetailPage, AdminUsersPage } from "./pages/AdminUserManagementPages";
+import AdminInboxPage from "./pages/AdminInboxPage";
+import AdminCertificationsPage from "./pages/AdminCertificationsPage";
 import { intendedPath } from "./utils/frontendState";
 import { PublishingToolsPage, AdminOperationsPage } from "./pages/WorkflowPages";
 
@@ -63,7 +65,7 @@ function Workspace({ children }) {
   if (accountError) return <EmptyState title="Session temporarily unavailable" description={accountError} action={<button className="button primary" onClick={() => void retrySession()}>Retry session</button>} />;
   const required = location.pathname === "/home" ? ["wallet", "orders", "applications"]
     : ["/wallet", "/transactions"].includes(location.pathname) ? ["wallet"]
-    : ["/orders", "/purchases"].includes(location.pathname) ? ["orders"]
+    : ["/orders", "/purchases"].includes(location.pathname) || location.pathname.startsWith("/refund/") ? ["orders"]
     : location.pathname === "/cart" ? ["wallet", "catalog"]
     : location.pathname === "/role-application" ? ["applications", "certification"]
     : location.pathname.startsWith("/checkout-success") && !orders.length ? ["orders"] : [];
@@ -104,6 +106,8 @@ function TrainerOperational({ children }) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/admin/inbox" element={<Workspace><Protected roles={["Admin"]}><AdminInboxPage /></Protected></Workspace>} />
+      <Route path="/admin/certifications" element={<Workspace><Protected roles={["Admin"]}><AdminCertificationsPage /></Protected></Workspace>} />
       <Route path="/login" element={<AnonymousOnly><AuthPage /></AnonymousOnly>} />
       <Route path="/register" element={<AnonymousOnly><AuthPage mode="register" /></AnonymousOnly>} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
