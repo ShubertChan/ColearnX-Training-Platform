@@ -49,11 +49,12 @@ function DecisionButtons({ onDecision, busy, approveValue = "approved", approval
   return <div className="queue-actions"><input aria-label="Decision reason" placeholder="Decision reason" value={reason} onChange={(event) => setReason(event.target.value)} /><Button className="sm" disabled={busy || approvalDisabled || reason.trim().length < 3} onClick={() => onDecision(approveValue, reason.trim())}><CheckCircle2 size={14} /> Approve</Button><Button className="sm danger" disabled={busy || reason.trim().length < 3} onClick={() => onDecision("rejected", reason.trim())}><XCircle size={14} /> Reject</Button></div>;
 }
 
-function ContentReviewActions({ item, busy, onDecision }) {
+export function ContentReviewActions({ item, busy, onDecision }) {
   const [expanded, setExpanded] = useState(false);
   const [previewedAssetKeys, setPreviewedAssetKeys] = useState(() => new Set());
   const [previewBusyKey, setPreviewBusyKey] = useState("");
   const [previewError, setPreviewError] = useState("");
+  const [readyPreview, setReadyPreview] = useState(null);
   const assets = normalizeReviewAssets(item);
   const readyAssetEntries = assets
     .map((asset, index) => ({ asset, key: reviewAssetKey(asset, index), index }))
@@ -70,11 +71,20 @@ function ContentReviewActions({ item, busy, onDecision }) {
     setPreviewBusyKey(assetKey);
     setPreviewError("");
     try {
+      // Verify in this page before opening a new tab; otherwise a blank tab
+      // would hide the MFA dialog. Keep a direct-click fallback for browsers
+      // which block popups after an asynchronous identity check.
+      const result = readyPreview?.key === assetKey && Date.parse(readyPreview.expiresAt) > Date.now()
+        ? readyPreview : await previewContentSubmission(item.id, asset.assetId);
       previewWindow = window.open("", "_blank");
-      if (!previewWindow) throw new Error("Preview was blocked. Allow pop-ups and try again.");
+      if (!previewWindow) {
+        setReadyPreview({ ...result, key: assetKey });
+        setPreviewError("Your file is ready. Click Open preview to open it in a new tab.");
+        return;
+      }
       previewWindow.opener = null;
-      const result = await previewContentSubmission(item.id, asset.assetId);
       previewWindow.location.replace(result.previewUrl);
+      setReadyPreview(null);
       setPreviewedAssetKeys((current) => {
         const next = new Set(current);
         next.add(assetKey);
@@ -149,7 +159,7 @@ function ContentReviewActions({ item, busy, onDecision }) {
                       onClick={() => preview(asset, index)}
                     >
                       {reviewed ? <CheckCircle2 size={14} /> : <ExternalLink size={14} />}
-                      {previewBusyKey === assetKey ? "Opening…" : reviewed ? "Preview again" : "Preview file"}
+                      {previewBusyKey === assetKey ? "Opening…" : readyPreview?.key === assetKey ? "Open preview" : reviewed ? "Preview again" : "Preview file"}
                     </Button>
                   </div>
                 );

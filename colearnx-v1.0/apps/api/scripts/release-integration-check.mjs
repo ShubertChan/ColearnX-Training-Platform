@@ -58,6 +58,8 @@ function testEnvironment(databaseUrl) {
     REFRESH_TOKEN_SECRET: randomBytes(32).toString('hex'),
     CSRF_SECRET: randomBytes(32).toString('hex'),
     SECURITY_HASH_PEPPER: randomBytes(32).toString('hex'),
+    MFA_SECRET_KEY: randomBytes(32).toString('hex'),
+    MFA_CHALLENGE_SECRET: randomBytes(32).toString('hex'),
     SECURITY_ALERT_WEBHOOK_URL: '',
     SECURITY_EVENT_RETENTION_DAYS: '180',
     PWNED_PASSWORDS_ENABLED: 'false',
@@ -193,7 +195,7 @@ try {
   runtimeUrl.searchParams.set('options', '-c role=colearnx_app');
   const environment = testEnvironment(runtimeUrl.href);
   for (const key of Object.keys(process.env)) {
-    if (/^(DATABASE_|MIGRATION_|STRIPE_|R2_|RESEND_|EMAIL_|OBJECT_STORAGE_|ENABLE_|COOKIE_|SECURITY_|PWNED_|PASSWORD_|LOGIN_|REDIS_|APP_ORIGIN|API_ORIGIN|NODE_ENV|DOTENV_|.*_TOKEN_SECRET|CSRF_SECRET|LOG_LEVEL)/.test(key)) delete process.env[key];
+    if (/^(DATABASE_|MIGRATION_|MFA_|STEP_UP_|STRIPE_|R2_|RESEND_|EMAIL_|OBJECT_STORAGE_|ENABLE_|COOKIE_|SECURITY_|PWNED_|PASSWORD_|LOGIN_|REDIS_|APP_ORIGIN|API_ORIGIN|NODE_ENV|DOTENV_|.*_TOKEN_SECRET|CSRF_SECRET|LOG_LEVEL)/.test(key)) delete process.env[key];
   }
   Object.assign(process.env, environment);
   const database = await import('../src/db/database.ts'); apiPool = database.pool;
@@ -335,7 +337,14 @@ try {
     .send({ token: resetToken, password: newPassword, passwordConfirmation: newPassword }).expect(400);
   assert.equal(reusedReset.body.error.code, 'PASSWORD_RESET_TOKEN_INVALID');
   passed('real password reset preserves weak-attempt token, rotates Argon2 hash/timestamp, revokes only active sessions, clears lock counters, writes audit, and rejects token reuse');
-  const accessToken = (id) => jwt.sign({ sub: id }, environment.ACCESS_TOKEN_SECRET, { expiresIn: '5m' });
+  // Access tokens now name a real revocable session, including synthetic ones.
+  const fixtureSessions = new Map();
+  for (const id of [buyerId, sellerId, adminId]) {
+    const sid = randomUUID(); fixtureSessions.set(id, sid);
+    await owner.query(`INSERT INTO refresh_sessions (session_id, user_id, token_hash, expires_at)
+      VALUES ($1,$2,$3,now()+interval '1 hour')`, [sid, id, createHash('sha256').update(randomBytes(32)).digest('hex')]);
+  }
+  const accessToken = (id) => jwt.sign({ sub: id, sid: fixtureSessions.get(id) }, environment.ACCESS_TOKEN_SECRET, { expiresIn: '5m' });
   const buyerToken = accessToken(buyerId);
   await request(app).get('/health/ready').expect(200);
   const listing = await request(app).get('/api/v1/content').expect(200);
@@ -553,6 +562,8 @@ try {
   assert.equal(retentionCommand.code, 0, retentionCommand.stderr);
   assert.match(retentionCommand.stdout, /removed 1 security events older than 180 days, 0 closed reset tokens/);
   passed('real second-delete failure rolls back the first deletion; CLI rejects malformed days before deletion and succeeds with the corrected schema');
+  const { runMfaSessionChecks } = await import('./mfa-session-checks.mjs');
+  await runMfaSessionChecks({ owner, app, apiPool, environment, passed });
   assert.equal(blockedHttpCalls, 0, 'No email, HIBP, alert, payment, or storage HTTP request may be attempted.');
   process.stdout.write(`SUCCESS ${checks} integration check groups passed; test-only data retained in disposable local PostgreSQL cluster.\n`);
 } finally {

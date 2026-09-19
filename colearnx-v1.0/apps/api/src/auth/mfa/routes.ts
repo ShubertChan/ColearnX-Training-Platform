@@ -132,7 +132,7 @@ export async function requestStepUp(req: Request, res: Response) {
     throw new ApiError(400, 'MFA_CODE_INVALID', 'That code is not valid.');
   }
 
-  const token = issueChallenge('step-up', actor.id, env.STEP_UP_TTL_SECONDS, env.MFA_CHALLENGE_SECRET);
+  const token = issueChallenge('step-up', actor.id, env.STEP_UP_TTL_SECONDS, env.MFA_CHALLENGE_SECRET, Date.now(), res.locals.sessionId as string);
   await recordSecurityEvent(securityContext(req, res), {
     type: 'auth.step_up_granted', actorUserId: actor.id,
     context: { ttlSeconds: env.STEP_UP_TTL_SECONDS, viaRecoveryCode: factor.usedRecoveryCode },
