@@ -55,18 +55,19 @@ export const mfaRequired = (state: MfaState) => state.enrolled;
  * would make MFA worse than useless.
  */
 export async function beginEnrolment(userId: string, accountEmail: string) {
-  const existing = await readMfaState(userId);
-  if (existing.enrolled) {
-    return { alreadyEnrolled: true as const };
-  }
   const secret = generateTotpSecret();
-  await query(
+  // ON CONFLICT locks the current row and rechecks this predicate after any
+  // concurrent confirmation commits. A prior SELECT cannot make that guarantee.
+  const result = await query(
     `INSERT INTO user_mfa_secrets (user_id, secret_encrypted, confirmed_at, last_used_step)
      VALUES ($1, $2, NULL, NULL)
      ON CONFLICT (user_id) DO UPDATE SET
-       secret_encrypted = $2, confirmed_at = NULL, last_used_step = NULL, updated_at = now()`,
+       secret_encrypted = $2, last_used_step = NULL, updated_at = now()
+     WHERE user_mfa_secrets.confirmed_at IS NULL
+     RETURNING user_id`,
     [userId, encryptSecret(secret, mfaKey)],
   );
+  if (!result.rowCount) return { alreadyEnrolled: true as const };
   return {
     alreadyEnrolled: false as const,
     secret,

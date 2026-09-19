@@ -25,7 +25,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export type ChallengePurpose = 'mfa-continuation' | 'step-up';
 
-type Payload = { p: ChallengePurpose; s: string; e: number; n: string };
+type Payload = { p: ChallengePurpose; s: string; e: number; n: string; b?: string };
 
 const sign = (body: string, secret: string, purpose: ChallengePurpose) =>
   createHmac('sha256', `${secret}:${purpose}`).update(body).digest('base64url');
@@ -36,6 +36,7 @@ export function issueChallenge(
   ttlSeconds: number,
   secret: string,
   nowMs = Date.now(),
+  sessionId?: string,
 ): string {
   const payload: Payload = {
     p: purpose,
@@ -44,13 +45,14 @@ export function issueChallenge(
     // Makes two tokens issued in the same millisecond for the same subject
     // distinct, so one cannot be mistaken for the other in a log.
     n: randomBytes(9).toString('base64url'),
+    ...(sessionId ? { b: sessionId } : {}),
   };
   const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
   return `${body}.${sign(body, secret, purpose)}`;
 }
 
 export type ChallengeResult =
-  | { valid: true; subject: string }
+  | { valid: true; subject: string; sessionId?: string }
   | { valid: false; reason: 'malformed' | 'signature' | 'expired' | 'purpose' };
 
 export function verifyChallenge(
@@ -77,7 +79,8 @@ export function verifyChallenge(
   } catch {
     return { valid: false, reason: 'malformed' };
   }
-  if (typeof payload?.s !== 'string' || typeof payload?.e !== 'number') {
+  if (typeof payload?.s !== 'string' || typeof payload?.e !== 'number'
+    || (payload.b !== undefined && typeof payload.b !== 'string')) {
     return { valid: false, reason: 'malformed' };
   }
   // Redundant given the per-purpose key, and kept anyway: if the key derivation
@@ -85,5 +88,5 @@ export function verifyChallenge(
   // purposes.
   if (payload.p !== purpose) return { valid: false, reason: 'purpose' };
   if (payload.e <= nowMs) return { valid: false, reason: 'expired' };
-  return { valid: true, subject: payload.s };
+  return { valid: true, subject: payload.s, ...(payload.b ? { sessionId: payload.b } : {}) };
 }

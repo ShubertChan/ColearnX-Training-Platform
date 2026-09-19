@@ -1,12 +1,11 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../db/database.js';
-import { sha256 } from '../lib/crypto.js';
 import { ApiError, ok } from '../lib/http.js';
 import { parse } from '../lib/validation.js';
 import { recordSecurityEvent, securityContext } from '../security/events.js';
 import type { Actor } from './auth.js';
-import { refreshCookieName } from './auth.js';
+import { resolveActiveSession, withSessionLock } from './session-state.js';
 
 /**
  * Session visibility and revocation (threat model F-17, ASVS 3.3.3, 3.3.4).
@@ -47,16 +46,15 @@ export function describeUserAgent(userAgent: string | null): string {
   return `${browser} on ${platform}`;
 }
 
-export async function listSessions(req: Request, res: Response) {
+export async function listSessions(_req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
-  const currentToken = req.cookies?.[refreshCookieName] as string | undefined;
-  const currentHash = currentToken ? sha256(currentToken) : null;
+  const currentId = res.locals.sessionId as string;
 
   const result = await query<{
     session_id: string; created_at: Date; last_used_at: Date | null;
-    expires_at: Date; user_agent: string | null; token_hash: string;
+    expires_at: Date; user_agent: string | null;
   }>(
-    `SELECT session_id, created_at, last_used_at, expires_at, user_agent, token_hash
+    `SELECT session_id, created_at, last_used_at, expires_at, user_agent
        FROM refresh_sessions
       WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()
       ORDER BY coalesce(last_used_at, created_at) DESC`,
@@ -72,7 +70,7 @@ export async function listSessions(req: Request, res: Response) {
       expiresAt: row.expires_at,
       // Marking the current session is what makes "revoke the others" a safe
       // action to offer: the user can see which row is the one they are on.
-      current: currentHash !== null && row.token_hash === currentHash,
+      current: row.session_id === currentId,
     })),
   });
 }
@@ -85,12 +83,14 @@ export async function revokeSession(req: Request, res: Response) {
   // afterwards, so a session id belonging to someone else simply matches
   // nothing -- no row is read, and the response cannot distinguish "not yours"
   // from "does not exist".
-  const result = await query(
-    `UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = 'user-revoked'
-      WHERE session_id = $1 AND user_id = $2 AND revoked_at IS NULL`,
-    [input.id, actor.id],
-  );
-  if (!result.rowCount) throw new ApiError(404, 'SESSION_NOT_FOUND', 'That session is no longer active.');
+  await withSessionLock(actor.id, async (client) => {
+    const activeId = await resolveActiveSession(input.id, actor.id, client);
+    if (!activeId) throw new ApiError(404, 'SESSION_NOT_FOUND', 'That session is no longer active.');
+    await client.query(
+      `UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = 'user-revoked'
+        WHERE session_id = $1 AND user_id = $2 AND revoked_at IS NULL`, [activeId, actor.id],
+    );
+  });
 
   await recordSecurityEvent(securityContext(req, res), {
     type: 'session.revoked_one', actorUserId: actor.id, context: { reason: 'user-revoked' },
@@ -110,19 +110,18 @@ export async function revokeSession(req: Request, res: Response) {
  */
 export async function revokeOtherSessions(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
-  const currentToken = req.cookies?.[refreshCookieName] as string | undefined;
-  const currentHash = currentToken ? sha256(currentToken) : null;
-
-  const result = await query(
-    `UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = 'user-revoked-all'
-      WHERE user_id = $1 AND revoked_at IS NULL
-        AND ($2::text IS NULL OR token_hash <> $2)`,
-    [actor.id, currentHash],
-  );
+  const result = await withSessionLock(actor.id, async (client) => {
+    const currentId = await resolveActiveSession(res.locals.sessionId as string, actor.id, client);
+    if (!currentId) throw new ApiError(401, 'SESSION_REVOKED', 'Please sign in again.');
+    return client.query(
+      `UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = 'user-revoked-all'
+        WHERE user_id = $1 AND revoked_at IS NULL AND session_id <> $2`, [actor.id, currentId],
+    );
+  });
 
   await recordSecurityEvent(securityContext(req, res), {
     type: 'session.revoked_all', actorUserId: actor.id,
-    context: { reason: 'user-revoked-all', count: result.rowCount ?? 0, keptCurrent: currentHash !== null },
+    context: { reason: 'user-revoked-all', count: result.rowCount ?? 0, keptCurrent: true },
   }, res);
   return ok(res, { revoked: result.rowCount ?? 0 });
 }

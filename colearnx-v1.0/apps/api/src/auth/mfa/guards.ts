@@ -3,6 +3,7 @@ import { env } from '../../config/env.js';
 import { ApiError } from '../../lib/http.js';
 import { recordSecurityEvent, securityContext } from '../../security/events.js';
 import type { Actor } from '../auth.js';
+import { resolveActiveSession } from '../session-state.js';
 import { verifyChallenge } from './challenge.js';
 import { readMfaState } from './service.js';
 
@@ -66,10 +67,12 @@ export async function requireStepUp(_req: Request, res: Response, next: NextFunc
     // Binding to the acting account matters as much as the signature: a valid
     // step-up token issued to one administrator must not authorise an action
     // performed under another's session.
-    if (!result.valid || result.subject !== actor.id) {
+    const sessionMatches = result.valid && result.subject === actor.id && result.sessionId
+      && await resolveActiveSession(result.sessionId, actor.id) === res.locals.sessionId;
+    if (!sessionMatches) {
       await recordSecurityEvent(securityContext(_req, res), {
         type: 'auth.step_up_rejected', actorUserId: actor.id, decision: 'deny',
-        context: { reason: result.valid ? 'subject-mismatch' : result.reason },
+        context: { reason: result.valid ? 'session-mismatch' : result.reason },
       }, res);
       throw new ApiError(401, 'STEP_UP_REQUIRED', 'Confirm your identity to continue.');
     }

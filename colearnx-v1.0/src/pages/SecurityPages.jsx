@@ -137,6 +137,7 @@ function SessionSection() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
+    setError("");
     try { setSessions((await listSessions()).sessions); } catch (loadError) { setError(loadError.message); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -146,7 +147,7 @@ function SessionSection() {
     try { await action(); await load(); } catch (actionError) { setError(actionError.message); } finally { setBusy(false); }
   };
 
-  if (!sessions) return <div className="security-panel"><h3>Active sessions</h3><p>Loading…</p></div>;
+  if (!sessions) return <div className="security-panel"><h3>Active sessions</h3>{error ? <><p className="form-error" role="alert">{error}</p><Button onClick={load}>Retry sessions</Button></> : <p role="status">Loading…</p>}</div>;
 
   return (
     <div className="security-panel">
@@ -190,7 +191,11 @@ function SessionSection() {
 
 export function SecuritySettingsPage() {
   const [status, setStatus] = useState(null);
-  const load = useCallback(async () => { setStatus(await getMfaStatus()); }, []);
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    setError("");
+    try { setStatus(await getMfaStatus()); } catch (failure) { setError(failure.message); }
+  }, []);
   useEffect(() => { void load(); }, [load]);
 
   return (
@@ -200,7 +205,8 @@ export function SecuritySettingsPage() {
         <h1>Security</h1>
         <p>Two-factor authentication and the devices signed in to your account.</p>
       </header>
-      {status ? <MfaSection status={status} onChanged={load} /> : <div className="security-panel"><p>Loading…</p></div>}
+      {error && <div className="security-panel"><p className="form-error" role="alert">{error}</p><Button onClick={load}>Retry security settings</Button></div>}
+      {status ? <MfaSection status={status} onChanged={load} /> : !error && <div className="security-panel"><p role="status">Loading…</p></div>}
       <SessionSection />
     </div>
   );

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { readSessionValue, writeSessionValue } from "../utils/sessionStorage.js";
+import { clearStepUpAuthorization, withStepUp } from "./stepUp.js";
 
 const accessTokenKey = "colearnx-api-access-token";
 const csrfTokenKey = "colearnx-api-csrf-token";
@@ -10,7 +11,7 @@ const pendingMutations = new Map();
 
 export const apiClient = axios.create({ baseURL: import.meta.env?.VITE_API_BASE_URL || "/api/v1", timeout: 12000, withCredentials: true, headers: { Accept: "application/json", "Content-Type": "application/json" } });
 
-export function setAccessToken(token) { sessionGeneration++; pendingMutations.clear(); accessToken = token || ""; writeSessionValue(accessTokenKey, accessToken); }
+export function setAccessToken(token) { sessionGeneration++; clearStepUpAuthorization(); pendingMutations.clear(); accessToken = token || ""; writeSessionValue(accessTokenKey, accessToken); }
 export const hasAccessToken = () => Boolean(accessToken);
 export function setCsrfToken(token) { csrfToken = token || ""; writeSessionValue(csrfTokenKey, csrfToken); }
 export const hasCsrfToken = () => Boolean(csrfToken);
@@ -57,7 +58,7 @@ async function refreshAccess(generation) {
 apiClient.interceptors.response.use((response) => response, async (error) => {
   const config = error.config, code = error.response?.data?.error?.code;
   if (config && error.response?.status === 401 && !config._authRetried && !config._skipAuthRefresh
-    && !/(^|\/)auth\//.test(config.url || "") && !String(code || "").startsWith("PLAYBACK_") && config._sentAccessToken) {
+    && code !== "STEP_UP_REQUIRED" && !/(^|\/)auth\//.test(config.url || "") && !String(code || "").startsWith("PLAYBACK_") && config._sentAccessToken) {
     if (config._sessionGeneration !== sessionGeneration) throw sessionChanged();
     config._authRetried = true;
     if (config._sentAccessToken === accessToken) await refreshAccess(config._sessionGeneration);
@@ -75,13 +76,18 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
 
 // Retain uncertain operations in memory so a manual retry also uses the same key.
 // Successful operations and explicit account changes release their keys.
-export async function mutateApi(method, url, data) {
+export async function mutateApi(method, url, data, { stepUp = false } = {}) {
   const identity = JSON.stringify([sessionGeneration, method, url, data ?? null]);
   const key = pendingMutations.get(identity) || crypto.randomUUID();
   pendingMutations.set(identity, key);
-  const options = { headers: { "Idempotency-Key": key } };
+  const revision = sessionGeneration;
+  const send = (stepUpToken) => {
+    if (revision !== sessionGeneration) throw sessionChanged();
+    const options = { headers: { "Idempotency-Key": key, ...(stepUpToken ? { "X-Step-Up-Token": stepUpToken } : {}) } };
+    return method === "delete" ? apiClient.delete(url, { ...options, data }) : apiClient[method](url, data, options);
+  };
   try {
-    const response = method === "delete" ? await apiClient.delete(url, { ...options, data }) : await apiClient[method](url, data, options);
+    const response = await (stepUp ? withStepUp(send) : send());
     if (pendingMutations.get(identity) === key) pendingMutations.delete(identity);
     return response;
   } catch (error) {

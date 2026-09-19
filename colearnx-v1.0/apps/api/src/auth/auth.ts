@@ -20,6 +20,7 @@ import { describeLockDuration } from './lockout-policy.js';
 import { assertPasswordAcceptable } from './password-gate.js';
 import { issueChallenge, verifyChallenge } from './mfa/challenge.js';
 import { readMfaState, verifySecondFactor } from './mfa/service.js';
+import { resolveActiveSession, withSessionLock } from './session-state.js';
 import {
   createVerificationCode,
   hashVerificationCode,
@@ -99,8 +100,8 @@ const refreshLifetimeMs = 1000 * 60 * 60 * 24 * 14;
 export const refreshCookieName = 'colearnx_refresh';
 const registrationContinuationCookieName = 'colearnx_registration';
 
-function signAccessToken(actor: Actor) {
-  return jwt.sign({ sub: actor.id, email: actor.email, roles: actor.roles }, env.ACCESS_TOKEN_SECRET, { expiresIn: accessTokenLifetime });
+function signAccessToken(actor: Actor, sessionId: string) {
+  return jwt.sign({ sub: actor.id, sid: sessionId, email: actor.email, roles: actor.roles }, env.ACCESS_TOKEN_SECRET, { expiresIn: accessTokenLifetime });
 }
 
 async function loadActor(userId: string): Promise<Actor | null> {
@@ -155,9 +156,9 @@ function assertCsrfToken(req: Request, refreshToken: string) {
 
 async function createRefreshSession(actor: Actor, req: Request, res: Response) {
   const token = createOpaqueToken();
-  await query(`INSERT INTO refresh_sessions (user_id, token_hash, expires_at, user_agent, ip_hash) VALUES ($1, $2, $3, $4, $5)`, [actor.id, sha256(token), new Date(Date.now() + refreshLifetimeMs), req.get('user-agent')?.slice(0, 500) ?? null, sha256(req.ip || 'unknown')]);
+  const result = await withSessionLock(actor.id, (client) => client.query<{ id: string }>(`INSERT INTO refresh_sessions (user_id, token_hash, expires_at, user_agent, ip_hash) VALUES ($1, $2, $3, $4, $5) RETURNING session_id AS id`, [actor.id, sha256(token), new Date(Date.now() + refreshLifetimeMs), req.get('user-agent')?.slice(0, 500) ?? null, sha256(req.ip || 'unknown')]));
   res.cookie(refreshCookieName, token, refreshCookieOptions());
-  return token;
+  return { token, sessionId: result.rows[0].id };
 }
 
 function createChallenge(userId: string, email: string): PendingChallenge {
@@ -349,13 +350,13 @@ export async function verifyEmail(req: Request, res: Response) {
     if (!actor || actor.status !== 'active' || actorNeedsEmailVerification(actor)) {
       return ok(res, { verified: true, authenticated: false });
     }
-    const refreshToken = await createRefreshSession(actor, req, res);
+    const session = await createRefreshSession(actor, req, res);
     return ok(res, {
       verified: true,
       authenticated: true,
       user: actor,
-      accessToken: signAccessToken(actor),
-      csrfToken: createCsrfToken(refreshToken),
+      accessToken: signAccessToken(actor, session.sessionId),
+      csrfToken: createCsrfToken(session.token),
     });
   } catch (sessionError) {
     res.locals.log?.warn({
@@ -704,8 +705,6 @@ export async function login(req: Request, res: Response) {
     throw new ApiError(403, 'EMAIL_VERIFICATION_REQUIRED', 'Verify your email address before signing in.');
   }
 
-  await clearFailures(actor.id);
-
   // The first factor is now proven. If a second is enrolled, no session is
   // issued here -- the caller gets a short-lived, purpose-bound continuation
   // token instead. Issuing the session first and demanding the code afterwards
@@ -723,12 +722,14 @@ export async function login(req: Request, res: Response) {
     });
   }
 
-  const refreshToken = await createRefreshSession(actor, req, res);
+  // Only a completed authentication clears the shared password/MFA ladder.
+  await clearFailures(actor.id);
+  const session = await createRefreshSession(actor, req, res);
   await recordSecurityEvent(fingerprint, {
     type: 'auth.login_succeeded', actorUserId: actor.id,
     context: { clearedFailures: lock?.consecutiveFailures ?? 0, mfa: false },
   }, res);
-  return ok(res, { user: actor, accessToken: signAccessToken(actor), csrfToken: createCsrfToken(refreshToken) });
+  return ok(res, { user: actor, accessToken: signAccessToken(actor, session.sessionId), csrfToken: createCsrfToken(session.token) });
 }
 
 
@@ -762,16 +763,17 @@ export async function verifyMfaLogin(req: Request, res: Response) {
   }
 
   const lock = await readLockState(challenge.subject);
-  const factor = await verifySecondFactor(challenge.subject, input.code);
 
   if (lock.locked) {
     await recordSecurityEvent(fingerprint, {
       type: 'auth.login_blocked', actorUserId: challenge.subject, decision: 'lock',
-      context: { stage: 'mfa', lockedUntil: lock.lockedUntil, factorMatched: factor.ok },
+      context: { stage: 'mfa', lockedUntil: lock.lockedUntil },
     }, res);
     throw new ApiError(401, 'MFA_CODE_INVALID', 'That code is not valid.');
   }
 
+  // Locked attempts must not consume a valid recovery code or TOTP time step.
+  const factor = await verifySecondFactor(challenge.subject, input.code);
   if (!factor.ok) {
     const outcome = await registerFailure(challenge.subject, env.LOGIN_FAILURE_DECAY_HOURS * 3600);
     await recordSecurityEvent(fingerprint, {
@@ -797,7 +799,7 @@ export async function verifyMfaLogin(req: Request, res: Response) {
   }
 
   await clearFailures(actor.id);
-  const refreshToken = await createRefreshSession(actor, req, res);
+  const session = await createRefreshSession(actor, req, res);
   await recordSecurityEvent(fingerprint, {
     type: 'auth.login_succeeded', actorUserId: actor.id,
     context: { mfa: true, viaRecoveryCode: factor.usedRecoveryCode },
@@ -806,8 +808,8 @@ export async function verifyMfaLogin(req: Request, res: Response) {
   // their last code and unaware of it is one lost phone from a lockout.
   return ok(res, {
     user: actor,
-    accessToken: signAccessToken(actor),
-    csrfToken: createCsrfToken(refreshToken),
+    accessToken: signAccessToken(actor, session.sessionId),
+    csrfToken: createCsrfToken(session.token),
     usedRecoveryCode: factor.usedRecoveryCode,
     recoveryCodesRemaining: factor.recoveryCodesRemaining,
   });
@@ -824,11 +826,21 @@ export async function refresh(req: Request, res: Response) {
   const token = req.cookies?.[refreshCookieName] as string | undefined;
   if (!token) throw new ApiError(401, 'REFRESH_TOKEN_MISSING', 'Refresh session is missing.');
   assertCsrfToken(req, token);
-  const session = await query<{ id: string; user_id: string; revoked_at: Date | null; expires_at: Date }>('SELECT session_id AS id, user_id, revoked_at, expires_at FROM refresh_sessions WHERE token_hash = $1', [sha256(token)]);
+  const session = await query<{ id: string; user_id: string; revoked_at: Date | null; revoke_reason: string | null; expires_at: Date }>('SELECT session_id AS id, user_id, revoked_at, revoke_reason, expires_at FROM refresh_sessions WHERE token_hash = $1', [sha256(token)]);
   if (!session.rowCount) throw new ApiError(401, 'REFRESH_TOKEN_INVALID', 'Refresh session is invalid.');
   const current = session.rows[0];
   if (current.revoked_at) {
-    const revoked = await query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2 WHERE user_id = $1 AND revoked_at IS NULL', [current.user_id, 'refresh-token-reuse']);
+    // Replaying an explicitly terminated session must not kick out the device
+    // that terminated it. Only reuse of a rotated token triggers family recovery.
+    if (current.revoke_reason !== 'rotated') throw new ApiError(401, 'REFRESH_TOKEN_INVALID', 'Refresh session is no longer valid.');
+    const revoked = await withSessionLock(current.user_id, async (client) => {
+      // A rotated ancestor of an already-ended device is no longer a live
+      // family. Replaying it must not terminate unrelated retained devices.
+      if (!await resolveActiveSession(current.id, current.user_id, client)) {
+        throw new ApiError(401, 'REFRESH_TOKEN_INVALID', 'Refresh session is no longer valid.');
+      }
+      return client.query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2 WHERE user_id = $1 AND revoked_at IS NULL', [current.user_id, 'refresh-token-reuse']);
+    });
     // Critical severity: replay of a rotated token is either stolen session
     // material or a broken client, and the two are indistinguishable here. It
     // pages an operator by design.
@@ -847,12 +859,21 @@ export async function refresh(req: Request, res: Response) {
   const actor = await loadActor(current.user_id);
   if (!actor || actor.status !== 'active' || actorNeedsEmailVerification(actor)) throw new ApiError(401, 'ACCOUNT_UNAVAILABLE', 'Account is unavailable.');
   const newToken = createOpaqueToken();
-  await withTransaction(async (client) => {
+  const nextSessionId = await withSessionLock(actor.id, async (client) => {
+    // Serialize rotation with revocation and competing refresh requests. Without
+    // this recheck one revoked row could create two live successor sessions.
+    const locked = await client.query<{ revoked_at: Date | null; expires_at: Date }>(
+      'SELECT revoked_at, expires_at FROM refresh_sessions WHERE session_id = $1 FOR UPDATE', [current.id],
+    );
+    if (!locked.rows[0] || locked.rows[0].revoked_at || locked.rows[0].expires_at <= new Date()) {
+      throw new ApiError(401, 'REFRESH_TOKEN_INVALID', 'Refresh session is no longer valid.');
+    }
     const next = await client.query<{ id: string }>(`INSERT INTO refresh_sessions (user_id, token_hash, expires_at, user_agent, ip_hash) VALUES ($1, $2, $3, $4, $5) RETURNING session_id AS id`, [actor.id, sha256(newToken), new Date(Date.now() + refreshLifetimeMs), req.get('user-agent')?.slice(0, 500) ?? null, sha256(req.ip || 'unknown')]);
     await client.query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2, replaced_by_session_id = $3 WHERE session_id = $1', [current.id, 'rotated', next.rows[0].id]);
+    return next.rows[0].id;
   });
   res.cookie(refreshCookieName, newToken, refreshCookieOptions());
-  return ok(res, { user: actor, accessToken: signAccessToken(actor), csrfToken: createCsrfToken(newToken) });
+  return ok(res, { user: actor, accessToken: signAccessToken(actor, nextSessionId), csrfToken: createCsrfToken(newToken) });
 }
 
 export async function logout(req: Request, res: Response) {
@@ -860,7 +881,16 @@ export async function logout(req: Request, res: Response) {
   const token = req.cookies?.[refreshCookieName] as string | undefined;
   if (token) {
     assertCsrfToken(req, token);
-    await query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2 WHERE token_hash = $1 AND revoked_at IS NULL', [sha256(token), 'logout']);
+    const session = await query<{ session_id: string; user_id: string }>(
+      'SELECT session_id, user_id FROM refresh_sessions WHERE token_hash = $1', [sha256(token)],
+    );
+    if (session.rows[0]) {
+      const current = session.rows[0];
+      await withSessionLock(current.user_id, async (client) => {
+        const activeId = await resolveActiveSession(current.session_id, current.user_id, client);
+        if (activeId) await client.query('UPDATE refresh_sessions SET revoked_at = now(), revoke_reason = $2 WHERE session_id = $1', [activeId, 'logout']);
+      });
+    }
   }
   res.clearCookie(refreshCookieName, refreshCookieOptions());
   return ok(res, { loggedOut: true });
@@ -871,10 +901,16 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     const header = req.get('authorization');
     if (!header?.startsWith('Bearer ')) throw new ApiError(401, 'AUTH_REQUIRED', 'Authentication is required.');
     const payload = jwt.verify(header.slice(7), env.ACCESS_TOKEN_SECRET);
-    if (typeof payload === 'string' || !payload.sub) throw new ApiError(401, 'TOKEN_INVALID', 'Authentication token is invalid.');
+    if (typeof payload === 'string' || !payload.sub || !z.string().uuid().safeParse(payload.sid).success) {
+      // Legacy unbound tokens must refresh once; they must not bypass revocation.
+      throw new ApiError(401, 'TOKEN_INVALID', 'Authentication token is invalid.');
+    }
+    const sessionId = await resolveActiveSession(payload.sid as string, payload.sub);
+    if (!sessionId) throw new ApiError(401, 'SESSION_REVOKED', 'Please sign in again.');
     const actor = await loadActor(payload.sub);
     if (!actor || actor.status !== 'active' || actorNeedsEmailVerification(actor)) throw new ApiError(401, 'ACCOUNT_UNAVAILABLE', 'Account is unavailable.');
     res.locals.actor = actor;
+    res.locals.sessionId = sessionId;
     next();
   } catch (error) {
     next(error instanceof ApiError ? error : new ApiError(401, 'TOKEN_INVALID', 'Authentication token is invalid.'));
