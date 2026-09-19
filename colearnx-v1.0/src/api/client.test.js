@@ -2,6 +2,7 @@ import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import axios from "axios";
 import { apiClient, setAccessToken, setCsrfToken, hasAccessToken, mutateApi } from "./client.js";
+import { registerStepUpHandler } from "./stepUp.js";
 
 const originalAdapter = apiClient.defaults.adapter;
 const response = (config, data = {}) => ({ config, status: 200, headers: {}, data: { data } });
@@ -152,4 +153,22 @@ test("temporary refresh failure preserves credentials and permits a later recove
   assert.equal(hasAccessToken(), true);
   unavailable = false; await apiClient.get("/wallet");
   assert.equal(refreshes, 2);
+});
+
+test("step-up rejection never triggers refresh and preserves the mutation key on retry", async () => {
+  const calls = []; let proof = 0;
+  const cleanup = registerStepUpHandler(async()=>({stepUpToken:`proof-${++proof}`, expiresInSeconds:300}));
+  apiClient.defaults.adapter = async config => {
+    calls.push({url:config.url, token:config.headers.get("X-Step-Up-Token"), key:config.headers.get("Idempotency-Key")});
+    if (calls.length === 1) reject(config, 401, "STEP_UP_REQUIRED");
+    return response(config);
+  };
+  try {
+    await mutateApi("post", "/admin/role-applications/a/decision", {decision:"approved"}, {stepUp:true});
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls.map(c=>c.token), ["proof-1", "proof-2"]);
+    assert.equal(calls[0].key, calls[1].key);
+    await mutateApi("post", "/courses", {title:"ordinary"});
+    assert.equal(calls[2].token, undefined);
+  } finally { cleanup(); }
 });

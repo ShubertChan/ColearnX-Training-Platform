@@ -52,3 +52,13 @@ test('two tokens for the same subject in the same instant differ', () => {
   const b = issueChallenge('step-up', 'user-1', 300, secret, now);
   assert.notEqual(a, b);
 });
+
+test('step-up tokens preserve their signed session binding', () => {
+  const token = issueChallenge('step-up', 'user-1', 300, secret, now, 'session-1');
+  assert.deepEqual(verifyChallenge(token, 'step-up', secret, now), { valid: true, subject: 'user-1', sessionId: 'session-1' });
+  const [body, mac] = token.split('.');
+  const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+  payload.b = 'session-2';
+  const changed = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  assert.equal(verifyChallenge(`${changed}.${mac}`, 'step-up', secret, now).valid, false);
+});

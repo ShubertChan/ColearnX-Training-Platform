@@ -18,7 +18,7 @@ export const getCourseSubmissions = () => listEveryPage("/admin/course-submissio
 export const decideCourseSubmission = (courseRunId, input) => mutateApi("post", `/admin/course-runs/${courseRunId}/decision`, input).then(unwrap);
 export const getContentSubmissions = () => listEveryPage("/admin/content-submissions");
 export const decideContentSubmission = (contentVersionId, input) => mutateApi("post", `/admin/content-versions/${contentVersionId}/decision`, input).then(unwrap);
-export const previewContentSubmission = (contentVersionId, assetId) => mutateApi("post", `/admin/content-versions/${contentVersionId}/preview-url`, assetId ? { assetId } : {}).then(unwrap);
+export const previewContentSubmission = (contentVersionId, assetId) => mutateApi("post", `/admin/content-versions/${contentVersionId}/preview-url`, assetId ? { assetId } : {}, { stepUp: true }).then(unwrap);
 
 export const getAdminUsers = async ({ status, search, page = 1, limit = 50 } = {}) => {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
