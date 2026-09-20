@@ -26,7 +26,6 @@ const courseInput = z.object({
   trainerContact: z.string().trim().min(1).max(500).nullable().optional(),
   joinUrl: z.string().url().max(2000).nullable().optional(),
   progressTrackingType: z.enum(['none', 'online_video']).default('none'),
-  totalDurationSeconds: z.coerce.number().int().positive().nullable().optional(),
 }).superRefine((value, context) => {
   const needsCoordination = value.deliveryModes.some((mode) => mode === 'local' || mode === 'live');
   if (needsCoordination && (!value.fulfilmentInstructions || !value.trainerContact)) {
@@ -34,12 +33,6 @@ const courseInput = z.object({
   }
   if (needsCoordination && !value.startsAt) {
     context.addIssue({ code: 'custom', path: ['startsAt'], message: 'Self-arranged Local and Live courses require a confirmed start time for the 72-hour refund deadline.' });
-  }
-  if (value.progressTrackingType === 'online_video' && !value.totalDurationSeconds) {
-    context.addIssue({ code: 'custom', path: ['totalDurationSeconds'], message: 'Online video requires a total duration.' });
-  }
-  if (value.progressTrackingType === 'none' && value.totalDurationSeconds !== null && value.totalDurationSeconds !== undefined) {
-    context.addIssue({ code: 'custom', path: ['totalDurationSeconds'], message: 'A duration is only accepted for platform-hosted online video.' });
   }
 });
 const contentInput = z.object({
@@ -143,7 +136,7 @@ export async function createCourse(req: Request, res: Response) {
   const course = await withTransaction(async (client) => {
     await assertTrainerOperational(client, actor.id);
     const created = await client.query<{ course_id: string }>(`INSERT INTO courses (owner_user_id, category_id, title, description) VALUES ($1, $2, $3, $4) RETURNING course_id`, [actor.id, input.categoryId ?? null, input.title, input.description]);
-    const run = await client.query<{ course_run_id: string }>(`INSERT INTO course_runs (course_id, run_code, price_points, capacity, starts_at, ends_at, timezone, primary_delivery_type, progress_tracking_type, total_duration_seconds) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING course_run_id`, [created.rows[0].course_id, `run-${randomUUID()}`, input.pricePoints, input.capacity ?? null, input.startsAt ?? null, input.endsAt ?? null, input.timezone ?? null, input.deliveryModes[0], input.progressTrackingType, input.totalDurationSeconds ?? null]);
+    const run = await client.query<{ course_run_id: string }>(`INSERT INTO course_runs (course_id, run_code, price_points, capacity, starts_at, ends_at, timezone, primary_delivery_type, progress_tracking_type, total_duration_seconds) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING course_run_id`, [created.rows[0].course_id, `run-${randomUUID()}`, input.pricePoints, input.capacity ?? null, input.startsAt ?? null, input.endsAt ?? null, input.timezone ?? null, input.deliveryModes[0], input.progressTrackingType, null]);
     for (const [index, mode] of input.deliveryModes.entries()) { const coordinates = mode === 'local' || mode === 'live'; await client.query(`INSERT INTO course_delivery_options (course_run_id, delivery_type, access_mode, is_primary, option_status, fulfilment_instructions, trainer_contact, join_url) VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7)`, [run.rows[0].course_run_id, mode, mode === 'live' ? 'attendance' : 'on_demand', index === 0, coordinates ? input.fulfilmentInstructions ?? null : null, coordinates ? input.trainerContact ?? null : null, coordinates ? input.joinUrl ?? null : null]); }
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id) VALUES ($1, 'course.create', 'courses', $2, jsonb_build_object('courseRunId', $3::uuid), $4)`, [actor.id, created.rows[0].course_id, run.rows[0].course_run_id, res.locals.requestId]);
     return { id: run.rows[0].course_run_id, courseId: created.rows[0].course_id, status: 'draft' };
@@ -167,7 +160,7 @@ export async function updateCourse(req: Request, res: Response) {
     await client.query(`UPDATE course_runs SET price_points = $2, capacity = $3, starts_at = $4, ends_at = $5,
       timezone = $6, primary_delivery_type = $7, progress_tracking_type = $8, total_duration_seconds = $9
       WHERE course_run_id = $1`, [id, input.pricePoints, input.capacity ?? null, input.startsAt ?? null, input.endsAt ?? null,
-      input.timezone ?? null, input.deliveryModes[0], input.progressTrackingType, input.totalDurationSeconds ?? null]);
+      input.timezone ?? null, input.deliveryModes[0], input.progressTrackingType, null]);
     await client.query('DELETE FROM course_delivery_options WHERE course_run_id = $1', [id]);
     await client.query(`INSERT INTO course_delivery_options
       (course_run_id, delivery_type, access_mode, is_primary, option_status, fulfilment_instructions, trainer_contact, join_url)

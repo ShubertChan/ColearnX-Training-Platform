@@ -11,6 +11,7 @@ export const createVideoUpload = (id, file, requestKey, signal) => apiClient.pos
 }, options(requestKey, signal)).then(unwrap);
 export const completeVideoUpload = (id, versionId, requestKey, signal) => apiClient.post(`${version(id, versionId)}/complete`, {}, options(requestKey, signal)).then(unwrap);
 export const retryVideo = (id, versionId, requestKey) => apiClient.post(`${version(id, versionId)}/retry`, {}, options(requestKey)).then(unwrap);
+export const retryVideoOperation = (id, versionId, requestKey) => apiClient.post(`/admin/course-runs/${encodeURIComponent(id)}/video-versions/${encodeURIComponent(versionId)}/retry`, {}, options(requestKey)).then(unwrap);
 export const deleteVideo = (id, versionId) => apiClient.delete(version(id, versionId), options()).then(unwrap);
 
 // Extension contracts awaiting backend agreement are documented in HOSTED_VIDEO_HANDOFF.md.

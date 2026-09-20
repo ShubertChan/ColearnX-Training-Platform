@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "colearnx-media-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-19",
+  "r2_buckets": [
+    { "binding": "HLS_BUCKET", "bucket_name": "REPLACE_WITH_PRIVATE_HLS_BUCKET" }
+  ],
+  "vars": { "APP_ORIGIN": "https://REPLACE_WITH_APP_ORIGIN" }
+}

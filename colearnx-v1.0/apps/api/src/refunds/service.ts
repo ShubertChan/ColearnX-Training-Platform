@@ -7,6 +7,7 @@ import { ApiError, ok } from '../lib/http.js';
 import { parse, uuid } from '../lib/validation.js';
 import { loadSystemPointAccount, postPointTransaction } from '../points/ledger.js';
 import { evaluateRefund, type RefundDecision } from './policy.js';
+import { uniqueWatchedSeconds } from '../video/progress.js';
 
 const requestSchema = z.object({ orderItemId: uuid, reason: z.string().trim().min(5).max(2000) });
 const decisionSchema = z.object({ decision: z.enum(['approved', 'rejected']), reason: z.string().trim().min(3).max(2000) });
@@ -14,6 +15,7 @@ const reviewListSchema = z.object({ status: z.enum(['pending', 'approved', 'reje
 
 type RefundEvidence = {
   order_item_id: string;
+  course_video_version_id: string | null;
   item_type: string;
   fulfilment_status: string;
   points_amount: string;
@@ -43,22 +45,44 @@ function evaluateEvidence(evidence: RefundEvidence, requestTime: Date): RefundDe
 }
 
 async function loadEvidence(client: Pick<PoolClient, 'query'>, orderItemId: string, buyerId: string) {
-  const result = await client.query<RefundEvidence>(`SELECT oi.order_item_id, oi.item_type, oi.fulfilment_status, oi.points_amount,
+  // Lock the order before its evidence. Heartbeats take the same first lock,
+  // so a refund snapshot cannot race an accepted interval write.
+  const locked = await client.query<{ course_video_version_id: string | null }>(`SELECT oi.course_video_version_id
+    FROM order_items oi JOIN orders o ON o.order_id = oi.order_id
+    WHERE oi.order_item_id = $1 AND o.buyer_user_id = $2 FOR UPDATE OF oi`, [orderItemId, buyerId]);
+  const videoVersionId = locked.rows[0]?.course_video_version_id;
+  if (!locked.rowCount) return null;
+  await client.query(`SELECT ce.enrolment_id FROM course_enrolments ce
+    WHERE ce.order_item_id = $1 FOR UPDATE`, [orderItemId]);
+  await client.query(`SELECT cap.access_progress_id FROM course_access_progress cap
+    JOIN course_enrolments ce ON ce.enrolment_id = cap.enrolment_id
+    WHERE ce.order_item_id = $1 FOR UPDATE OF cap`, [orderItemId]);
+  if (videoVersionId) await client.query(`SELECT course_video_watch_interval_id FROM course_video_watch_intervals
+    WHERE order_item_id = $1 AND course_video_version_id = $2 FOR UPDATE`, [orderItemId, videoVersionId]);
+
+  const result = await client.query<RefundEvidence>(`SELECT oi.order_item_id, oi.course_video_version_id, oi.item_type, oi.fulfilment_status, oi.points_amount,
     oi.delivery_modes_snapshot_json, oi.refund_policy_snapshot_json, o.created_at AS purchased_at, cr.starts_at,
     COALESCE(MAX(cap.watched_seconds), 0)::text AS watched_seconds,
-    MAX(cap.total_seconds)::text AS total_seconds,
+    COALESCE(cv.duration_seconds, MAX(cap.total_seconds))::text AS total_seconds,
     COALESCE(MIN(cap.first_started_at), MIN(cag.first_accessed_at)) AS first_accessed_at,
     COALESCE(MAX(cap.download_completed_at), MAX(cag.first_accessed_at)) AS download_completed_at
     FROM order_items oi
     JOIN orders o ON o.order_id = oi.order_id
     LEFT JOIN course_runs cr ON cr.course_run_id = oi.course_run_id
+    LEFT JOIN course_video_versions cv ON cv.course_video_version_id = oi.course_video_version_id
     LEFT JOIN course_enrolments ce ON ce.order_item_id = oi.order_item_id
     LEFT JOIN course_access_progress cap ON cap.enrolment_id = ce.enrolment_id
     LEFT JOIN content_access_grants cag ON cag.order_item_id = oi.order_item_id
     WHERE oi.order_item_id = $1 AND o.buyer_user_id = $2
-    GROUP BY oi.order_item_id, o.order_id, cr.course_run_id`,
+    GROUP BY oi.order_item_id, oi.course_video_version_id, o.order_id, cr.course_run_id, cv.duration_seconds`,
     [orderItemId, buyerId]);
-  return result.rows[0] ?? null;
+  const evidence = result.rows[0] ?? null;
+  if (evidence?.course_video_version_id && evidence.total_seconds !== null) {
+    const intervals = await client.query<{ interval_start_seconds: string; interval_end_seconds: string }>(`SELECT interval_start_seconds::text, interval_end_seconds::text
+      FROM course_video_watch_intervals WHERE order_item_id = $1 AND course_video_version_id = $2`, [orderItemId, evidence.course_video_version_id]);
+    evidence.watched_seconds = String(uniqueWatchedSeconds(intervals.rows.map((row) => ({ startSeconds: Number(row.interval_start_seconds), endSeconds: Number(row.interval_end_seconds) })), Number(evidence.total_seconds)));
+  }
+  return evidence;
 }
 
 export async function createRefundRequest(req: Request, res: Response) {
@@ -200,6 +224,8 @@ export async function decideRefund(req: Request, res: Response) {
             AND purchase.order_item_id = $1 AND ph.hold_status = 'active'`, [current.order_item_id, pointTransactionId]);
       }
       await client.query(`UPDATE order_items SET fulfilment_status = 'refunded' WHERE order_item_id = $1`, [current.order_item_id]);
+      await client.query(`UPDATE course_video_progress_sessions SET session_status = 'revoked', updated_at = now()
+        WHERE order_item_id = $1 AND session_status = 'active'`, [current.order_item_id]);
       await client.query(`UPDATE course_enrolments SET enrolment_status = 'refunded' WHERE order_item_id = $1`, [current.order_item_id]);
       await client.query(`UPDATE content_access_grants SET expires_at = now() WHERE order_item_id = $1`, [current.order_item_id]);
       await client.query(`UPDATE earnings_allocations SET allocation_status = 'reversed'

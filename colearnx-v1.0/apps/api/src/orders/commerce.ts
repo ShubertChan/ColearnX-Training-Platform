@@ -31,6 +31,7 @@ type Product = {
   refundPolicyId: string | null;
   progressTrackingType: 'none' | 'online_video';
   totalDurationSeconds: number | null;
+  courseVideoVersionId: string | null;
   deliverySnapshot: { instructions: string; trainerContact: string; joinUrl: string };
 };
 
@@ -100,11 +101,20 @@ async function lockProduct(client: PoolClient, item: { kind: 'course' | 'content
       joinUrl: coordination?.join_url ?? '',
     };
     const row = course.rows[0];
+    const video = row.progress_tracking_type === 'online_video'
+      ? await client.query<{ course_video_version_id: string; duration_seconds: string }>(`SELECT course_video_version_id, duration_seconds::text
+          FROM course_video_versions WHERE course_run_id = $1 AND is_current AND video_status = 'ready'
+            AND duration_seconds IS NOT NULL FOR SHARE`, [row.course_run_id])
+      : { rowCount: 0, rows: [] as Array<{ course_video_version_id: string; duration_seconds: string }> };
+    if (row.progress_tracking_type === 'online_video' && !video.rowCount) {
+      throw new ApiError(409, 'VIDEO_NOT_READY', 'This course video is still being prepared.');
+    }
     return {
       kind: 'course', id: row.course_run_id, sellerUserId: row.owner_user_id, title: row.title,
       pricePoints: points(row.price_points, 'Course price'), deliveryModes, startsAt: row.starts_at,
       capacity: row.capacity, refundPolicyId: row.refund_policy_id, progressTrackingType: row.progress_tracking_type,
-      totalDurationSeconds: row.total_duration_seconds, deliverySnapshot,
+      totalDurationSeconds: video.rowCount ? Number(video.rows[0].duration_seconds) : row.total_duration_seconds,
+      courseVideoVersionId: video.rows[0]?.course_video_version_id ?? null, deliverySnapshot,
     };
   }
 
@@ -123,7 +133,7 @@ async function lockProduct(client: PoolClient, item: { kind: 'course' | 'content
   return {
     kind: 'content', id: row.content_version_id, sellerUserId: row.creator_user_id, title: row.title,
     pricePoints: points(row.price_points, 'Content price'), deliveryModes: [], startsAt: null,
-    capacity: null, refundPolicyId: row.refund_policy_id, progressTrackingType: 'none', totalDurationSeconds: null,
+    capacity: null, refundPolicyId: row.refund_policy_id, progressTrackingType: 'none', totalDurationSeconds: null, courseVideoVersionId: null,
     deliverySnapshot: { instructions: '', trainerContact: '', joinUrl: '' },
   };
 }
@@ -224,8 +234,8 @@ export async function checkout(req: Request, res: Response) {
       const orderItem = await client.query<{ order_item_id: string }>(`INSERT INTO order_items
         (order_id, item_type, course_run_id, content_version_id, seller_user_id, item_title_snapshot, points_amount,
          refund_policy_id, refund_policy_snapshot_json, refund_deadline_at, fulfilment_status, delivery_modes_snapshot_json,
-         delivery_snapshot_json, revenue_share_bps, revenue_share_snapshot_json)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12::jsonb, $13::jsonb, 10000, $14::jsonb)
+         delivery_snapshot_json, revenue_share_bps, revenue_share_snapshot_json, course_video_version_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12::jsonb, $13::jsonb, 10000, $14::jsonb, $15)
         RETURNING order_item_id`, [
         order.rows[0].order_id,
         product.kind === 'course' ? 'course_run' : 'content_version',
@@ -236,6 +246,7 @@ export async function checkout(req: Request, res: Response) {
         JSON.stringify(product.deliveryModes), JSON.stringify(product.deliverySnapshot),
         JSON.stringify({ policyCode: revenuePolicy.policy_code, platformShareBps: revenuePolicy.platform_share_bps,
           trainerShareBps: revenuePolicy.trainer_share_bps, creatorShareBps: revenuePolicy.creator_share_bps }),
+        product.courseVideoVersionId,
       ]);
       const orderItemId = orderItem.rows[0].order_item_id;
       await createAllocations(client, orderItemId, product, revenuePolicy);
@@ -321,7 +332,7 @@ export async function getOrder(req: Request, res: Response) {
   const order = await query(`SELECT order_id, order_no, order_status, total_points, receipt_snapshot_json, created_at, paid_at
     FROM orders WHERE order_id = $1 AND buyer_user_id = $2`, [orderId, actor.id]);
   if (!order.rowCount) throw new ApiError(404, 'ORDER_NOT_FOUND', 'Order was not found.');
-  const itemRows = await query(`SELECT order_item_id, item_type, course_run_id, content_version_id, item_title_snapshot,
+  const itemRows = await query(`SELECT order_item_id, item_type, course_run_id, content_version_id, course_video_version_id, item_title_snapshot,
       points_amount, delivery_modes_snapshot_json, refund_policy_snapshot_json, refund_deadline_at, fulfilment_status,
       delivery_snapshot_json, revenue_share_snapshot_json, seller.user_id AS seller_user_id, seller.full_name AS seller_name,
       COALESCE(course_download.download_completed_at, content_download.download_completed_at) AS download_completed_at
@@ -352,7 +363,7 @@ export async function getOrder(req: Request, res: Response) {
     id: row.order_id, orderNo: row.order_no, status: row.order_status, totalPoints: Number(row.total_points),
     receipt: row.receipt_snapshot_json, createdAt: row.created_at, paidAt: row.paid_at,
     items: itemRows.rows.map((item) => ({ id: item.order_item_id, kind: item.item_type === 'course_run' ? 'course' : 'content',
-      productId: item.course_run_id ?? item.content_version_id, title: item.item_title_snapshot, pricePoints: Number(item.points_amount),
+      productId: item.course_run_id ?? item.content_version_id, courseVideoVersionId: item.course_video_version_id, title: item.item_title_snapshot, pricePoints: Number(item.points_amount),
       seller: { id: item.seller_user_id, displayName: item.seller_name }, transactionReference: row.order_no,
       delivery: item.delivery_snapshot_json, fulfilmentInstructions: item.delivery_snapshot_json?.instructions ?? '',
       trainerContact: item.delivery_snapshot_json?.trainerContact ?? '', joinUrl: item.delivery_snapshot_json?.joinUrl ?? '',
