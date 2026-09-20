@@ -48,6 +48,11 @@ function contentType(key: string) {
 }
 
 function range(value: string | null): R2Range | undefined {
+  const suffix = /^bytes=-(\d+)$/i.exec(value ?? '');
+  if (suffix) {
+    const length = Number(suffix[1]);
+    return Number.isSafeInteger(length) && length > 0 ? { suffix: length } : undefined;
+  }
   const match = /^bytes=(\d+)-(\d*)$/i.exec(value ?? '');
   if (!match) return undefined;
   const offset = Number(match[1]);
@@ -72,20 +77,27 @@ export default {
     if (!claims) return expired();
     const [, videoVersionId, assetPath] = match;
     if (claims.videoVersionId !== videoVersionId || assetPath.includes('..') || assetPath.includes('\\') || assetPath.startsWith('/')) return forbidden();
-    const object = await env.HLS_BUCKET.get(`course-video-hls/${videoVersionId}/${assetPath}`, { range: range(request.headers.get('Range')) });
+    const requestedRange = request.headers.get('Range');
+    const parsedRange = range(requestedRange);
+    if (requestedRange && !parsedRange) {
+      return new Response('Range not satisfiable.', { status: 416, headers: { 'Cache-Control': 'no-store', ...cors(request, env) } });
+    }
+    const object = await env.HLS_BUCKET.get(`course-video-hls/${videoVersionId}/${assetPath}`, { range: parsedRange });
     if (!object) return new Response('Not found.', { status: 404, headers: { 'Cache-Control': 'no-store', ...cors(request, env) } });
-    const headers = new Headers({
-      'Content-Type': object.httpMetadata?.contentType ?? contentType(assetPath),
-      'Cache-Control': 'private, no-store',
-      'Accept-Ranges': 'bytes',
-      ...cors(request, env),
-    });
+    const headers = new Headers(cors(request, env));
     object.writeHttpMetadata(headers);
+    // Security policy must win over any cache metadata stored on the R2 object.
+    headers.set('Content-Type', object.httpMetadata?.contentType ?? contentType(assetPath));
+    headers.set('Cache-Control', 'private, no-store');
+    headers.set('Accept-Ranges', 'bytes');
     headers.set('ETag', object.httpEtag);
     if (object.range && 'offset' in object.range && typeof object.range.offset === 'number') {
       const offset = object.range.offset;
       const length = object.range.length ?? Math.max(0, object.size - offset);
       headers.set('Content-Range', `bytes ${offset}-${offset + length - 1}/${object.size}`);
+    } else if (object.range && 'suffix' in object.range && typeof object.range.suffix === 'number') {
+      const length = Math.min(object.size, object.range.suffix);
+      headers.set('Content-Range', `bytes ${object.size - length}-${object.size - 1}/${object.size}`);
     }
     return new Response(request.method === 'HEAD' ? null : object.body, { status: object.range ? 206 : 200, headers });
   },
