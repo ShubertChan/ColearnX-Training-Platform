@@ -30,7 +30,8 @@ import { activityReport } from './admin/activity-report.js';
 import { createReport, decideReport, listReports } from './reports/reports.js';
 import { publishingAnalytics } from './reports/publishing-analytics.js';
 import { completeUploadIntent, createContentDownloadUrl, createUploadIntent, deleteUploadIntent, listContentAssets, previewContentAsset } from './storage/content-assets.js';
-import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUploadIntent, deleteCourseUploadIntent, getCourseDelivery, listCourseAssets, recordCourseProgress } from './storage/course-delivery.js';
+import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUploadIntent, deleteCourseUploadIntent, getCourseDelivery, listCourseAssets } from './storage/course-delivery.js';
+import { abortVideoMultipart, completeVideoMultipart, completeVideoUpload, createPlaybackSession, createPreviewPlaybackSession, createVideoUploadIntent, deleteVideoVersion, getCourseVideo, listVideoMultipartParts, listVideoOperations, recordVideoProgress, retryVideo, retryVideoForAdmin, signVideoMultipartPart } from './video/service.js';
 
 
 const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-step-up-token"]', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'req.body.token', 'req.body.mfaToken', 'res.headers.set-cookie'] });
@@ -133,6 +134,15 @@ export function createApp() {
   api.post('/courses/:courseRunId/upload-intents', authenticate, mutationLimiter, createCourseUploadIntent);
   api.post('/courses/:courseRunId/upload-intents/:assetId/complete', authenticate, mutationLimiter, completeCourseUploadIntent);
   api.delete('/courses/:courseRunId/upload-intents/:assetId', authenticate, mutationLimiter, deleteCourseUploadIntent);
+  api.get('/courses/:id/video', authenticate, getCourseVideo);
+  api.post('/courses/:id/video-upload-intents', authenticate, mutationLimiter, createVideoUploadIntent);
+  api.get('/courses/:id/video-versions/:versionId/multipart', authenticate, listVideoMultipartParts);
+  api.post('/courses/:id/video-versions/:versionId/multipart/sign', authenticate, mutationLimiter, signVideoMultipartPart);
+  api.post('/courses/:id/video-versions/:versionId/multipart/complete', authenticate, mutationLimiter, completeVideoMultipart);
+  api.delete('/courses/:id/video-versions/:versionId/multipart', authenticate, mutationLimiter, abortVideoMultipart);
+  api.post('/courses/:id/video-versions/:versionId/complete', authenticate, mutationLimiter, completeVideoUpload);
+  api.post('/courses/:id/video-versions/:versionId/retry', authenticate, mutationLimiter, retryVideo);
+  api.delete('/courses/:id/video-versions/:versionId', authenticate, mutationLimiter, deleteVideoVersion);
   api.post('/role-applications', authenticate, mutationLimiter, createRoleApplication);
   api.get('/role-applications/me', authenticate, myRoleApplications);
   api.post('/trainer-certifications', authenticate, mutationLimiter, createTrainerCertification);
@@ -153,7 +163,8 @@ export function createApp() {
   api.post('/refund-requests', authenticate, mutationLimiter, createRefundRequest);
   api.get('/order-items/:orderItemId/delivery', authenticate, getCourseDelivery);
   api.post('/order-items/:orderItemId/delivery/download-url', authenticate, mutationLimiter, createCourseDownloadUrl);
-  api.post('/order-items/:orderItemId/progress', authenticate, mutationLimiter, recordCourseProgress);
+  api.post('/order-items/:orderItemId/progress', authenticate, mutationLimiter, recordVideoProgress);
+  api.post('/order-items/:orderItemId/playback-sessions', authenticate, mutationLimiter, createPlaybackSession);
   api.get('/refund-requests/:id', authenticate, getRefundRequest);
   api.get('/admin/role-applications', authenticate, requireRole('admin'), requireAdminMfa, listRoleApplications);
   api.post('/admin/role-applications/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, requireStepUp, decideRoleApplication);
@@ -161,6 +172,9 @@ export function createApp() {
   api.post('/admin/trainer-certifications/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, decideTrainerCertification);
   api.get('/admin/course-submissions', authenticate, requireRole('admin'), requireAdminMfa, listCourseSubmissions);
   api.post('/admin/course-runs/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, decideCourseSubmission);
+  api.post('/admin/course-runs/:id/video-versions/:versionId/playback-sessions', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, createPreviewPlaybackSession);
+  api.get('/admin/video-operations', authenticate, requireRole('admin'), requireAdminMfa, listVideoOperations);
+  api.post('/admin/course-runs/:id/video-versions/:versionId/retry', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, retryVideoForAdmin);
   api.get('/admin/content-submissions', authenticate, requireRole('admin'), requireAdminMfa, listContentSubmissions);
   api.post('/admin/content-versions/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, decideContentSubmission);
   api.post('/admin/content-versions/:contentVersionId/preview-url', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, requireStepUp, previewContentAsset);

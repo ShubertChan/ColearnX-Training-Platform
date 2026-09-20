@@ -44,6 +44,13 @@ const schema = z.object({
   CONTENT_PENDING_UPLOAD_LIMIT: z.coerce.number().int().min(1).max(10).default(3),
   ENABLE_LOCAL_DELIVERY: booleanFromString,
   ENABLE_HOSTED_VIDEO: booleanFromString,
+  VIDEO_SOURCE_MAX_BYTES: z.coerce.number().int().min(5 * 1024 * 1024).max(80 * 1024 * 1024 * 1024).default(20 * 1024 * 1024 * 1024),
+  VIDEO_PLAYBACK_GATEWAY_ORIGIN: z.union([z.string().url(), z.literal('')]).optional().default(''),
+  VIDEO_PLAYBACK_TOKEN_SECRET: z.string().optional().default(''),
+  VIDEO_PLAYBACK_TTL_SECONDS: z.coerce.number().int().min(60).max(300).default(300),
+  VIDEO_HEARTBEAT_MAX_GAP_SECONDS: z.coerce.number().int().min(10).max(120).default(30),
+  VIDEO_QUEUE_DATABASE_URL: z.union([z.string().url(), z.literal('')]).optional().default(''),
+  VIDEO_QUEUE_MIGRATION_DATABASE_URL: z.union([z.string().url(), z.literal('')]).optional().default(''),
   // --- W2 security telemetry ---------------------------------------------
   // Keys every low-entropy identifier written to security_events. A bare
   // SHA-256 of an IPv4 address is exhaustively reversible, so this is what
@@ -120,6 +127,10 @@ if (parsed.data.OBJECT_STORAGE_PROVIDER === 'r2') {
   if (!parsed.data.R2_ACCESS_KEY_ID) throw new Error('R2_ACCESS_KEY_ID is required when OBJECT_STORAGE_PROVIDER=r2.');
   if (!parsed.data.R2_SECRET_ACCESS_KEY) throw new Error('R2_SECRET_ACCESS_KEY is required when OBJECT_STORAGE_PROVIDER=r2.');
   if (!parsed.data.R2_BUCKET_NAME) throw new Error('R2_BUCKET_NAME is required when OBJECT_STORAGE_PROVIDER=r2.');
+}
+if (parsed.data.ENABLE_HOSTED_VIDEO) {
+  if (!parsed.data.VIDEO_PLAYBACK_GATEWAY_ORIGIN) throw new Error('VIDEO_PLAYBACK_GATEWAY_ORIGIN is required when ENABLE_HOSTED_VIDEO=true.');
+  if (parsed.data.VIDEO_PLAYBACK_TOKEN_SECRET.length < 32) throw new Error('VIDEO_PLAYBACK_TOKEN_SECRET must be at least 32 characters when ENABLE_HOSTED_VIDEO=true.');
 }
 // The pepper separates a de-identified ledger from a stored list of IP
 // addresses, so a real deployment must supply one. Anywhere else -- local

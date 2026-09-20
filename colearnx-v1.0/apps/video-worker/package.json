@@ -1,0 +1,21 @@
+{
+  "name": "@colearnx/video-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/worker.ts",
+    "typecheck": "tsc --noEmit --target ES2023 --module NodeNext --moduleResolution NodeNext --strict --esModuleInterop --skipLibCheck src/worker.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1123.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.23.0",
+    "pg-boss": "12.33.2",
+    "tsx": "^4.23.12"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
+    "typescript": "^7.0.2"
+  }
+}
