@@ -1,0 +1,149 @@
+name: Deploy staging
+
+# Deliberately manual. PRs and pushes only run CI; they cannot publish.
+on:
+  workflow_dispatch:
+    inputs:
+      migrations_reviewed:
+        description: I verified required cloud migrations separately (this workflow never migrates or seeds)
+        required: true
+        type: boolean
+        default: false
+      last_applied_migration:
+        description: Exact last migration filename verified in the cloud ledger (for example 017_video_order_course_integrity.sql)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Do not interrupt a release between publishing the API and the frontend.
+concurrency:
+  group: colearnx-staging-release
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: colearnx-v1.0/.node-version
+      - name: Require current main and exact migration acknowledgement
+        env:
+          MIGRATIONS_REVIEWED: ${{ inputs.migrations_reviewed }}
+          LAST_APPLIED_MIGRATION: ${{ inputs.last_applied_migration }}
+          RELEASE_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: node colearnx-v1.0/scripts/deployment/source-guard.mjs
+
+  validate:
+    needs: guard
+    uses: ./.github/workflows/ci.yml
+    # No secrets are passed to install, test, or build steps.
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: staging
+      url: https://staging.colearnx.net
+    defaults:
+      run:
+        working-directory: colearnx-v1.0
+    env:
+      RELEASE_SHA: ${{ github.sha }}
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: colearnx-v1.0/.node-version
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.validate.outputs.pages_artifact }}
+          path: colearnx-v1.0/dist
+      - name: Verify exact artifact before any deployment
+        run: npm run release:verify
+      - name: Install lockfile-pinned Pages CLI before providing platform secrets
+        run: npm --prefix deployment ci --ignore-scripts
+      - name: Reject a stale queued release before changing either platform
+        env:
+          MIGRATIONS_REVIEWED: ${{ inputs.migrations_reviewed }}
+          LAST_APPLIED_MIGRATION: ${{ inputs.last_applied_migration }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/deployment/source-guard.mjs
+      - name: Check required deployment configuration
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$RENDER_API_KEY"
+          test -n "$RENDER_SERVICE_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - name: Verify existing Pages target before changing Render
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/deployment/pages-preflight.mjs
+      - name: Deploy Render API at the tested commit and wait for live
+        id: render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+        run: node scripts/deployment/render-deploy.mjs
+      - name: Check API, database connectivity, and canonical CORS
+        run: npm run release:smoke -- --api-only
+      - name: Confirm Render still serves the tested SHA
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+        run: node scripts/deployment/render-deploy.mjs --verify-only
+      - name: Reject a competing Pages publication
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/deployment/pages-preflight.mjs --verify-unchanged
+      - name: Publish tested artifact to the existing Pages project
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        # Version fixed to the CLI already used for this staging project.
+        run: node scripts/deployment/pages-deploy.mjs
+      - name: Verify published version, assets, and API
+        run: npm run release:smoke
+      - name: Verify final backend identity
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+        run: node scripts/deployment/render-deploy.mjs --verify-only
+      - name: Write release summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          RENDER_DEPLOY_ID: ${{ steps.render.outputs.render_deploy_id }}
+          RENDER_PREVIOUS_DEPLOY_ID: ${{ steps.render.outputs.render_previous_deploy_id }}
+          RENDER_PREVIOUS_COMMIT_SHA: ${{ steps.render.outputs.render_previous_commit_sha }}
+        run: node scripts/deployment/release-summary.mjs
+      - name: Keep non-secret deployment evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: staging-release-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            colearnx-v1.0/release-report
+            colearnx-v1.0/dist/release.json
+          if-no-files-found: warn
+          retention-days: 14

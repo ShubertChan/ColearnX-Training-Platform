@@ -9,7 +9,17 @@
     "preview": "vite preview",
     "test": "node --test src/**/*.test.js",
     "test:components": "vitest run --config vitest.config.js --configLoader native",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "api:build": "npm --prefix apps/api run build",
+    "api:typecheck": "npm --prefix apps/api run typecheck",
+    "api:test": "npm --prefix apps/api test",
+    "db:migrate": "npm --prefix apps/api run db:migrate",
+    "db:seed": "npm --prefix apps/api run db:seed",
+    "release:test": "node --test scripts/deployment/*.test.mjs",
+    "release:build": "node scripts/deployment/artifact.mjs build",
+    "release:verify": "node scripts/deployment/artifact.mjs verify",
+    "release:smoke": "node scripts/deployment/smoke.mjs",
+    "release:database-test": "npm --prefix apps/api run test:integration"
   },
   "dependencies": {
     "@fontsource/geist": "^5.3.0",

@@ -1,0 +1,12 @@
+{
+  "appOrigin": "https://staging.colearnx.net",
+  "apiOrigin": "https://api-staging.colearnx.net",
+  "apiBaseUrl": "https://api-staging.colearnx.net/api/v1",
+  "pagesProject": "colearnx-staging",
+  "pagesBranch": "main",
+  "paymentsEnabled": true,
+  "paymentProvider": "stripe",
+  "hostedVideoEnabled": false,
+  "mediaOrigins": [],
+  "uploadOrigins": []
+}

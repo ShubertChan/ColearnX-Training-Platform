@@ -1,0 +1,8 @@
+{
+  "name": "colearnx-deployment-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "wrangler": "4.129.1"
+  }
+}
