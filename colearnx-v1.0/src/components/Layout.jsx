@@ -24,6 +24,7 @@ import {
   X,
   AlertTriangle,
   RotateCcw,
+  ShieldCheck
 } from "lucide-react";
 import { usePlatform } from "../context/PlatformContext";
 import { useAdminInbox } from "../context/AdminInboxContext";
@@ -308,6 +309,13 @@ export default function Layout({ children }) {
               <small>{role}</small>
             </span>
             <CircleUserRound size={18} />
+          </button>
+          {/* Placed with the profile chip and sign-out rather than in the role
+              navigation above: two-factor and session management belong to the
+              account, not to a workspace, and each role sees a different nav —
+              a fixed home here means no one has to relearn where it lives. */}
+          <button className="sidebar-security" onClick={() => navigate("/security")}>
+            <ShieldCheck size={15} /> Account security
           </button>
           <button
             className="sidebar-signout"
