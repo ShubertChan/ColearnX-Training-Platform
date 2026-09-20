@@ -362,7 +362,8 @@ select:focus-visible {
   color: var(--muted);
   font-size: 10px;
 }
-.sidebar-signout {
+.sidebar-signout,
+.sidebar-security {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -380,6 +381,10 @@ select:focus-visible {
 .sidebar-signout:hover {
   color: var(--danger);
   background: #fff2f1;
+}
+.sidebar-security:hover {
+  color: #2f6fed;
+  background: #eef3ff;
 }
 .mobile-close,
 .menu-button,
