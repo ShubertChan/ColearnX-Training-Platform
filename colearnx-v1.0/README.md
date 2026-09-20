@@ -1,6 +1,6 @@
-# CoLearnX frontend
+# CoLearnX training platform
 
-This archive contains the React/Vite frontend only. It does **not** contain `apps/api`, a database, migrations or a mail/storage service. The browser expects a compatible API at `/api/v1`; during Vite development that path is proxied to `http://localhost:3001`.
+This repository contains the React/Vite frontend, the Express/Node API in `apps/api`, PostgreSQL migrations, and the hosted-video worker and media gateway source. Cloud databases and external mail/storage/payment services are configured separately; credentials are not included. The browser expects a compatible API at `/api/v1`; during Vite development that path is proxied to `http://localhost:3001`.
 
 ## Run locally
 
@@ -34,4 +34,8 @@ The frontend/backend boundary and the server work still required for the reporte
 
 ## Backend integration
 
-The repository also includes the backend delivery and refund workflows. Apply migration 008_frontend_delivery_backend.sql and configure the deployment secrets before using the protected delivery, video-progress, profile, privacy and password-reset endpoints. See [API contract](docs/API.md), [local runbook](docs/LOCAL_RUNBOOK.md), and [staging runbook](docs/STAGING_RENDER_NEON.md). The frontend treats server-recorded refund eligibility as authoritative.
+The repository also includes the backend delivery and refund workflows. Review and apply all pending migrations from the target commit (not only the original delivery migration 008), and configure deployment secrets before enabling protected features. See [API contract](docs/API.md), [local runbook](docs/LOCAL_RUNBOOK.md), and [staging runbook](docs/STAGING_RENDER_NEON.md). The frontend treats server-recorded refund eligibility as authoritative.
+
+## Controlled staging CI/CD
+
+See [the staging CI/CD guide](docs/STAGING_CICD.md) for automated tests, isolated PostgreSQL integration checks, pinned release artifacts, required migration acknowledgement, and manual publishing of the same commit to Render and Cloudflare Pages. Cloud migration and runtime secrets are deliberately kept outside this workflow. Hosted video remains disabled in `deployment/staging.json` until its separate worker, gateway and storage configuration are ready.

@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/**/*.test.ts",
     "test:integration:upload-retry": "node --import tsx scripts/upload-retry-permissions-integration-check.mjs",
+    "test:integration": "node --import tsx scripts/release-integration-check.mjs",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "storage:reconcile": "tsx src/storage/reconcile.ts",

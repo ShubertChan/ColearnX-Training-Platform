@@ -1,0 +1,103 @@
+name: CoLearnX CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      pages_artifact:
+        description: Tested frontend artifact from this exact run
+        value: ${{ jobs.validate.outputs.pages_artifact }}
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Tests and production builds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: release_owner
+          # Disposable runner-local test credential; never a cloud password.
+          POSTGRES_PASSWORD: ci-local-fixture-only
+          POSTGRES_DB: colearnx_release_check_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U release_owner -d colearnx_release_check_ci"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: colearnx-v1.0
+    outputs:
+      pages_artifact: pages-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    env:
+      RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: colearnx-v1.0/.node-version
+          cache: npm
+          cache-dependency-path: |
+            colearnx-v1.0/package-lock.json
+            colearnx-v1.0/apps/api/package-lock.json
+            colearnx-v1.0/apps/video-worker/package-lock.json
+            colearnx-v1.0/apps/media-gateway/package-lock.json
+            colearnx-v1.0/deployment/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --include=dev
+      - name: Install API dependencies
+        run: npm --prefix apps/api ci --include=dev
+      - name: Install video service and pinned deployment dependencies without cloud secrets
+        run: |
+          npm --prefix apps/video-worker ci --include=dev
+          npm --prefix apps/media-gateway ci --include=dev
+          npm --prefix deployment ci --ignore-scripts
+      - name: Audit frontend production dependencies (block high or critical)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit API production dependencies (block high or critical)
+        run: npm --prefix apps/api audit --omit=dev --audit-level=high
+      - name: Deployment script tests (mock network only)
+        run: npm run release:test
+      - name: Frontend tests
+        run: npm test
+      - name: Frontend component tests
+        run: npm run test:components
+      - name: API tests
+        run: npm run api:test
+      - name: API type check
+        run: npm run api:typecheck
+      - name: Video Worker and gateway type checks (no deployment)
+        run: |
+          npm --prefix apps/video-worker run typecheck
+          npm --prefix apps/media-gateway run typecheck
+      - name: Isolated PostgreSQL 16 migrations, data preservation and permissions
+        env:
+          RELEASE_CHECK_DATABASE_URL: postgresql://release_owner:ci-local-fixture-only@127.0.0.1:5432/colearnx_release_check_ci
+        run: npm run release:database-test
+      - name: Browser regression checks against local fixtures only
+        run: |
+          npm exec -- playwright install --with-deps chromium
+          npm run test:e2e -- --project=chromium
+      - name: Build API
+        run: npm run api:build
+      - name: Build frontend with canonical staging configuration
+        run: npm run release:build
+      - name: Verify frontend artifact
+        run: npm run release:verify
+      - name: Save tested frontend artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pages-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: colearnx-v1.0/dist
+          if-no-files-found: error
+          retention-days: 7

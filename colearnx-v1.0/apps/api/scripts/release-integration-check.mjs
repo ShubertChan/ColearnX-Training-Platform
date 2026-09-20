@@ -389,7 +389,9 @@ try {
   const createdDraft = await request(app).post('/api/v1/courses').set('Authorization', `Bearer ${trainerToken}`).send(draftPayload).expect(201);
   const firstListings = await request(app).get('/api/v1/my/listings').set('Authorization', `Bearer ${trainerToken}`).expect(200);
   const savedDraft = firstListings.body.data.find((item) => item.id === createdDraft.body.data.id);
-  for (const [key, value] of Object.entries(draftPayload)) assert.deepEqual(savedDraft[key], value, `Draft listings omitted ${key}`);
+  // Only FFprobe may establish trusted duration; a newly saved draft has no
+  // verified source. Do not reintroduce trust in client duration to pass tests.
+  for (const [key, value] of Object.entries(draftPayload)) assert.deepEqual(savedDraft[key], key === 'totalDurationSeconds' ? null : value, `Draft listings omitted ${key}`);
   const editPayload = Object.fromEntries(Object.keys(draftPayload).map((key) => [key, savedDraft[key]]));
   editPayload.title = 'Edited fixture title';
   await request(app).patch(`/api/v1/courses/${savedDraft.id}`).set('Authorization', `Bearer ${trainerToken}`).send(editPayload).expect(200);
@@ -564,6 +566,8 @@ try {
   passed('real second-delete failure rolls back the first deletion; CLI rejects malformed days before deletion and succeeds with the corrected schema');
   const { runMfaSessionChecks } = await import('./mfa-session-checks.mjs');
   await runMfaSessionChecks({ owner, app, apiPool, environment, passed });
+  const { runVideoOrderIntegrityChecks } = await import('./video-order-integrity-checks.mjs');
+  await runVideoOrderIntegrityChecks({ owner, buyerId, sellerId, courseId, courseRunId, passed });
   assert.equal(blockedHttpCalls, 0, 'No email, HIBP, alert, payment, or storage HTTP request may be attempted.');
   process.stdout.write(`SUCCESS ${checks} integration check groups passed; test-only data retained in disposable local PostgreSQL cluster.\n`);
 } finally {
