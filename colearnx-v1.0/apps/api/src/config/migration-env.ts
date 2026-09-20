@@ -8,6 +8,10 @@ const migrationSchema = z.object({
   DATABASE_SSL: booleanFromString,
 });
 
+const queueMigrationSchema = z.object({
+  VIDEO_QUEUE_MIGRATION_DATABASE_URL: z.string().url(),
+});
+
 export type MigrationEnv = z.infer<typeof migrationSchema>;
 
 export function parseMigrationEnv(input: Record<string, string | undefined>): MigrationEnv {
@@ -20,4 +24,18 @@ export function parseMigrationEnv(input: Record<string, string | undefined>): Mi
 
 export function loadMigrationEnv() {
   return parseMigrationEnv(process.env);
+}
+
+export type QueueMigrationEnv = z.infer<typeof queueMigrationSchema>;
+
+export function parseQueueMigrationEnv(input: Record<string, string | undefined>): QueueMigrationEnv {
+  const parsed = queueMigrationSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(`Invalid queue migration environment configuration: ${parsed.error.issues.map((issue) => issue.path.join('.')).join(', ')}`);
+  }
+  return parsed.data;
+}
+
+export function loadQueueMigrationEnv() {
+  return parseQueueMigrationEnv(process.env);
 }

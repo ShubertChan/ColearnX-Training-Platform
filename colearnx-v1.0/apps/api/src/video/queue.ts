@@ -1,8 +1,8 @@
 import { PgBoss } from 'pg-boss';
 import { env } from '../config/env.js';
 import { ApiError } from '../lib/http.js';
+import { VIDEO_TRANSCODE_QUEUE } from './constants.js';
 
-export const VIDEO_TRANSCODE_QUEUE = 'course-video.transcode';
 export type VideoTranscodeJob = { videoVersionId: string };
 
 let queue: PgBoss | undefined;
