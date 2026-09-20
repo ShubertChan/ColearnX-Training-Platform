@@ -1,9 +1,8 @@
 import { PgBoss } from 'pg-boss';
-import { env } from '../config/env.js';
-import { VIDEO_TRANSCODE_QUEUE } from './queue.js';
+import { loadQueueMigrationEnv } from '../config/migration-env.js';
+import { VIDEO_TRANSCODE_QUEUE } from './constants.js';
 
-const connectionString = env.VIDEO_QUEUE_MIGRATION_DATABASE_URL;
-if (!connectionString) throw new Error('VIDEO_QUEUE_MIGRATION_DATABASE_URL is required for video:queue:prepare.');
+const { VIDEO_QUEUE_MIGRATION_DATABASE_URL: connectionString } = loadQueueMigrationEnv();
 
 const boss = new PgBoss({ connectionString, schema: 'pgboss', migrate: true, createSchema: true, supervise: false });
 await boss.start();
