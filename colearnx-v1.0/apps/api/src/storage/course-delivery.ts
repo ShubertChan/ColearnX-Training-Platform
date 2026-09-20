@@ -40,7 +40,7 @@ type CourseAsset = {
   course_delivery_asset_id: string;
   course_run_id: string;
   owner_user_id: string;
-  asset_purpose: 'cloud_download' | 'online_video';
+  asset_purpose: 'cloud_download' | 'online_video' | 'video_source';
   bucket_name: string;
   object_key: string;
   original_filename: string;
@@ -149,22 +149,20 @@ function mismatch(head: HeadedObject, asset: CourseAsset) {
     || !contentTypeMatches(asset.declared_content_type, head.contentType);
 }
 
-function purposeFor(course: DraftCourse, metadata: UploadMetadata): 'cloud_download' | 'online_video' {
-  return course.progress_tracking_type === 'online_video' && metadata.mediaType === 'video/mp4'
-    ? 'online_video'
-    : 'cloud_download';
+function purposeFor(_course: DraftCourse, _metadata: UploadMetadata): 'cloud_download' {
+  // Hosted-video sources use the dedicated multipart route. General course uploads
+  // remain downloadable attachments and can never become a direct playback object.
+  return 'cloud_download';
 }
 
 export async function assertCourseReadyForSubmission(client: Pick<PoolClient, 'query'>, courseRunId: string, ownerUserId: string) {
-  const course = await client.query<{ progress_tracking_type: 'none' | 'online_video'; total_duration_seconds: number | null }>(
-    `SELECT cr.progress_tracking_type, cr.total_duration_seconds
-     FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id
+  const course = await client.query<{ progress_tracking_type: 'none' | 'online_video' }>(
+    `SELECT cr.progress_tracking_type FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id
      WHERE cr.course_run_id = $1 AND c.owner_user_id = $2`, [courseRunId, ownerUserId],
   );
   if (!course.rowCount) throw new ApiError(404, 'COURSE_NOT_FOUND', 'Course offering was not found.');
   const options = await client.query<{ delivery_type: string; fulfilment_instructions: string | null; trainer_contact: string | null }>(
-    `SELECT delivery_type, fulfilment_instructions, trainer_contact
-     FROM course_delivery_options WHERE course_run_id = $1`, [courseRunId],
+    `SELECT delivery_type, fulfilment_instructions, trainer_contact FROM course_delivery_options WHERE course_run_id = $1`, [courseRunId],
   );
   if (!options.rowCount) throw new ApiError(409, 'COURSE_DELIVERY_UNAVAILABLE', 'A course must have a delivery option.');
   const coordinating = options.rows.some((option) => option.delivery_type === 'local' || option.delivery_type === 'live');
@@ -173,20 +171,19 @@ export async function assertCourseReadyForSubmission(client: Pick<PoolClient, 'q
       && (!option.fulfilment_instructions?.trim() || !option.trainer_contact?.trim()))) {
     throw new ApiError(409, 'COURSE_COORDINATION_REQUIRED', 'Local and Live delivery require buyer-only instructions and Trainer contact details.');
   }
-  const assets = await client.query<{ asset_purpose: string; count: string }>(`SELECT asset_purpose, count(*)::text AS count
-    FROM course_delivery_assets WHERE course_run_id = $1 AND owner_user_id = $2 AND asset_status = 'ready'
-    GROUP BY asset_purpose`, [courseRunId, ownerUserId]);
-  const ready = new Map(assets.rows.map((row) => [row.asset_purpose, Number(row.count)]));
-  if (options.rows.some((option) => option.delivery_type === 'cloud') && !ready.get('cloud_download') && !(course.rows[0].progress_tracking_type === 'online_video' && ready.get('online_video'))) {
-    throw new ApiError(409, 'COURSE_FILE_NOT_READY', 'Cloud delivery requires a verified protected course file.');
+  const readyAttachments = await client.query<{ count: string }>(`SELECT count(*)::text AS count FROM course_delivery_assets
+    WHERE course_run_id = $1 AND owner_user_id = $2 AND asset_purpose = 'cloud_download' AND asset_status = 'ready'`, [courseRunId, ownerUserId]);
+  const readyVideo = course.rows[0].progress_tracking_type === 'online_video'
+    ? await client.query<{ duration_seconds: string }>(`SELECT duration_seconds::text FROM course_video_versions
+        WHERE course_run_id = $1 AND is_current AND video_status = 'ready' AND duration_seconds IS NOT NULL`, [courseRunId])
+    : { rowCount: 0, rows: [] as Array<{ duration_seconds: string }> };
+  if (options.rows.some((option) => option.delivery_type === 'cloud') && !Number(readyAttachments.rows[0]?.count) && !readyVideo.rowCount) {
+    throw new ApiError(409, 'COURSE_FILE_NOT_READY', 'Cloud delivery requires a verified protected attachment or a ready hosted video.');
   }
-  if (course.rows[0].progress_tracking_type === 'online_video') {
-    if (!course.rows[0].total_duration_seconds || !ready.get('online_video')) {
-      throw new ApiError(409, 'COURSE_VIDEO_NOT_READY', 'Online video requires a verified MP4 file and a total duration.');
-    }
+  if (course.rows[0].progress_tracking_type === 'online_video' && !readyVideo.rowCount) {
+    throw new ApiError(409, 'COURSE_VIDEO_NOT_READY', 'Online video requires a completed, verified HLS video version.');
   }
 }
-
 export async function listCourseAssets(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const courseRunId = parse(uuid, req.params.courseRunId);
@@ -367,11 +364,11 @@ async function activeDeliveryOption(client: Pick<PoolClient, 'query'>, courseRun
   return result.rows[0].delivery_option_id;
 }
 
-async function currentProgress(client: PoolClient, access: PurchaseAccess, preferred?: string) {
+async function currentProgress(client: PoolClient, access: PurchaseAccess, preferred?: string, totalDurationSeconds = access.total_duration_seconds) {
   const deliveryOptionId = await activeDeliveryOption(client, access.course_run_id, preferred);
   await client.query(`INSERT INTO course_access_progress (enrolment_id, delivery_option_id, total_seconds)
     VALUES ($1, $2, $3) ON CONFLICT (enrolment_id, delivery_option_id) DO NOTHING`,
-  [access.enrolment_id, deliveryOptionId, access.total_duration_seconds]);
+  [access.enrolment_id, deliveryOptionId, totalDurationSeconds]);
   const progress = await client.query<{ access_progress_id: string; watched_seconds: number; total_seconds: number | null; watch_percent: string }>(
     `SELECT access_progress_id, watched_seconds, total_seconds, watch_percent FROM course_access_progress
      WHERE enrolment_id = $1 AND delivery_option_id = $2 FOR UPDATE`, [access.enrolment_id, deliveryOptionId],
@@ -382,34 +379,36 @@ async function currentProgress(client: PoolClient, access: PurchaseAccess, prefe
 export async function getCourseDelivery(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const orderItemId = parse(uuid, req.params.orderItemId);
-  const access = await withTransaction((client) => purchaseAccess(client, orderItemId, actor.id));
-  const assets = await query<CourseAsset>(`SELECT course_delivery_asset_id, course_run_id, owner_user_id, asset_purpose,
-    bucket_name, object_key, original_filename, declared_content_type, declared_byte_size, verified_content_type,
-    verified_byte_size, etag, asset_status, upload_expires_at FROM course_delivery_assets
-    WHERE course_run_id = $1 AND asset_purpose = 'cloud_download' AND asset_status = 'ready' ORDER BY created_at ASC`, [access.course_run_id]);
-  const video = access.progress_tracking_type === 'online_video'
-    ? await query<CourseAsset>(`SELECT course_delivery_asset_id, course_run_id, owner_user_id, asset_purpose,
+  const delivery = await withTransaction(async (client) => {
+    const access = await purchaseAccess(client, orderItemId, actor.id);
+    const assets = await client.query<CourseAsset>(`SELECT course_delivery_asset_id, course_run_id, owner_user_id, asset_purpose,
       bucket_name, object_key, original_filename, declared_content_type, declared_byte_size, verified_content_type,
       verified_byte_size, etag, asset_status, upload_expires_at FROM course_delivery_assets
-      WHERE course_run_id = $1 AND asset_purpose = 'online_video' AND asset_status = 'ready'
-      ORDER BY created_at ASC LIMIT 1`, [access.course_run_id])
-    : { rows: [] as CourseAsset[] };
-  const progress = access.progress_tracking_type === 'online_video'
-    ? await withTransaction((client) => currentProgress(client, access))
-    : null;
-  const playbackUrl = video.rows[0]
-    ? await signDownload({ bucketName: video.rows[0].bucket_name, objectKey: video.rows[0].object_key },
-      video.rows[0].verified_content_type ?? video.rows[0].declared_content_type, video.rows[0].original_filename, 'inline')
-    : null;
-  return ok(res, {
-    ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse),
-    onlineVideo: access.progress_tracking_type === 'online_video', progressTrackingType: access.progress_tracking_type,
-    playbackUrl, watchedSeconds: progress?.progress.watched_seconds ?? 0,
-    totalDurationSeconds: access.total_duration_seconds ?? 0,
-    progressPercent: Number(progress?.progress.watch_percent ?? 0),
+      WHERE course_run_id = $1 AND asset_purpose = 'cloud_download' AND asset_status = 'ready' ORDER BY created_at ASC`, [access.course_run_id]);
+    if (access.progress_tracking_type !== 'online_video') {
+      return { ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse), onlineVideo: false, progressTrackingType: 'none' };
+    }
+    const video = await client.query<{ course_video_version_id: string; duration_seconds: string }>(`SELECT cv.course_video_version_id, cv.duration_seconds::text
+      FROM order_items oi JOIN course_video_versions cv ON cv.course_video_version_id = oi.course_video_version_id
+      WHERE oi.order_item_id = $1 AND cv.video_status IN ('ready', 'superseded') AND cv.duration_seconds IS NOT NULL`, [orderItemId]);
+    if (!video.rowCount) {
+      return { ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse), onlineVideo: true,
+        progressTrackingType: 'online_video', video: null, videoVersionId: null, playerState: 'processing' };
+    }
+    const durationSeconds = Number(video.rows[0].duration_seconds);
+    const state = await currentProgress(client, access, undefined, durationSeconds);
+    const watchedSeconds = Math.min(durationSeconds, Math.max(0, Number(state.progress.watched_seconds ?? 0)));
+    const watchedRatio = durationSeconds > 0 ? watchedSeconds / durationSeconds : 0;
+    return {
+      ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse), onlineVideo: true,
+      progressTrackingType: 'online_video', video: { id: video.rows[0].course_video_version_id, status: 'ready' },
+      videoVersionId: video.rows[0].course_video_version_id, playerState: 'ready',
+      progress: { uniqueContentWatchedSeconds: watchedSeconds, durationSeconds, watchedRatio },
+      uniqueContentWatchedSeconds: watchedSeconds, durationSeconds, watchedRatio,
+    };
   });
+  return ok(res, delivery);
 }
-
 export async function createCourseDownloadUrl(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const orderItemId = parse(uuid, req.params.orderItemId);

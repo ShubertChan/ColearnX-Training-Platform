@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getVideoOperations, retryVideo } from "../../api/video";
+import { getVideoOperations, retryVideoOperation } from "../../api/video";
 import { videoError, JOB_STATUSES } from "../../utils/videoContract";
 import { Button, Card } from "../ui";
 
@@ -15,7 +15,7 @@ export default function VideoOperations() {
   useEffect(() => { const abort = new AbortController(); void refresh(abort.signal); return () => abort.abort(); }, [refresh]);
   const retry = async job => {
     setBusy(true); setError("");
-    try { await retryVideo(job.courseRunId, job.videoVersionId); await refresh(); } catch (error) { setError(videoError(error)); } finally { setBusy(false); }
+    try { await retryVideoOperation(job.courseRunId, job.videoVersionId); await refresh(); } catch (error) { setError(videoError(error)); } finally { setBusy(false); }
   };
   return <Card><h3>Video processing operations</h3><Button variant="secondary" disabled={busy} onClick={() => void refresh()}>Refresh video operations</Button>
     {error && <p role="alert" className="form-error">{error}</p>}
