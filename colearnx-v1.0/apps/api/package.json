@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -15,7 +15,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
 "storage:reconcile": "tsx src/storage/reconcile.ts",
-    "security:retention": "tsx src/security/retention.ts"
+    "security:retention": "tsx src/security/retention.ts",
+    "video:queue:prepare": "tsx src/video/prepare-queue.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1123.0",
@@ -31,6 +32,7 @@
     "pg": "^8.23.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "pg-boss": "12.33.2",
     "stripe": "^22.6.0",
     "zod": "^4.5.2"
   },
