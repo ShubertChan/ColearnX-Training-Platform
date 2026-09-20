@@ -14,7 +14,7 @@
     "test": "tsx --test src/**/*.test.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-"storage:reconcile": "tsx src/storage/reconcile.ts",
+    "storage:reconcile": "tsx src/storage/reconcile.ts",
     "security:retention": "tsx src/security/retention.ts",
     "video:queue:prepare": "tsx src/video/prepare-queue.ts"
   },

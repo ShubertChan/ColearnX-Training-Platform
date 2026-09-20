@@ -15,7 +15,8 @@ Keep `ENABLE_HOSTED_VIDEO=false` until all services below are ready. Before enab
 - `VIDEO_SOURCE_MAX_BYTES` — source cap; default is 20 GiB.
 - `VIDEO_PLAYBACK_GATEWAY_ORIGIN` — deployed `colearnx-media-gateway` origin.
 - `VIDEO_PLAYBACK_TOKEN_SECRET` — a unique 32+ character HMAC secret, shared only with the gateway.
-- `VIDEO_PLAYBACK_TTL_SECONDS` — fixed at no more than five minutes (V1 defaults to 300 seconds); a self-contained gateway ticket cannot be revoked per segment without violating the Free Plan boundary.`r`n- `VIDEO_HEARTBEAT_MAX_GAP_SECONDS` — server-receive-time gap that resets the watch interval; default 30 seconds.
+- `VIDEO_PLAYBACK_TTL_SECONDS` — fixed at no more than five minutes (V1 defaults to 300 seconds); a self-contained gateway ticket cannot be revoked per segment without violating the Free Plan boundary.
+- `VIDEO_HEARTBEAT_MAX_GAP_SECONDS` — server-receive-time gap that resets the watch interval; default 30 seconds.
 - `VIDEO_QUEUE_DATABASE_URL` — pg-boss connection for the web service.
 
 Keep `R2_*` credentials server-only. The API returns only short-lived R2 multipart `PUT` URLs to the trainer, never source URLs to learners.
