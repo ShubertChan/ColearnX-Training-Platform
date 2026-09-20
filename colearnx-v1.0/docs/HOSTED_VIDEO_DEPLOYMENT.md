@@ -4,7 +4,7 @@ This implementation uses private R2 source/HLS objects, the existing PostgreSQL 
 
 ## 1. Apply database and prepare the queue
 
-Apply migrations through the existing migration process, including `016_hosted_video.sql`. Do not edit an already-applied migration.
+Apply migrations through the existing migration process, including `016_hosted_video.sql` and the forward-only `017_video_order_course_integrity.sql`. Do not edit an already-applied migration.
 
 Before applying the migration, have the controlled Neon owner create the login role `colearnx_video_worker` (do not reuse `colearnx_app`). Migration `016` grants that role only the video state and object-metadata columns it needs. From `apps/api`, run `npm run video:queue:prepare` once with `VIDEO_QUEUE_MIGRATION_DATABASE_URL` set to a migration-owner database role. This creates/migrates the `pgboss` schema and grants the API and Worker only their queue permissions. The Render API role must use `VIDEO_QUEUE_DATABASE_URL` with only the privileges it needs to submit jobs; do not give it schema-owner privileges.
 
@@ -29,9 +29,9 @@ Build/run `apps/video-worker` on a team-controlled computer with Docker and outb
 - `VIDEO_QUEUE_DATABASE_URL` (or omit to reuse the worker URL).
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_REGION`.
 - `VIDEO_HLS_BUCKET_NAME` — private R2 bucket for `course-video-hls/<videoVersionId>/` objects.
-- optional `VIDEO_WORKER_CONCURRENCY` (default `1`) and `DATABASE_SSL=true`.
+- optional `VIDEO_WORKER_CONCURRENCY` (default `1`), `VIDEO_TRANSCODE_TIMEOUT_MS` (default and maximum five hours), and `DATABASE_SSL=true`.
 
-The worker claims only `queued` versions, validates duration and dimensions with `ffprobe`, produces HLS plus a thumbnail with FFmpeg, verifies the playlist/segments and decodability, writes a non-public staging prefix, then publishes the verified output to the immutable version prefix and makes the version current. It also retries `delete_pending` cleanup for both source and HLS objects. A replacement supersedes the former current version but leaves its HLS objects available for orders already bound to it.
+The worker claims `queued` versions, validates duration and dimensions with `ffprobe`, produces HLS plus a thumbnail with FFmpeg, verifies the playlist/segments and decodability, writes attempt-specific non-public staging and final prefixes, then makes the fenced attempt current. pg-boss refreshes the heartbeat roughly every 30 seconds, treats a heartbeat older than 60 seconds as lost, and separately enforces a six-hour hard processing cap. A redelivered job that finds interrupted `transcoding` work creates a successor job with a new UUID before takeover, so a late callback can only settle its obsolete job UUID; the database attempt ID independently fences state and R2 publication. It also retries `delete_pending` cleanup for the source and every prefix below the immutable video-version root. A replacement supersedes the former current version but leaves its HLS objects available for orders already bound to it.
 
 ## 4. Deploy the media gateway
 

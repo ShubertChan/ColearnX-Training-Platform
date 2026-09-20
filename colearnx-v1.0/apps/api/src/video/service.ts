@@ -15,7 +15,7 @@ import {
   abortMultipartVideoUpload,
   completeMultipartVideoUpload,
   createVideoSourceObjectKey,
-
+  findVideoSource,
   headVideoSource,
   listMultipartVideoParts,
   signMultipartVideoPart,
@@ -67,6 +67,10 @@ type VideoSourceRow = VideoVersion & {
   asset_status: string;
   upload_expires_at: Date;
 };
+
+function isTerminalVideoFailure(code: string | null) {
+  return code === 'VIDEO_INVALID_SOURCE' || code === 'TRANSCODE_RETRIES_EXHAUSTED';
+}
 
 function requireHostedVideo() {
   if (!env.ENABLE_HOSTED_VIDEO) throw new ApiError(503, 'HOSTED_VIDEO_DISABLED', 'Hosted video is not enabled for this deployment.');
@@ -128,7 +132,7 @@ function versionResponse(row: VideoVersion, hasOrderReferences = false) {
     failureMessage: row.failure_message,
     isCurrent: row.is_current,
     hasOrderReferences,
-    canRetry: row.video_status === 'failed' || row.video_status === 'queued',
+    canRetry: row.video_status === 'queued' || (row.video_status === 'failed' && !isTerminalVideoFailure(row.failure_code)),
     canDelete: !hasOrderReferences && ['upload_pending', 'queued', 'failed', 'superseded'].includes(row.video_status),
     createdAt: row.created_at,
   };
@@ -263,17 +267,25 @@ export async function completeVideoMultipart(req: Request, res: Response) {
     if (row.video_status !== 'upload_pending' || !row.source_upload_id || row.upload_expires_at <= new Date()) {
       throw new ApiError(410, 'UPLOAD_EXPIRED', 'This upload is no longer open.');
     }
-    // Keep the row lock while R2 is checked and finalised, so an idempotency
-    // record can never be committed without the corresponding state change.
-    const remote = await listMultipartVideoParts(row.bucket_name, row.object_key, row.source_upload_id);
-    const expectedCount = Math.ceil(Number(row.declared_byte_size) / row.source_upload_part_size_bytes);
-    const submitted = new Map(input.parts.map((part) => [part.partNumber, part.etag.replaceAll('"', '')]));
-    if (submitted.size !== expectedCount || remote.length !== expectedCount || remote.some((part, index) =>
-      part.partNumber !== index + 1 || part.sizeBytes !== Math.min(row.source_upload_part_size_bytes, Number(row.declared_byte_size) - index * row.source_upload_part_size_bytes)
-        || submitted.get(part.partNumber) !== part.etag)) {
-      throw new ApiError(409, 'VIDEO_PARTS_INVALID', 'All source parts must be uploaded once with their matching ETags.');
+    // R2 multipart completion and the DB commit cannot be atomic. First check
+    // the unique server-generated key so a retry can recover when R2 completed
+    // but the prior database transaction rolled back.
+    let completedObject = await findVideoSource(row.bucket_name, row.object_key);
+    if (!completedObject) {
+      const remote = await listMultipartVideoParts(row.bucket_name, row.object_key, row.source_upload_id);
+      const expectedCount = Math.ceil(Number(row.declared_byte_size) / row.source_upload_part_size_bytes);
+      const submitted = new Map(input.parts.map((part) => [part.partNumber, part.etag.replaceAll('"', '')]));
+      if (submitted.size !== expectedCount || remote.length !== expectedCount || remote.some((part, index) =>
+        part.partNumber !== index + 1 || part.sizeBytes !== Math.min(row.source_upload_part_size_bytes, Number(row.declared_byte_size) - index * row.source_upload_part_size_bytes)
+          || submitted.get(part.partNumber) !== part.etag)) {
+        throw new ApiError(409, 'VIDEO_PARTS_INVALID', 'All source parts must be uploaded once with their matching ETags.');
+      }
+      await completeMultipartVideoUpload(row.bucket_name, row.object_key, row.source_upload_id, input.parts);
+      completedObject = await headVideoSource(row.bucket_name, row.object_key);
     }
-    await completeMultipartVideoUpload(row.bucket_name, row.object_key, row.source_upload_id, input.parts);
+    if (completedObject.contentLength !== Number(row.declared_byte_size)) {
+      throw new ApiError(409, 'UPLOAD_OBJECT_MISMATCH', 'The uploaded source size does not match the upload intent.');
+    }
     await client.query(`UPDATE course_delivery_assets SET asset_status = 'uploaded', uploaded_at = now(), updated_at = now()
       WHERE course_delivery_asset_id = $1 AND asset_status = 'pending'`, [row.source_asset_id]);
     const body = { videoVersionId: versionId, status: 'upload_pending' };
@@ -324,7 +336,9 @@ async function retryVideoForActor(req: Request, res: Response) {
     const row = await videoSourceForTrainer(client, actor, courseRunId, versionId, true);
     const claimed = await claimIdempotency(client, actor.id, 'course-video-retry', key, { versionId });
     if (claimed.cached) return { body: claimed.cached, enqueue: claimed.cached.status === 'queued' };
-    if (!['failed', 'queued'].includes(row.video_status) || row.asset_status !== 'ready') throw new ApiError(409, 'VIDEO_RETRY_NOT_ALLOWED', 'This video version cannot be retried.');
+    if (!['failed', 'queued'].includes(row.video_status) || row.asset_status !== 'ready' || isTerminalVideoFailure(row.failure_code)) {
+      throw new ApiError(409, 'VIDEO_RETRY_NOT_ALLOWED', 'This video version cannot be retried.');
+    }
     await client.query(`UPDATE course_video_versions SET video_status = 'queued', queued_at = now(), failure_code = NULL,
       failure_message = NULL, updated_at = now() WHERE course_video_version_id = $1`, [versionId]);
     const body = { videoVersionId: versionId, status: 'queued' };
@@ -395,9 +409,12 @@ function signPlaybackToken(value: Record<string, unknown>) {
   return `v1.${payload}.${signature}`;
 }
 
-function gatewayManifestUrl(versionId: string) {
+function gatewayManifestUrl(versionId: string, masterKey: string) {
   const origin = env.VIDEO_PLAYBACK_GATEWAY_ORIGIN.replace(/\/$/, '');
-  return `${origin}/v1/hls/${encodeURIComponent(versionId)}/master.m3u8`;
+  const root = `course-video-hls/${versionId}/`;
+  if (!masterKey.startsWith(root)) throw new ApiError(503, 'VIDEO_OUTPUT_INVALID', 'The stored video output path is invalid.');
+  const assetPath = masterKey.slice(root.length).split('/').map(encodeURIComponent).join('/');
+  return `${origin}/v1/hls/${encodeURIComponent(versionId)}/${assetPath}`;
 }
 
 async function createPlaybackSessionForVersion(client: PoolClient, actor: Actor, orderItemId: string, versionId: string, preview = false) {
@@ -426,7 +443,7 @@ async function createPlaybackSessionForVersion(client: PoolClient, actor: Actor,
     VALUES ($1, $2, $3, $4, 'active', 0, now())`, [orderItemId, versionId, sessionId, expiresAt]);
   const token = signPlaybackToken({ sub: actor.id, orderItemId, videoVersionId: versionId, sessionId, exp: Math.floor(expiresAt.getTime() / 1000), scope: preview ? 'preview' : 'play' });
   return {
-    sessionId, videoVersionId: versionId, manifestUrl: gatewayManifestUrl(versionId), expiresAt: expiresAt.toISOString(),
+    sessionId, videoVersionId: versionId, manifestUrl: gatewayManifestUrl(versionId, row.rows[0].hls_master_key), expiresAt: expiresAt.toISOString(),
     durationSeconds, resumeAt: Math.min(durationSeconds, Math.max(0, Number(resume.rows[0]?.resume_at ?? 0))),
     authorization: { type: 'header' as const, token },
   };
@@ -459,7 +476,7 @@ export async function createPreviewPlaybackSession(req: Request, res: Response) 
     const expiresAt = new Date(Date.now() + env.VIDEO_PLAYBACK_TTL_SECONDS * 1000);
     const sessionId = randomUUID();
     const token = signPlaybackToken({ sub: actor.id, videoVersionId: versionId, sessionId, exp: Math.floor(expiresAt.getTime() / 1000), scope: 'preview' });
-    return { sessionId, videoVersionId: versionId, manifestUrl: gatewayManifestUrl(versionId), expiresAt: expiresAt.toISOString(), durationSeconds: Number(version.rows[0].duration_seconds), resumeAt: 0, authorization: { type: 'header' as const, token } };
+    return { sessionId, videoVersionId: versionId, manifestUrl: gatewayManifestUrl(versionId, version.rows[0].hls_master_key), expiresAt: expiresAt.toISOString(), durationSeconds: Number(version.rows[0].duration_seconds), resumeAt: 0, authorization: { type: 'header' as const, token } };
   });
   res.set('Cache-Control', 'private, no-store');
   return ok(res, session, 201);
@@ -574,8 +591,12 @@ export async function listVideoOperations(_req: Request, res: Response) {
   const count = counts.rows[0];
   return ok(res, {
     counts: { queued: Number(count.queued), failed: Number(count.failed), orphanCandidates: 0, pendingCleanup: Number(count.pending_cleanup) },
-    jobs: versions.rows.map((row) => ({ id: row.course_video_version_id, videoVersionId: row.course_video_version_id,
-      courseRunId: row.course_run_id, status: row.video_status === 'transcoding' ? 'running' : row.video_status === 'failed' ? 'retryable_failed' : 'queued', updatedAt: row.created_at, canRetry: row.video_status === 'failed' || row.video_status === 'queued' })),
+    jobs: versions.rows.filter((row) => row.video_status !== 'delete_pending').map((row) => {
+      const terminal = row.video_status === 'failed' && isTerminalVideoFailure(row.failure_code);
+      return { id: row.course_video_version_id, videoVersionId: row.course_video_version_id,
+        courseRunId: row.course_run_id, status: row.video_status === 'transcoding' ? 'running' : terminal ? 'dead' : row.video_status === 'failed' ? 'retryable_failed' : 'queued',
+        updatedAt: row.created_at, canRetry: row.video_status === 'queued' || (row.video_status === 'failed' && !terminal) };
+    }),
     cleanupTasks: versions.rows.filter((row) => row.video_status === 'delete_pending').map((row) => ({ videoVersionId: row.course_video_version_id, status: 'pending' })),
   });
 }

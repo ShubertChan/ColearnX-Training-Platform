@@ -146,6 +146,25 @@ export async function headVideoSource(bucketName: string, objectKey: string) {
   }
 }
 
+function httpStatus(error: unknown) {
+  if (!error || typeof error !== 'object' || !('$metadata' in error)) return undefined;
+  const metadata = (error as { $metadata?: { httpStatusCode?: unknown } }).$metadata;
+  return typeof metadata?.httpStatusCode === 'number' ? metadata.httpStatusCode : undefined;
+}
+
+// Multipart completion and the PostgreSQL commit cannot be one atomic action.
+// A retry after R2 succeeded but the DB transaction failed must therefore be
+// able to recognise the already-completed, server-generated object key.
+export async function findVideoSource(bucketName: string, objectKey: string) {
+  try {
+    const object = await storageClient().send(new HeadObjectCommand({ Bucket: bucketName, Key: objectKey }));
+    return { contentLength: object.ContentLength, etag: object.ETag?.replaceAll('"', '') };
+  } catch (error) {
+    if (httpStatus(error) === 404) return null;
+    throw unavailable();
+  }
+}
+
 export async function deleteVideoObject(bucketName: string, objectKey: string) {
   try {
     await storageClient().send(new DeleteObjectCommand({ Bucket: bucketName, Key: objectKey }));
