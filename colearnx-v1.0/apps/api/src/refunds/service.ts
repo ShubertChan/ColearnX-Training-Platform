@@ -198,25 +198,28 @@ export async function decideRefund(req: Request, res: Response) {
     await client.query(`UPDATE refund_requests SET refund_status = $2, reviewed_by_user_id = $3, reviewed_at = now(), decision_note = $4
       WHERE refund_request_id = $1`, [refundRequestId, input.decision, admin.id, input.reason]);
     let pointTransactionId: string | null = null;
-    if (input.decision === 'approved' && Number(current.requested_points) > 0) {
+    if (input.decision === 'approved') {
       const isReservedLive = current.fulfilment_status === 'reserved';
-      pointTransactionId = await postPointTransaction(client, isReservedLive ? {
-        type: 'refund', reason: 'eligible_live_refund', idempotencyKey: `refund:${refundRequestId}`,
-        orderItemId: current.order_item_id, refundRequestId,
-        entries: [
-          { pointAccountId: current.point_account_id, entryRole: 'member_frozen_debit', frozenDelta: -Number(current.requested_points) },
-          { pointAccountId: current.point_account_id, entryRole: 'member_available_credit', availableDelta: Number(current.requested_points) },
-        ],
-      } : {
-        type: 'refund', reason: 'eligible_purchase_refund', idempotencyKey: `refund:${refundRequestId}`,
-        orderItemId: current.order_item_id, refundRequestId,
-        entries: [
-          { pointAccountId: current.point_account_id, entryRole: 'member_available_credit', availableDelta: Number(current.requested_points) },
-          { pointAccountId: system.point_account_id, entryRole: 'platform_settlement_debit', availableDelta: -Number(current.requested_points) },
-        ],
-      });
-      await client.query(`UPDATE refund_requests SET resulting_point_transaction_id = $2 WHERE refund_request_id = $1`, [refundRequestId, pointTransactionId]);
-      if (isReservedLive) {
+      const requestedPoints = Number(current.requested_points);
+      if (requestedPoints > 0) {
+        pointTransactionId = await postPointTransaction(client, isReservedLive ? {
+          type: 'refund', reason: 'eligible_live_refund', idempotencyKey: `refund:${refundRequestId}`,
+          orderItemId: current.order_item_id, refundRequestId,
+          entries: [
+            { pointAccountId: current.point_account_id, entryRole: 'member_frozen_debit', frozenDelta: -requestedPoints },
+            { pointAccountId: current.point_account_id, entryRole: 'member_available_credit', availableDelta: requestedPoints },
+          ],
+        } : {
+          type: 'refund', reason: 'eligible_purchase_refund', idempotencyKey: `refund:${refundRequestId}`,
+          orderItemId: current.order_item_id, refundRequestId,
+          entries: [
+            { pointAccountId: current.point_account_id, entryRole: 'member_available_credit', availableDelta: requestedPoints },
+            { pointAccountId: system.point_account_id, entryRole: 'platform_settlement_debit', availableDelta: -requestedPoints },
+          ],
+        });
+        await client.query(`UPDATE refund_requests SET resulting_point_transaction_id = $2 WHERE refund_request_id = $1`, [refundRequestId, pointTransactionId]);
+      }
+      if (isReservedLive && pointTransactionId) {
         await client.query(`UPDATE point_holds ph SET release_transaction_id = $2, hold_status = 'cancelled',
           release_trigger = 'refund_approved', release_at = now(), cancelled_at = now()
           FROM point_transactions purchase
