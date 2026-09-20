@@ -1,7 +1,12 @@
 import { PgBoss } from 'pg-boss';
 import { env } from '../config/env.js';
 import { ApiError } from '../lib/http.js';
-import { VIDEO_TRANSCODE_QUEUE } from './constants.js';
+import {
+  VIDEO_TRANSCODE_EXPIRE_SECONDS,
+  VIDEO_TRANSCODE_QUEUE,
+  VIDEO_TRANSCODE_RETRY_DELAY_SECONDS,
+  VIDEO_TRANSCODE_RETRY_LIMIT,
+} from './constants.js';
 
 export type VideoTranscodeJob = { videoVersionId: string };
 
@@ -38,9 +43,9 @@ async function boss() {
 export async function enqueueVideoTranscode(videoVersionId: string) {
   const jobId = await (await boss()).send(VIDEO_TRANSCODE_QUEUE, { videoVersionId }, {
     singletonKey: `video-version:${videoVersionId}`,
-    retryLimit: 5,
-    retryDelay: 30,
-    expireInSeconds: 4 * 60 * 60,
+    retryLimit: VIDEO_TRANSCODE_RETRY_LIMIT,
+    retryDelay: VIDEO_TRANSCODE_RETRY_DELAY_SECONDS,
+    expireInSeconds: VIDEO_TRANSCODE_EXPIRE_SECONDS,
   });
   return jobId;
 }

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createReadStream, createWriteStream } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -35,24 +36,32 @@ const storage = new S3Client({ region: process.env.R2_REGION || 'auto', endpoint
 const queue = new PgBoss({ connectionString: queueDatabaseUrl, schema: 'pgboss', migrate: false, createSchema: false });
 const queueName = 'course-video.transcode';
 const workerConcurrency = Number(process.env.VIDEO_WORKER_CONCURRENCY || 1);
+const transcodeTimeoutMs = Number(process.env.VIDEO_TRANSCODE_TIMEOUT_MS || 5 * 60 * 60 * 1000);
 if (!Number.isInteger(workerConcurrency) || workerConcurrency < 1 || workerConcurrency > 8) {
   throw new Error('VIDEO_WORKER_CONCURRENCY must be an integer between 1 and 8.');
 }
+if (!Number.isInteger(transcodeTimeoutMs) || transcodeTimeoutMs < 60_000 || transcodeTimeoutMs > 5 * 60 * 60 * 1000) {
+  throw new Error('VIDEO_TRANSCODE_TIMEOUT_MS must be an integer between 60000 and 18000000.');
+}
 
-type Source = { course_video_version_id: string; course_run_id: string; bucket_name: string; object_key: string };
+type Source = { course_video_version_id: string; course_run_id: string; bucket_name: string; object_key: string; processing_attempt_id: string };
 type Probe = { format?: { duration?: string }; streams?: Array<{ codec_type?: string; width?: number; height?: number }> };
 type PendingDelete = Source & { source_asset_id: string; hls_bucket_name: string | null; hls_output_prefix: string | null };
 
 async function run(command: string, args: string[]) {
-  await execFile(command, args, { maxBuffer: 1024 * 1024 });
+  await execFile(command, args, { maxBuffer: 1024 * 1024, timeout: transcodeTimeoutMs, killSignal: 'SIGKILL' });
 }
 
-function stagingPrefix(videoVersionId: string) {
-  return `course-video-staging/${videoVersionId}`;
+function stagingPrefix(videoVersionId: string, attemptId: string) {
+  return `course-video-staging/${videoVersionId}/${attemptId}`;
 }
 
-function finalPrefix(videoVersionId: string) {
+function finalRootPrefix(videoVersionId: string) {
   return `course-video-hls/${videoVersionId}`;
+}
+
+function finalPrefix(videoVersionId: string, attemptId: string) {
+  return `${finalRootPrefix(videoVersionId)}/${attemptId}`;
 }
 
 function outputContentType(name: string) {
@@ -101,7 +110,7 @@ async function verifyRemoteOutput(prefix: string, names: string[]) {
 }
 
 async function probe(input: string) {
-  const { stdout } = await execFile('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,width,height', '-of', 'json', input], { maxBuffer: 1024 * 1024 });
+  const { stdout } = await execFile('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,width,height', '-of', 'json', input], { maxBuffer: 1024 * 1024, timeout: 60_000, killSignal: 'SIGKILL' });
   const info = JSON.parse(stdout) as Probe;
   const duration = Number(info.format?.duration);
   const video = info.streams?.find((stream) => stream.codec_type === 'video');
@@ -119,17 +128,20 @@ async function validateHls(output: string, sourceDuration: number) {
   if (!Number.isFinite(playlistDuration) || playlistDuration <= 0 || Math.abs(playlistDuration - sourceDuration) > Math.max(2, sourceDuration * 0.1)) {
     throw new Error('HLS_OUTPUT_INVALID');
   }
-  const { stdout } = await execFile('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', join(output, 'master.m3u8')], { maxBuffer: 1024 * 1024 });
+  const { stdout } = await execFile('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', join(output, 'master.m3u8')], { maxBuffer: 1024 * 1024, timeout: 60_000, killSignal: 'SIGKILL' });
   const decodedDuration = Number((JSON.parse(stdout) as Probe).format?.duration);
   if (!Number.isFinite(decodedDuration) || decodedDuration <= 0) throw new Error('HLS_OUTPUT_INVALID');
 }
 
-async function loadAndClaim(videoVersionId: string): Promise<Source | null> {
-  const result = await pool.query<Source>(`UPDATE course_video_versions cv SET video_status = 'transcoding', transcoding_started_at = now(), updated_at = now()
+async function loadAndClaim(videoVersionId: string, resumeInterrupted: boolean): Promise<Source | null> {
+  const attemptId = randomUUID();
+  const result = await pool.query<Source>(`UPDATE course_video_versions cv SET video_status = 'transcoding', processing_attempt_id = $3,
+      transcoding_started_at = now(), updated_at = now()
     FROM course_delivery_assets asset
     WHERE cv.course_video_version_id = $1 AND cv.source_asset_id = asset.course_delivery_asset_id
-      AND cv.video_status IN ('queued', 'transcoding')
-    RETURNING cv.course_video_version_id, cv.course_run_id, asset.bucket_name, asset.object_key`, [videoVersionId]);
+      AND (cv.video_status = 'queued' OR ($2::boolean AND cv.video_status = 'transcoding'))
+    RETURNING cv.course_video_version_id, cv.course_run_id, asset.bucket_name, asset.object_key, cv.processing_attempt_id`,
+  [videoVersionId, resumeInterrupted, attemptId]);
   return result.rows[0] ?? null;
 }
 
@@ -138,17 +150,21 @@ async function markReady(source: Source, metadata: { duration: number; width: nu
   try {
     await client.query('BEGIN');
     const current = await client.query<{ course_run_id: string }>(`SELECT course_run_id FROM course_video_versions
-      WHERE course_video_version_id = $1 AND video_status = 'transcoding' FOR UPDATE`, [source.course_video_version_id]);
-    if (!current.rowCount) { await client.query('ROLLBACK'); return; }
+      WHERE course_video_version_id = $1 AND video_status = 'transcoding' AND processing_attempt_id = $2 FOR UPDATE`,
+    [source.course_video_version_id, source.processing_attempt_id]);
+    if (!current.rowCount) { await client.query('ROLLBACK'); return false; }
     // Clear the partial unique index before promoting the replacement version.
     await client.query(`UPDATE course_video_versions SET video_status = 'superseded', is_current = false, updated_at = now()
       WHERE course_run_id = $1 AND course_video_version_id <> $2 AND is_current`, [source.course_run_id, source.course_video_version_id]);
     await client.query(`UPDATE course_video_versions SET video_status = 'ready', is_current = true, duration_seconds = $2,
       width = $3, height = $4, hls_bucket_name = $5, hls_output_prefix = $6, hls_master_key = $7, thumbnail_key = $8,
-      ready_at = now(), failure_code = NULL, failure_message = NULL, updated_at = now()
-      WHERE course_video_version_id = $1`, [source.course_video_version_id, metadata.duration, metadata.width, metadata.height, hlsBucket, prefix, `${prefix}/master.m3u8`, `${prefix}/thumbnail.jpg`]);
+      ready_at = now(), failure_code = NULL, failure_message = NULL, processing_attempt_id = NULL, updated_at = now()
+      WHERE course_video_version_id = $1 AND processing_attempt_id = $9`,
+    [source.course_video_version_id, metadata.duration, metadata.width, metadata.height, hlsBucket, prefix,
+      `${prefix}/master.m3u8`, `${prefix}/thumbnail.jpg`, source.processing_attempt_id]);
     await client.query('UPDATE course_runs SET total_duration_seconds = $2 WHERE course_run_id = $1', [source.course_run_id, Math.ceil(metadata.duration)]);
     await client.query('COMMIT');
+    return true;
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -161,22 +177,40 @@ function failureCode(error: unknown) {
   return error instanceof Error && error.message === 'VIDEO_INVALID_SOURCE' ? 'VIDEO_INVALID_SOURCE' : 'TRANSCODE_FAILED';
 }
 
-async function recordFailure(videoVersionId: string, error: unknown, terminal: boolean) {
-  const code = failureCode(error);
+async function recordFailure(source: Source, error: unknown, terminal: boolean, exhausted: boolean) {
+  const code = exhausted ? 'TRANSCODE_RETRIES_EXHAUSTED' : failureCode(error);
   await pool.query(`UPDATE course_video_versions SET video_status = CASE WHEN $3 THEN 'failed' ELSE 'queued' END,
     queued_at = CASE WHEN $3 THEN queued_at ELSE now() END,
     failed_at = CASE WHEN $3 THEN now() ELSE NULL END,
     failure_code = $2,
-    failure_message = CASE WHEN $2 = 'VIDEO_INVALID_SOURCE' THEN 'ffprobe did not recognise a supported video within the 4-hour limit.' ELSE 'Processing failed. You may retry this version.' END,
-    updated_at = now() WHERE course_video_version_id = $1 AND video_status = 'transcoding'`, [videoVersionId, code, terminal]);
+    failure_message = CASE WHEN $2 = 'VIDEO_INVALID_SOURCE' THEN 'ffprobe did not recognise a supported video within the 4-hour limit.'
+      WHEN $2 = 'TRANSCODE_RETRIES_EXHAUSTED' THEN 'Processing failed after all automatic retries.'
+      ELSE 'Processing failed. Automatic retry is pending.' END,
+    processing_attempt_id = NULL, updated_at = now()
+    WHERE course_video_version_id = $1 AND video_status = 'transcoding' AND processing_attempt_id = $4`,
+  [source.course_video_version_id, code, terminal, source.processing_attempt_id]);
 }
 
-async function transcode(videoVersionId: string, retryCount: number, retryLimit: number) {
-  const source = await loadAndClaim(videoVersionId);
+async function publishedPrefixMayBeReferenced(source: Source, prefix: string) {
+  try {
+    const result = await pool.query(`SELECT 1 FROM course_video_versions
+      WHERE course_video_version_id = $1 AND hls_bucket_name = $2 AND hls_output_prefix = $3
+        AND video_status IN ('ready', 'superseded')`, [source.course_video_version_id, hlsBucket, prefix]);
+    return Boolean(result.rowCount);
+  } catch {
+    // An uncertain COMMIT must favour availability over eager cleanup. The
+    // delete-pending sweeper can remove an orphan later; it cannot restore HLS.
+    return true;
+  }
+}
+
+async function transcode(videoVersionId: string, resumeInterrupted: boolean, retryCount: number, retryLimit: number) {
+  const source = await loadAndClaim(videoVersionId, resumeInterrupted);
   if (!source) return;
   const work = await mkdtemp(join(tmpdir(), 'colearnx-video-'));
-  const staged = stagingPrefix(source.course_video_version_id);
-  const published = finalPrefix(source.course_video_version_id);
+  const staged = stagingPrefix(source.course_video_version_id, source.processing_attempt_id);
+  const published = finalPrefix(source.course_video_version_id, source.processing_attempt_id);
+  let ready = false;
   try {
     const input = join(work, 'source');
     const output = join(work, 'hls');
@@ -196,19 +230,22 @@ async function transcode(videoVersionId: string, retryCount: number, retryLimit:
     const stagedFiles = await uploadOutput(output, staged);
     if (!stagedFiles.includes('master.m3u8') || !stagedFiles.includes('thumbnail.jpg')) throw new Error('HLS_OUTPUT_INVALID');
     await verifyRemoteOutput(staged, stagedFiles);
-    await deletePrefix(hlsBucket, published);
     const publishedFiles = await uploadOutput(output, published);
     if (!publishedFiles.includes('master.m3u8') || !publishedFiles.includes('thumbnail.jpg')) throw new Error('HLS_OUTPUT_INVALID');
     await verifyRemoteOutput(published, publishedFiles);
-    await markReady(source, metadata, published);
+    ready = await markReady(source, metadata, published);
   } catch (error) {
-    const terminal = failureCode(error) === 'VIDEO_INVALID_SOURCE' || retryCount >= retryLimit;
-    await recordFailure(videoVersionId, error, terminal);
+    const exhausted = retryCount >= retryLimit;
+    const terminal = failureCode(error) === 'VIDEO_INVALID_SOURCE' || exhausted;
+    await recordFailure(source, error, terminal, exhausted);
     // Retryable failures return the version to queued before pg-boss retries;
     // permanent or exhausted work is visible to the trainer as failed.
     if (!terminal) throw error;
   } finally {
     await deletePrefix(hlsBucket, staged).catch(() => undefined);
+    if (!ready && !await publishedPrefixMayBeReferenced(source, published)) {
+      await deletePrefix(hlsBucket, published).catch(() => undefined);
+    }
     await rm(work, { recursive: true, force: true });
   }
 }
@@ -221,8 +258,14 @@ async function cleanupDeletePending() {
   for (const candidate of candidates.rows) {
     try {
       await storage.send(new DeleteObjectCommand({ Bucket: candidate.bucket_name || sourceBucket, Key: candidate.object_key }));
-      if (candidate.hls_output_prefix) await deletePrefix(candidate.hls_bucket_name || hlsBucket, candidate.hls_output_prefix);
-      await deletePrefix(hlsBucket, stagingPrefix(candidate.course_video_version_id));
+      // Failed publication may have uploaded a partial deterministic final
+      // prefix before the DB ever recorded hls_output_prefix. Always remove it.
+      await deletePrefix(hlsBucket, finalRootPrefix(candidate.course_video_version_id));
+      if (candidate.hls_output_prefix
+        && (!candidate.hls_output_prefix.startsWith(`${finalRootPrefix(candidate.course_video_version_id)}/`) || candidate.hls_bucket_name !== hlsBucket)) {
+        await deletePrefix(candidate.hls_bucket_name || hlsBucket, candidate.hls_output_prefix);
+      }
+      await deletePrefix(hlsBucket, `course-video-staging/${candidate.course_video_version_id}`);
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -248,8 +291,44 @@ async function cleanupDeletePending() {
 
 await cleanupDeletePending();
 await queue.start();
-await queue.work(queueName, { localConcurrency: workerConcurrency, includeMetadata: true }, async (jobs: JobWithMetadata<{ videoVersionId: string }>[]) => {
-  for (const job of jobs) await transcode(job.data.videoVersionId, job.retryCount, job.retryLimit);
+type TranscodeJob = { videoVersionId: string; resumeInterrupted?: boolean; takeoversRemaining?: number };
+
+async function isTranscoding(videoVersionId: string) {
+  const result = await pool.query(`SELECT 1 FROM course_video_versions
+    WHERE course_video_version_id = $1 AND video_status = 'transcoding'`, [videoVersionId]);
+  return Boolean(result.rowCount);
+}
+
+async function spawnTakeover(job: JobWithMetadata<TranscodeJob>) {
+  // pg-boss retries retain their job UUID. A callback from the abandoned
+  // attempt could otherwise settle the concurrently active retry. Move the
+  // actual takeover to a successor UUID; fencing protects the DB/R2 work and
+  // late callbacks can only settle the obsolete UUID.
+  const remaining = job.data.takeoversRemaining ?? job.retryLimit;
+  if (remaining <= 0) {
+    await pool.query(`UPDATE course_video_versions SET video_status = 'failed', processing_attempt_id = NULL,
+      failure_code = 'TRANSCODE_RETRIES_EXHAUSTED', failure_message = 'Processing failed after all automatic retries.',
+      failed_at = now(), updated_at = now()
+      WHERE course_video_version_id = $1 AND video_status = 'transcoding'`, [job.data.videoVersionId]);
+    return;
+  }
+  await queue.send(queueName, {
+    videoVersionId: job.data.videoVersionId,
+    resumeInterrupted: true,
+    takeoversRemaining: remaining - 1,
+  }, {
+    singletonKey: `video-takeover:${job.id}`,
+  });
+}
+
+await queue.work(queueName, { localConcurrency: workerConcurrency, includeMetadata: true }, async (jobs: JobWithMetadata<TranscodeJob>[]) => {
+  for (const job of jobs) {
+    if (job.retryCount > 0 && await isTranscoding(job.data.videoVersionId)) {
+      await spawnTakeover(job);
+      continue;
+    }
+    await transcode(job.data.videoVersionId, Boolean(job.data.resumeInterrupted), job.retryCount, job.retryLimit);
+  }
 });
 const cleanupTimer = setInterval(() => void cleanupDeletePending().catch((error) => console.error('video cleanup scan failed', { error })), 5 * 60 * 1000);
 
