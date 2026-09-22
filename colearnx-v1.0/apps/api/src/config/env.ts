@@ -12,6 +12,11 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   DATABASE_SSL: booleanFromString,
   DB_POOL_MAX: z.coerce.number().int().positive().max(50).default(10),
+  // Number of proxy hops to trust for the client IP (used by per-IP rate
+  // limiting and the security ledger). An explicit, bounded count -- never
+  // `true`, which would trust an attacker-supplied X-Forwarded-For. Must equal
+  // the real hop count for the deployment (Render = 1); a production guard below
+  // rejects 0, which would collapse every client onto the proxy's address.
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
   ACCESS_TOKEN_SECRET: z.string().min(32),
   REFRESH_TOKEN_SECRET: z.string().min(32),
@@ -92,9 +97,11 @@ const schema = z.object({
   LOCK_NOTICE_COOLDOWN_HOURS: z.coerce.number().int().min(1).max(168).default(6),
   LOGIN_FAILURE_DECAY_HOURS: z.coerce.number().int().min(1).max(168).default(12),
 
-  // --- W5 placeholder ------------------------------------------------------
-  // Provisioned now so the compose stack is complete; the rate limiter does
-  // not read it until W5.
+  // --- W5 distributed controls --------------------------------------------
+  // When set, rate limiting (lib/redis.ts + security/rate-limit-store.ts) and
+  // security-alert dedup (security/alerts.ts) use Redis, so both are correct
+  // across more than one API instance. Empty = single-instance in-process
+  // behaviour, which is the default and unchanged from before W5.
   REDIS_URL: z.union([z.string().url(), z.literal('')]).optional().default(''),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -195,6 +202,14 @@ if (!parsed.data.SECURITY_HASH_PEPPER) {
 // alert channel while delivering nothing.
 if (parsed.data.NODE_ENV === 'production' && !parsed.data.SECURITY_ALERT_WEBHOOK_URL) {
   throw new Error('SECURITY_ALERT_WEBHOOK_URL is required in production: high-severity events must reach an operator.');
+}
+
+// F-14: in a deployed environment the client IP must come from the proxy, not
+// the socket. TRUST_PROXY=0 there would make every request appear to originate
+// from the load balancer, collapsing per-IP rate limiting and the security
+// ledger's source attribution onto one address. Fail closed on that misconfig.
+if (deployedEnvironment && parsed.data.TRUST_PROXY === 0) {
+  throw new Error('TRUST_PROXY must be the real proxy hop count (>= 1) in staging and production.');
 }
 
 export const env = parsed.data;
