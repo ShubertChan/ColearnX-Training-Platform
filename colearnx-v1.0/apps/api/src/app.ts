@@ -10,6 +10,7 @@ import { env } from './config/env.js';
 import { query } from './db/database.js';
 import { ApiError, errorHandler, notFound, ok } from './lib/http.js';
 import { recordAccessDecision } from './security/access-log.js';
+import { rateLimitStore } from './security/rate-limit-store.js';
 import { confirmMfaEnrolment, disableMfaForSelf, getMfaStatus, requestStepUp, rotateRecoveryCodes, startMfaEnrolment } from './auth/mfa/routes.js';
 import { requireAdminMfa, requireStepUp } from './auth/mfa/guards.js';
 import { listSessions, revokeOtherSessions, revokeSession } from './auth/sessions.js';
@@ -35,14 +36,37 @@ import { abortVideoMultipart, completeVideoMultipart, completeVideoUpload, creat
 
 
 const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-step-up-token"]', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'req.body.token', 'req.body.mfaToken', 'res.headers.set-cookie'] });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many authentication attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
-const verificationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many verification attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
-const mutationLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many requests.'), { status: 429, code: 'RATE_LIMITED' })) });
+// W5 (finding F-06): each limiter uses a Redis-backed store when REDIS_URL is
+// set, so the budget is shared across every API instance instead of living in
+// one process's memory. With no Redis configured, rateLimitStore returns
+// undefined and express-rate-limit uses its in-process MemoryStore -- identical
+// behaviour to before W5. The window/limit/message of each bucket are unchanged.
+function limiter(bucket: string, windowMs: number, limit: number, message: string) {
+  const store = rateLimitStore(bucket);
+  return rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    ...(store ? { store } : {}),
+    handler: (_req, _res, next) => next(Object.assign(new Error(message), { status: 429, code: 'RATE_LIMITED' })),
+  });
+}
+const authLimiter = limiter('auth', 15 * 60 * 1000, 20, 'Too many authentication attempts.');
+const verificationLimiter = limiter('verification', 15 * 60 * 1000, 10, 'Too many verification attempts.');
+const mutationLimiter = limiter('mutation', 60 * 1000, 60, 'Too many requests.');
 // Password reset is the highest-value unauthenticated endpoint here and is
 // also an outbound email amplifier, so it gets its own budget rather than
 // sharing the general auth one. The per-account cooldown in auth.ts is the
 // other half: this bounds one source, that bounds one inbox.
-const passwordResetLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, _res, next) => next(Object.assign(new Error('Too many password reset attempts.'), { status: 429, code: 'RATE_LIMITED' })) });
+const passwordResetLimiter = limiter('password-reset', 15 * 60 * 1000, 5, 'Too many password reset attempts.');
+
+// W5 (ASVS 8.2.1): mark sensitive authenticated reads non-cacheable so account
+// state is not left in a shared or browser cache after sign-out.
+const noStore: express.RequestHandler = (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+};
 
 export function createApp() {
   const app = express();
@@ -57,7 +81,10 @@ export function createApp() {
     return requestId;
   } }));
   app.use((req, res, next) => { res.locals.requestId ||= req.id || randomUUID(); res.locals.log = req.log; next(); });
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
+  // W5 (14.4.5): HSTS with a 2-year max-age, subdomains and preload so the API
+  // origin is eligible for the browser preload list. helmet's default omits
+  // preload and uses a shorter max-age.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' }, hsts: { maxAge: 63_072_000, includeSubDomains: true, preload: true } }));
   // A rejected origin used to be a bare Error, which reached errorHandler's
   // fallback branch and became a 500 plus an error-level log line -- letting
   // any external party generate error-severity log volume for free. It is a
@@ -94,16 +121,16 @@ export function createApp() {
   api.post('/auth/mfa/verify', authLimiter, verifyMfaLogin);
 
   // --- account security surface ------------------------------------------
-  api.get('/auth/mfa', authenticate, getMfaStatus);
+  api.get('/auth/mfa', authenticate, noStore, getMfaStatus);
   api.post('/auth/mfa/enrol', authenticate, mutationLimiter, startMfaEnrolment);
   api.post('/auth/mfa/confirm', authenticate, authLimiter, confirmMfaEnrolment);
   api.post('/auth/mfa/disable', authenticate, authLimiter, disableMfaForSelf);
   api.post('/auth/mfa/recovery-codes', authenticate, authLimiter, rotateRecoveryCodes);
   api.post('/auth/step-up', authenticate, authLimiter, requestStepUp);
-  api.get('/auth/sessions', authenticate, listSessions);
+  api.get('/auth/sessions', authenticate, noStore, listSessions);
   api.delete('/auth/sessions/:id', authenticate, mutationLimiter, revokeSession);
   api.post('/auth/sessions/revoke-others', authenticate, mutationLimiter, revokeOtherSessions);
-  api.get('/me', authenticate, me);
+  api.get('/me', authenticate, noStore, me);
   api.patch('/me', authenticate, mutationLimiter, updateMe);
 
   api.get('/courses', listCourses);
@@ -148,8 +175,8 @@ export function createApp() {
   api.post('/trainer-certifications', authenticate, mutationLimiter, createTrainerCertification);
   api.get('/trainer-certifications/me', authenticate, myTrainerCertifications);
 
-  api.get('/wallet', authenticate, wallet);
-  api.get('/wallet/transactions', authenticate, walletTransactions);
+  api.get('/wallet', authenticate, noStore, wallet);
+  api.get('/wallet/transactions', authenticate, noStore, walletTransactions);
   api.get('/wallet/top-up-packages', topUpPackages);
   api.get('/cart', authenticate, listCart);
   api.post('/cart/items', authenticate, mutationLimiter, addCartItem);
