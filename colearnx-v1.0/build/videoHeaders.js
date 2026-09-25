@@ -4,8 +4,9 @@
 // Content-Security-Policy of its own -- helmet only covers API responses. This
 // now ALWAYS emits a full security header set (CSP, HSTS preload, nosniff,
 // frame denial, referrer and permissions policy). When hosted video is enabled
-// the exact API / media / R2 origins are added to the relevant CSP directives;
-// with it off, only the API origin is allowed for connect-src.
+// the exact API / media / R2 origins are added to the relevant CSP directives.
+// Attachment uploads also use R2 without hosted video, so explicitly configured
+// upload origins remain allowed independently of the hosted-video switch.
 //
 // The function is named `securityHeaders`; `videoHeaders` remains exported as a
 // backwards-compatible alias for existing imports and tests.
@@ -18,7 +19,7 @@ function exactOrigins(value) {
     .map((value) => {
       const url = new URL(value);
       if (
-        url.origin !== value ||
+        url.origin !== value || url.hostname.includes("*") ||
         !(
           url.protocol === "https:" ||
           (["localhost", "127.0.0.1"].includes(url.hostname) && url.protocol === "http:")
@@ -33,9 +34,12 @@ function exactOrigins(value) {
 export function securityHeaders(env) {
   const videoOn = String(env.VITE_ENABLE_HOSTED_VIDEO).toLowerCase() === "true";
   const media = videoOn ? exactOrigins(env.VITE_MEDIA_ORIGINS) : [];
-  const upload = videoOn ? exactOrigins(env.VITE_UPLOAD_ORIGINS) : [];
+  const upload = exactOrigins(env.VITE_UPLOAD_ORIGINS);
   if (videoOn && !upload.length) {
     throw Error("Set VITE_UPLOAD_ORIGINS before enabling hosted video. Include the exact existing attachment and video R2 origins.");
+  }
+  if (videoOn && !media.length) {
+    throw Error("Set VITE_MEDIA_ORIGINS to the exact private playback gateway origin before enabling hosted video.");
   }
   const api = env.VITE_API_BASE_URL?.startsWith("http") ? [new URL(env.VITE_API_BASE_URL).origin] : [];
 

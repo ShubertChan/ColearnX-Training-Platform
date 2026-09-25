@@ -17,6 +17,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { PgBoss, type JobWithMetadata } from 'pg-boss';
 import { Pool } from 'pg';
+import { createWorkerLifecycle, pendingTranscodeSql, readIdleExitSeconds } from './lifecycle.js';
 
 const execFile = promisify(execFileCallback);
 const required = (name: string) => {
@@ -33,8 +34,10 @@ const hlsBucket = required('VIDEO_HLS_BUCKET_NAME');
 const queueDatabaseUrl = process.env.VIDEO_QUEUE_DATABASE_URL || databaseUrl;
 const pool = new Pool({ connectionString: databaseUrl, ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: true } : undefined });
 const storage = new S3Client({ region: process.env.R2_REGION || 'auto', endpoint: `https://${accountId}.r2.cloudflarestorage.com`, credentials: { accessKeyId, secretAccessKey } });
-const queue = new PgBoss({ connectionString: queueDatabaseUrl, schema: 'pgboss', migrate: false, createSchema: false });
+const queue = new PgBoss({ connectionString: queueDatabaseUrl, schema: 'pgboss', migrate: false, createSchema: false,
+  schedule: false, useListenNotify: false, reindex: false, connectionTimeoutMillis: 15_000 });
 const queueName = 'course-video.transcode';
+const idleExitSeconds = readIdleExitSeconds(process.env.VIDEO_WORKER_IDLE_EXIT_SECONDS);
 const workerConcurrency = Number(process.env.VIDEO_WORKER_CONCURRENCY || 1);
 const transcodeTimeoutMs = Number(process.env.VIDEO_TRANSCODE_TIMEOUT_MS || 5 * 60 * 60 * 1000);
 if (!Number.isInteger(workerConcurrency) || workerConcurrency < 1 || workerConcurrency > 8) {
@@ -289,8 +292,6 @@ async function cleanupDeletePending() {
   }
 }
 
-await cleanupDeletePending();
-await queue.start();
 type TranscodeJob = { videoVersionId: string; resumeInterrupted?: boolean; takeoversRemaining?: number };
 
 async function isTranscoding(videoVersionId: string) {
@@ -321,21 +322,85 @@ async function spawnTakeover(job: JobWithMetadata<TranscodeJob>) {
   });
 }
 
-await queue.work(queueName, { localConcurrency: workerConcurrency, includeMetadata: true }, async (jobs: JobWithMetadata<TranscodeJob>[]) => {
-  for (const job of jobs) {
-    if (job.retryCount > 0 && await isTranscoding(job.data.videoVersionId)) {
-      await spawnTakeover(job);
-      continue;
-    }
-    await transcode(job.data.videoVersionId, Boolean(job.data.resumeInterrupted), job.retryCount, job.retryLimit);
-  }
+let cleanupTimer: ReturnType<typeof setInterval> | undefined;
+let idleTimer: ReturnType<typeof setInterval> | undefined;
+let cleanupRunning = false;
+let startup: Promise<void>;
+const lifecycle = createWorkerLifecycle({
+  idleExitMs: idleExitSeconds * 1000,
+  hasPendingJobs: async () => {
+    // This is the pinned pg-boss 12 queue's parent table (also covers its
+    // partitions). Delayed retries and abandoned active leases block idle exit.
+    const result = await queue.getDb().executeSql(pendingTranscodeSql, [queueName]);
+    if (typeof result.rows[0]?.pending !== 'boolean') throw new Error('Invalid queue idle check result.');
+    return result.rows[0].pending;
+  },
+  onDraining: (reason) => {
+    clearInterval(cleanupTimer);
+    clearInterval(idleTimer);
+    console.log('Video worker draining; waiting for current work.', { reason });
+  },
+  drainWorkers: async () => {
+    // A signal during startup must not close the queue while work() is still
+    // being registered. Keep heartbeat/supervision alive throughout the drain.
+    await startup.catch(() => undefined);
+    await queue.offWork(queueName, { wait: true });
+  },
+  stopQueue: () => queue.stop(),
+  closeResources: async () => {
+    await pool.end();
+    storage.destroy();
+    console.log('Video worker stopped; queue and database connections closed.');
+  },
 });
-const cleanupTimer = setInterval(() => void cleanupDeletePending().catch((error) => console.error('video cleanup scan failed', { error })), 5 * 60 * 1000);
 
-async function shutdown() {
-  clearInterval(cleanupTimer);
-  await queue.stop();
-  await pool.end();
+function reportRuntimeError(event: string) {
+  // Do not log connection strings, tokens, or SQL parameters from queue errors.
+  console.error(`Video worker: ${event}; inspect service connectivity and permissions.`);
 }
-process.on('SIGINT', () => void shutdown().finally(() => process.exit(0)));
-process.on('SIGTERM', () => void shutdown().finally(() => process.exit(0)));
+queue.on('error', () => reportRuntimeError('queue operation failed'));
+pool.on('error', () => reportRuntimeError('database connection failed'));
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    void lifecycle.stop(signal).catch(() => { process.exitCode = 1; reportRuntimeError('shutdown failed'); });
+  });
+}
+
+startup = (async () => {
+  await lifecycle.runTask(cleanupDeletePending, false);
+  if (!lifecycle.isRunning()) return;
+  await queue.start();
+  if (!lifecycle.isRunning()) return;
+  await queue.work(queueName, { localConcurrency: workerConcurrency, includeMetadata: true, pollingIntervalSeconds: 5 },
+    (jobs: JobWithMetadata<TranscodeJob>[]) => lifecycle.runTask(async () => {
+      for (const job of jobs) {
+        if (job.retryCount > 0 && await isTranscoding(job.data.videoVersionId)) {
+          await spawnTakeover(job);
+          continue;
+        }
+        await transcode(job.data.videoVersionId, Boolean(job.data.resumeInterrupted), job.retryCount, job.retryLimit);
+      }
+    }));
+  if (!lifecycle.isRunning()) return;
+  cleanupTimer = setInterval(() => {
+    if (!lifecycle.isRunning() || cleanupRunning) return;
+    cleanupRunning = true;
+    void lifecycle.runTask(cleanupDeletePending, false)
+      .catch(() => reportRuntimeError('cleanup scan failed'))
+      .finally(() => { cleanupRunning = false; });
+  }, 5 * 60 * 1000);
+  if (idleExitSeconds > 0) {
+    idleTimer = setInterval(() => {
+      void lifecycle.checkIdle().catch(() => reportRuntimeError('idle check failed'));
+    }, 5_000);
+  }
+  console.log('Video worker started.', { concurrency: workerConcurrency, idleExitSeconds });
+})();
+
+try {
+  await startup;
+} catch {
+  process.exitCode = 1;
+  reportRuntimeError('startup failed');
+  await lifecycle.stop('startup-error');
+}

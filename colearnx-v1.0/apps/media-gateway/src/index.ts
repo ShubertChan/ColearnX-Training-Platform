@@ -8,12 +8,16 @@ type PlaybackClaims = { sub: string; videoVersionId: string; sessionId: string; 
 
 const encoder = new TextEncoder();
 
-function forbidden() {
-  return new Response('Playback unauthorised.', { status: 403, headers: { 'Cache-Control': 'no-store' } });
+function errorResponse(request: Request, env: Env, message: string, status: number) {
+  return new Response(message, { status, headers: { 'Cache-Control': 'no-store', ...cors(request, env) } });
 }
 
-function expired() {
-  return new Response('Playback authorisation expired.', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+function forbidden(request: Request, env: Env) {
+  return errorResponse(request, env, 'Playback unauthorised.', 403);
+}
+
+function expired(request: Request, env: Env) {
+  return errorResponse(request, env, 'Playback authorisation expired.', 401);
 }
 
 function decodeBase64Url(value: string) {
@@ -70,13 +74,13 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request, env) });
-    if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed.', { status: 405 });
+    if (request.method !== 'GET' && request.method !== 'HEAD') return errorResponse(request, env, 'Method not allowed.', 405);
     const match = /^\/v1\/hls\/([0-9a-f-]{36})\/(.+)$/i.exec(url.pathname);
-    if (!match) return new Response('Not found.', { status: 404 });
+    if (!match) return errorResponse(request, env, 'Not found.', 404);
     const claims = await validToken(request.headers.get('Authorization'), env.PLAYBACK_TOKEN_SECRET);
-    if (!claims) return expired();
+    if (!claims) return expired(request, env);
     const [, videoVersionId, assetPath] = match;
-    if (claims.videoVersionId !== videoVersionId || assetPath.includes('..') || assetPath.includes('\\') || assetPath.startsWith('/')) return forbidden();
+    if (claims.videoVersionId !== videoVersionId || assetPath.includes('..') || assetPath.includes('\\') || assetPath.startsWith('/')) return forbidden(request, env);
     const requestedRange = request.headers.get('Range');
     const parsedRange = range(requestedRange);
     if (requestedRange && !parsedRange) {
@@ -91,14 +95,17 @@ export default {
     headers.set('Cache-Control', 'private, no-store');
     headers.set('Accept-Ranges', 'bytes');
     headers.set('ETag', object.httpEtag);
-    if (object.range && 'offset' in object.range && typeof object.range.offset === 'number') {
+    // R2 can attach full-object range metadata even without a Range request.
+    // Only a client-requested range is an HTTP partial response.
+    const partialResponse = Boolean(parsedRange && object.range);
+    if (partialResponse && object.range && 'offset' in object.range && typeof object.range.offset === 'number') {
       const offset = object.range.offset;
       const length = object.range.length ?? Math.max(0, object.size - offset);
       headers.set('Content-Range', `bytes ${offset}-${offset + length - 1}/${object.size}`);
-    } else if (object.range && 'suffix' in object.range && typeof object.range.suffix === 'number') {
+    } else if (partialResponse && object.range && 'suffix' in object.range && typeof object.range.suffix === 'number') {
       const length = Math.min(object.size, object.range.suffix);
       headers.set('Content-Range', `bytes ${object.size - length}-${object.size - 1}/${object.size}`);
     }
-    return new Response(request.method === 'HEAD' ? null : object.body, { status: object.range ? 206 : 200, headers });
+    return new Response(request.method === 'HEAD' ? null : object.body, { status: partialResponse ? 206 : 200, headers });
   },
 };

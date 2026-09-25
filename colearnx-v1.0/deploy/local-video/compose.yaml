@@ -1,0 +1,45 @@
+name: colearnx-video-local
+services:
+  video-worker:
+    image: colearnx-video-worker:local-batch
+    build:
+      context: ../../apps/video-worker
+    container_name: colearnx-video-worker
+    # Successful idle exits AND failures must stay stopped until the operator
+    # starts another batch. Otherwise Docker defeats database scale-to-zero.
+    restart: "no"
+    init: true
+    env_file:
+      - path: ${COLEARNX_VIDEO_ROOT:-D:/comp/colearnx-video-local}/config/private/worker.env
+        required: true
+    environment:
+      NODE_ENV: production
+      DATABASE_SSL: "true"
+      VIDEO_WORKER_CONCURRENCY: "1"
+      VIDEO_WORKER_IDLE_EXIT_SECONDS: "120"
+      TMPDIR: /work/tmp
+      TMP: /work/tmp
+      TEMP: /work/tmp
+      XDG_CACHE_HOME: /work/cache
+      npm_config_cache: /work/cache/npm
+    volumes:
+      - type: bind
+        source: ${COLEARNX_VIDEO_ROOT:-D:/comp/colearnx-video-local}/runtime/work
+        target: /work
+    cpus: "4.0"
+    mem_limit: 6g
+    memswap_limit: 6g
+    pids_limit: 256
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Use the Stop action below for an asynchronous graceful drain without a
+    # Docker kill deadline. This grace is only for direct compose stop/down.
+    stop_grace_period: 6h30m
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
