@@ -36,11 +36,12 @@ test("video course saves the existing video delivery contract", async () => {
   fireEvent.change(screen.getByLabelText("Live-session link (optional)"), { target: { value: "https://meeting.example/live" } });
   fireEvent.click(screen.getByRole("radio", { name: /Video course/ }));
   expect(screen.queryByLabelText("Live-session link (optional)")).toBeNull();
+  expect(screen.getByLabelText("Start time (optional)").required).toBe(false);
   fillCoreFields();
   fireEvent.click(screen.getByRole("button", { name: "Create draft" }));
   await waitFor(() => expect(createCourse).toHaveBeenCalledTimes(1));
   expect(createCourse).toHaveBeenCalledWith(expect.objectContaining({
-    deliveryModes: ["cloud"], progressTrackingType: "online_video", fulfilmentInstructions: null, trainerContact: null, joinUrl: null,
+    deliveryModes: ["cloud"], progressTrackingType: "online_video", fulfilmentInstructions: null, trainerContact: null, joinUrl: null, startsAt: null,
   }));
 });
 
@@ -54,10 +55,11 @@ test("instructor-led selection keeps exactly one delivery mode and sends offline
   fillCoreFields();
   fireEvent.change(screen.getByLabelText("Course announcement for purchasers"), { target: { value: "Please contact me to choose a venue." } });
   fireEvent.change(screen.getByLabelText("Trainer contact for purchasers"), { target: { value: "trainer@example.test" } });
+  fireEvent.change(screen.getByLabelText("Start time (required)"), { target: { value: "2026-10-01T10:00" } });
   fireEvent.click(screen.getByRole("button", { name: "Create draft" }));
   await waitFor(() => expect(createCourse).toHaveBeenCalledTimes(1));
   expect(createCourse).toHaveBeenCalledWith(expect.objectContaining({
-    deliveryModes: ["local"], progressTrackingType: "none", fulfilmentInstructions: "Please contact me to choose a venue.", trainerContact: "trainer@example.test", joinUrl: null,
+    deliveryModes: ["local"], progressTrackingType: "none", fulfilmentInstructions: "Please contact me to choose a venue.", trainerContact: "trainer@example.test", joinUrl: null, startsAt: new Date("2026-10-01T10:00").toISOString(),
   }));
 });
 
@@ -69,9 +71,23 @@ test("online instructor-led selection sends only the live delivery mode and an o
   fireEvent.change(screen.getByLabelText("Course announcement for purchasers"), { target: { value: "Join ten minutes before the live class." } });
   fireEvent.change(screen.getByLabelText("Trainer contact for purchasers"), { target: { value: "trainer@example.test" } });
   fireEvent.change(screen.getByLabelText("Live-session link (optional)"), { target: { value: "https://meeting.example/live" } });
+  fireEvent.change(screen.getByLabelText("Start time (required)"), { target: { value: "2026-10-01T10:00" } });
   fireEvent.click(screen.getByRole("button", { name: "Create draft" }));
   await waitFor(() => expect(createCourse).toHaveBeenCalledTimes(1));
   expect(createCourse).toHaveBeenCalledWith(expect.objectContaining({
-    deliveryModes: ["live"], progressTrackingType: "none", joinUrl: "https://meeting.example/live",
+    deliveryModes: ["live"], progressTrackingType: "none", joinUrl: "https://meeting.example/live", startsAt: new Date("2026-10-01T10:00").toISOString(),
   }));
+});
+
+test.each([/Online — live session/, /Offline — arrange directly/])("instructor-led %s rejects a missing start time before calling the API", (teachingFormat) => {
+  renderEditor();
+  fireEvent.click(screen.getByRole("radio", { name: /Instructor-led course/ }));
+  fireEvent.click(screen.getByRole("radio", { name: teachingFormat }));
+  fillCoreFields();
+  fireEvent.change(screen.getByLabelText("Course announcement for purchasers"), { target: { value: "Contact me for the meeting arrangements." } });
+  fireEvent.change(screen.getByLabelText("Trainer contact for purchasers"), { target: { value: "trainer@example.test" } });
+  expect(screen.getByLabelText("Start time (required)").required).toBe(true);
+  fireEvent.submit(screen.getByRole("button", { name: "Create draft" }).closest("form"));
+  expect(createCourse).not.toHaveBeenCalled();
+  expect(screen.getByRole("alert").textContent).toContain("Enter a confirmed start time");
 });

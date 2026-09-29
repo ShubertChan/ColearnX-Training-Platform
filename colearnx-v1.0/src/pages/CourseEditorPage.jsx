@@ -44,6 +44,7 @@ export default function CourseEditorPage() {
     event.preventDefault(); setError("");
     const deliveryMode = videoCourse ? "cloud" : teachingMode;
     if (coordination && (!form.fulfilmentInstructions.trim() || !form.trainerContact.trim())) return setError("Enter a course announcement and Trainer contact details.");
+    if (coordination && !form.startsAt) return setError("Enter a confirmed start time for this instructor-led course. It is required to calculate the 72-hour refund deadline.");
     let joinUrl = null;
     if (teachingMode === "live" && form.joinUrl.trim()) {
       try { const url = new URL(form.joinUrl); if (!["http:", "https:"].includes(url.protocol)) throw Error(); joinUrl = url.href; }
@@ -84,12 +85,13 @@ export default function CourseEditorPage() {
       {videoCourse ? <p className="editor-policy-note">Upload a single main video after saving the draft. The service verifies its duration; the maximum is 4 hours.</p> : <>
         <fieldset className="delivery-mode-picker"><legend>Teaching format</legend>
           <label className="delivery-mode-option"><input type="radio" name="teaching-format" checked={teachingMode === "live"} onChange={() => selectTeachingMode("live")} /><span><b>Online — live session</b><small>Share the live-session details with purchasers after payment.</small></span></label>
-          <label className="delivery-mode-option"><input type="radio" name="teaching-format" checked={teachingMode === "local"} onChange={() => selectTeachingMode("local")} /><span><b>Offline — arrange directly</b><small>Agree the time and place with each learner after payment.</small></span></label>
+          <label className="delivery-mode-option"><input type="radio" name="teaching-format" checked={teachingMode === "local"} onChange={() => selectTeachingMode("local")} /><span><b>Offline — arrange directly</b><small>Share the venue and meeting arrangements with each learner after payment.</small></span></label>
         </fieldset>
         <FormField label="Course announcement for purchasers"><textarea required value={form.fulfilmentInstructions} onChange={(e) => change("fulfilmentInstructions", e.target.value)} /></FormField><FormField label="Trainer contact for purchasers"><input required value={form.trainerContact} onChange={(e) => change("trainerContact", e.target.value)} /></FormField>{teachingMode === "live" && <FormField label="Live-session link (optional)"><input type="url" value={form.joinUrl} onChange={(e) => change("joinUrl", e.target.value)} /></FormField>}
       </>}
       <FormField label="Capacity (optional)"><input min={1} type="number" value={form.capacity || ""} onChange={(e) => change("capacity", e.target.value)} /></FormField>
-      <div className="form-grid two"><FormField label="Start time (optional)"><input type="datetime-local" value={form.startsAt || ""} onChange={(e) => change("startsAt", e.target.value)} /></FormField><FormField label="End time (optional)"><input type="datetime-local" value={form.endsAt || ""} onChange={(e) => change("endsAt", e.target.value)} /></FormField></div>
+      <div className="form-grid two"><FormField label={coordination ? "Start time (required)" : "Start time (optional)"}><input type="datetime-local" required={coordination} value={form.startsAt || ""} onChange={(e) => change("startsAt", e.target.value)} /></FormField><FormField label="End time (optional)"><input type="datetime-local" value={form.endsAt || ""} onChange={(e) => change("endsAt", e.target.value)} /></FormField></div>
+      {coordination && <p className="editor-policy-note">Confirm the start time before saving an instructor-led course. It determines the 72-hour refund deadline for both online and offline sessions.</p>}
     </fieldset>{!draft && <Button type="submit" disabled={busy || Boolean(requested)}>{busy ? "Saving…" : "Create draft"}</Button>}</form>
     {error && <p role="alert" className="form-error">{error}</p>}
     {draft && <>{form.onlineVideo && hostedVideoEnabled && <CourseVideoUploader key={`video:${draft.id}`} courseId={draft.id} onStateChange={setVideo} disabled={submitted || busy} />}<PrivateAssetUploader key={draft.id} contentVersionId={draft.id} assetApi={courseAssetApi} label="Course attachments" onAssetsChange={updateFiles} disabled={submitted || busy} />
