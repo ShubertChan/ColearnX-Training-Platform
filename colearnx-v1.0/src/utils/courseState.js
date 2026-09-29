@@ -1,6 +1,6 @@
-export const WATCH_REFUND_LIMIT = 0.1;
+import { getCourseTypeLabel, isVideoCourse } from "./coursePresentation.js";
 
-const deliveryLabels = { cloud: "Cloud", local: "Local", live: "Live" };
+export const WATCH_REFUND_LIMIT = 0.1;
 
 export function getDeliveryModes(course) {
   if (Array.isArray(course.deliveryModes) && course.deliveryModes.length) return course.deliveryModes;
@@ -9,7 +9,7 @@ export function getDeliveryModes(course) {
 }
 
 export function getDeliveryLabel(course) {
-  return getDeliveryModes(course).map((mode) => deliveryLabels[mode] || mode).join(" + ");
+  return getCourseTypeLabel(course);
 }
 
 export function getLearningStatus(course) {
@@ -38,11 +38,15 @@ export function getRefundInfo(course) {
   const progressConditionMet = typeof course.refundEligibility?.progressConditionMet === "boolean" ? course.refundEligibility.progressConditionMet : null;
   const serverEligible = course.refundEligibility?.eligible ?? course.refundEligible;
   const delivery = getDeliveryModes(course);
-  const deliveryDetail = delivery.includes("cloud")
-    ? "Cloud is a protected course-file download."
-    : delivery.includes("live") || delivery.includes("local")
-      ? "The Trainer and learner coordinate fulfilment using buyer-only information."
-      : "Delivery is recorded in the purchase snapshot.";
+  const deliveryDetail = isVideoCourse(course)
+    ? "This is a video course watched in My Learning."
+    : delivery.includes("live")
+      ? "This instructor-led course is an online live session; the Trainer shares buyer-only details."
+      : delivery.includes("local")
+        ? "This instructor-led course is arranged directly with the Trainer using buyer-only information."
+        : delivery.includes("cloud")
+          ? "Course files are available through protected downloads."
+          : "Delivery is recorded in the purchase snapshot.";
   return {
     eligible: Boolean(course.purchased && serverEligible === true),
     policyPreview: !course.purchased,
