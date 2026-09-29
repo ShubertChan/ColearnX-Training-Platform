@@ -9,7 +9,7 @@ import { canSubmitCourse } from "../utils/courseSubmission";
 import PrivateAssetUploader from "../components/uploads/PrivateAssetUploader";
 import { Button, Card, FormField } from "../components/ui";
 
-const initial = { title: "", description: "", pricePoints: "", capacity: "", startsAt: "", endsAt: "", deliveryModes: ["cloud"], fulfilmentInstructions: "", trainerContact: "", joinUrl: "", onlineVideo: false };
+const initial = { title: "", description: "", pricePoints: "", capacity: "", startsAt: "", endsAt: "", deliveryModes: hostedVideoEnabled ? ["cloud"] : ["live"], fulfilmentInstructions: "", trainerContact: "", joinUrl: "", onlineVideo: hostedVideoEnabled };
 export default function CourseEditorPage() {
   const { refreshMyListings, notify } = usePlatform();
   const [params, setParams] = useSearchParams();
@@ -31,15 +31,21 @@ export default function CourseEditorPage() {
     return () => { current = false; };
   }, [requested, draft?.id, refreshMyListings]);
   const change = (name, value) => setForm((current) => ({ ...current, [name]: value }));
-  const coordination = form.deliveryModes.some((mode) => ["local", "live"].includes(mode));
+  const selectCourseType = (type) => setForm((current) => type === "video"
+    ? { ...current, deliveryModes: ["cloud"], onlineVideo: true, joinUrl: "" }
+    : { ...current, deliveryModes: ["live"], onlineVideo: false });
+  const selectTeachingMode = (mode) => setForm((current) => ({ ...current, deliveryModes: [mode], onlineVideo: false }));
+  const videoCourse = form.onlineVideo;
+  const teachingMode = form.deliveryModes.includes("local") ? "local" : "live";
+  const coordination = !videoCourse;
   const needsFile = form.deliveryModes.includes("cloud") && !form.onlineVideo;
   const canSubmit = canSubmitCourse({ files, video, onlineVideo: form.onlineVideo, needsFile, videoEnabled: hostedVideoEnabled });
   const create = async (event) => {
     event.preventDefault(); setError("");
-    if (!form.deliveryModes.length) return setError("Select at least one delivery method.");
-    if (coordination && (!form.fulfilmentInstructions.trim() || !form.trainerContact.trim())) return setError("Enter buyer-only instructions and Trainer contact details.");
+    const deliveryMode = videoCourse ? "cloud" : teachingMode;
+    if (coordination && (!form.fulfilmentInstructions.trim() || !form.trainerContact.trim())) return setError("Enter a course announcement and Trainer contact details.");
     let joinUrl = null;
-    if (form.joinUrl.trim()) {
+    if (teachingMode === "live" && form.joinUrl.trim()) {
       try { const url = new URL(form.joinUrl); if (!["http:", "https:"].includes(url.protocol)) throw Error(); joinUrl = url.href; }
       catch { return setError("Enter an HTTP or HTTPS meeting or group URL."); }
     }
@@ -47,12 +53,12 @@ export default function CourseEditorPage() {
     setBusy(true);
     try {
       const result = await createCourse({ title: form.title.trim(), description: form.description.trim(), pricePoints: Number(form.pricePoints), capacity: form.capacity ? Number(form.capacity) : null,
-        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null, endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null, timezone: "Asia/Singapore", deliveryModes: form.deliveryModes,
-        fulfilmentInstructions: coordination ? form.fulfilmentInstructions.trim() : null, trainerContact: coordination ? form.trainerContact.trim() : null, joinUrl: coordination ? joinUrl : null,
-        progressTrackingType: form.onlineVideo ? "online_video" : "none" });
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null, endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null, timezone: "Asia/Singapore", deliveryModes: [deliveryMode],
+        fulfilmentInstructions: coordination ? form.fulfilmentInstructions.trim() : null, trainerContact: coordination ? form.trainerContact.trim() : null, joinUrl: teachingMode === "live" ? joinUrl : null,
+        progressTrackingType: videoCourse ? "online_video" : "none" });
       if (!result?.id) throw new Error("The service did not return a saved draft.");
       setDraft(result); setParams({ draft: result.id }, { replace: true });
-      notify("Course draft saved. Add the required private files before submitting.");
+      notify("Course draft saved. Complete any required course material before submitting.");
       void refreshMyListings().catch(() => notify("Draft saved. Refresh My listings later to synchronise."));
     } catch (error) { setError(error.message); } finally { setBusy(false); }
   };
@@ -70,17 +76,25 @@ export default function CourseEditorPage() {
       <FormField label="Course title"><input required maxLength={200} value={form.title} onChange={(e) => change("title", e.target.value)} /></FormField>
       <FormField label="Public description"><textarea required value={form.description} onChange={(e) => change("description", e.target.value)} /></FormField>
       <FormField label="Price in points"><input required min={0} step={1} type="number" value={form.pricePoints} onChange={(e) => change("pricePoints", e.target.value)} /></FormField>
-      <fieldset className="delivery-mode-picker"><legend>Delivery modes</legend>{[["cloud", "Cloud: protected download"], ["local", "Local: arrange with learner"], ["live", "Live: arrange the session"]].map(([mode, label]) => <label key={mode} className="check-label"><input type="checkbox" checked={form.deliveryModes.includes(mode)} onChange={() => change("deliveryModes", form.deliveryModes.includes(mode) ? form.deliveryModes.filter((value) => value !== mode) : [...form.deliveryModes, mode])} />{label}</label>)}</fieldset>
-      {coordination && <><FormField label="Buyer-only fulfilment instructions"><textarea required value={form.fulfilmentInstructions} onChange={(e) => change("fulfilmentInstructions", e.target.value)} /></FormField><FormField label="Trainer contact for purchasers"><input required value={form.trainerContact} onChange={(e) => change("trainerContact", e.target.value)} /></FormField><FormField label="Meeting or group link (optional)"><input type="url" value={form.joinUrl} onChange={(e) => change("joinUrl", e.target.value)} /></FormField></>}
-      <label className="check-label"><input type="checkbox" disabled={!hostedVideoEnabled} checked={form.onlineVideo} onChange={(e) => change("onlineVideo", e.target.checked)} />Includes platform-hosted online video</label>
-      {form.onlineVideo && <p>Upload a single main video after saving the draft. The service verifies its duration; the maximum is 4 hours.</p>}{!hostedVideoEnabled && <small>Online video is not enabled for this deployment.</small>}
+      <fieldset className="delivery-mode-picker"><legend>Course type</legend>
+        <label className="delivery-mode-option"><input type="radio" name="course-type" checked={videoCourse} disabled={!hostedVideoEnabled} onChange={() => selectCourseType("video")} /><span><b>Video course</b><small>Upload one protected course video for learners to watch on the platform.</small></span></label>
+        <label className="delivery-mode-option"><input type="radio" name="course-type" checked={!videoCourse} onChange={() => selectCourseType("teaching")} /><span><b>Instructor-led course</b><small>Teach learners live online or arrange an offline session directly.</small></span></label>
+      </fieldset>
+      {!hostedVideoEnabled && <small>Video courses are not enabled for this deployment.</small>}
+      {videoCourse ? <p className="editor-policy-note">Upload a single main video after saving the draft. The service verifies its duration; the maximum is 4 hours.</p> : <>
+        <fieldset className="delivery-mode-picker"><legend>Teaching format</legend>
+          <label className="delivery-mode-option"><input type="radio" name="teaching-format" checked={teachingMode === "live"} onChange={() => selectTeachingMode("live")} /><span><b>Online — live session</b><small>Share the live-session details with purchasers after payment.</small></span></label>
+          <label className="delivery-mode-option"><input type="radio" name="teaching-format" checked={teachingMode === "local"} onChange={() => selectTeachingMode("local")} /><span><b>Offline — arrange directly</b><small>Agree the time and place with each learner after payment.</small></span></label>
+        </fieldset>
+        <FormField label="Course announcement for purchasers"><textarea required value={form.fulfilmentInstructions} onChange={(e) => change("fulfilmentInstructions", e.target.value)} /></FormField><FormField label="Trainer contact for purchasers"><input required value={form.trainerContact} onChange={(e) => change("trainerContact", e.target.value)} /></FormField>{teachingMode === "live" && <FormField label="Live-session link (optional)"><input type="url" value={form.joinUrl} onChange={(e) => change("joinUrl", e.target.value)} /></FormField>}
+      </>}
       <FormField label="Capacity (optional)"><input min={1} type="number" value={form.capacity || ""} onChange={(e) => change("capacity", e.target.value)} /></FormField>
       <div className="form-grid two"><FormField label="Start time (optional)"><input type="datetime-local" value={form.startsAt || ""} onChange={(e) => change("startsAt", e.target.value)} /></FormField><FormField label="End time (optional)"><input type="datetime-local" value={form.endsAt || ""} onChange={(e) => change("endsAt", e.target.value)} /></FormField></div>
     </fieldset>{!draft && <Button type="submit" disabled={busy || Boolean(requested)}>{busy ? "Saving…" : "Create draft"}</Button>}</form>
     {error && <p role="alert" className="form-error">{error}</p>}
     {draft && <>{form.onlineVideo && hostedVideoEnabled && <CourseVideoUploader key={`video:${draft.id}`} courseId={draft.id} onStateChange={setVideo} disabled={submitted || busy} />}<PrivateAssetUploader key={draft.id} contentVersionId={draft.id} assetApi={courseAssetApi} label="Course attachments" onAssetsChange={updateFiles} disabled={submitted || busy} />
-      <p>Video courses require a processed, ready main video. Attachments are optional for video courses and remain separate. Cloud courses without video require a verified attachment.</p>
+      <p>Video courses require a processed, ready main video. Attachments are optional for video courses and remain separate. Instructor-led courses show their course announcement only to purchasers.</p>
       <Button disabled={busy || submitted || !canSubmit} onClick={() => void submit()}>{submitted ? "Submitted for review" : busy ? "Submitting…" : "Submit for administrator review"}</Button>
       {submitted && <Button variant="secondary" onClick={() => { setDraft(null); setForm(initial); setSubmitted(false); setParams({}); }}>Create another course</Button>}</>}
-  </Card><Card><h3>Private delivery</h3><p>Cloud files are uploaded directly with a short-lived signed URL. The service must confirm each file before review is enabled.</p><p>Local and Live instructions are sent separately from the public description and displayed only through protected purchase endpoints.</p><p>Saved metadata can be revised in Publishing tools. No local change is presented as published until the service accepts it.</p></Card></div>;
+  </Card><Card><h3>Private delivery</h3><p>Video-course files are uploaded directly with a short-lived signed URL. The service must confirm each file before review is enabled.</p><p>Instructor-led course announcements and contact details are separate from the public description and displayed only through protected purchase endpoints.</p><p>Saved metadata can be revised in Publishing tools. No local change is presented as published until the service accepts it.</p></Card></div>;
 }

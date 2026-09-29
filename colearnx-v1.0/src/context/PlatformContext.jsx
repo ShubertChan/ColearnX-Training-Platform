@@ -51,6 +51,7 @@ import { decoratePurchasedItems, purchaseMetadataByProduct } from "../utils/purc
 import { loadCatalogSection } from "../utils/catalogState";
 import { cartItemKey } from "../utils/purchaseDisclosure";
 import { cartStorageKey, readAccountCart, mergeConfirmedOrders } from "../utils/frontendState";
+import { getCourseTypeLabel } from "../utils/coursePresentation";
 
 const PlatformContext = createContext(null);
 
@@ -66,9 +67,6 @@ const titleCase = (value) =>
   String(value || "").replace(/(^|_)([a-z])/g, (_match, _prefix, letter) =>
     letter.toUpperCase(),
   );
-const deliveryLabel = (modes = []) =>
-  modes.map((mode) => titleCase(mode)).join(" + ") || "Not specified";
-
 export const mapCourse = (course) => ({
   id: course.id,
   courseId: course.courseId,
@@ -79,8 +77,8 @@ export const mapCourse = (course) => ({
   ownerId: course.owner?.id || null,
   category: course.category?.name || "General",
   deliveryModes: Array.isArray(course.deliveryModes) ? course.deliveryModes : [],
-  format: deliveryLabel(course.deliveryModes),
-  delivery: deliveryLabel(course.deliveryModes),
+  format: getCourseTypeLabel(course),
+  delivery: getCourseTypeLabel(course),
   capacity: course.capacity,
   startsAt: course.startsAt,
   endsAt: course.endsAt,
@@ -165,7 +163,7 @@ const mapOrder = (order) => ({
     price: Number(item.pricePoints || 0),
     seller: item.seller?.displayName || item.sellerName || item.trainer || item.creator || "Seller recorded in order",
     trainer: item.seller?.displayName || item.sellerName || item.trainer || "",
-    delivery: deliveryLabel(item.deliveryModes),
+    delivery: getCourseTypeLabel(item),
     deliveryModes: item.deliveryModes || [],
     refundPolicy: item.refundPolicy?.summary || item.refundPolicySnapshot?.summary || item.refundPolicySnapshot?.description || (typeof item.refundPolicy === "string" ? item.refundPolicy : "Refund snapshot text was not supplied."),
     refundPolicySnapshot: item.refundPolicySnapshot || item.refundPolicy || null,
@@ -235,7 +233,7 @@ const mapPublishedItem = (listing) => ({
   timezone: listing.timezone,
   totalDurationSeconds: listing.totalDurationSeconds || "",
   category: "General",
-  format: listing.contentType || deliveryLabel(listing.deliveryModes),
+  format: listing.contentType || getCourseTypeLabel(listing),
   price: Number(listing.pricePoints || 0),
   capacity: listing.capacity,
   startsAt: listing.startsAt,
