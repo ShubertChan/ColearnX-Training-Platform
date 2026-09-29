@@ -1,57 +1,13 @@
 import { PgBoss } from 'pg-boss';
 import { env } from '../config/env.js';
-import { ApiError } from '../lib/http.js';
-import {
-  VIDEO_TRANSCODE_EXPIRE_SECONDS,
-  VIDEO_TRANSCODE_QUEUE,
-  VIDEO_TRANSCODE_RETRY_DELAY_SECONDS,
-  VIDEO_TRANSCODE_RETRY_LIMIT,
-} from './constants.js';
+import { createVideoQueueProducer, videoQueueProducerOptions } from './queue-producer.js';
 
 export type VideoTranscodeJob = { videoVersionId: string };
 
-let queue: PgBoss | undefined;
-let queueStarted = false;
+const producer = createVideoQueueProducer(
+  () => new PgBoss(videoQueueProducerOptions(env.VIDEO_QUEUE_DATABASE_URL || env.DATABASE_URL)),
+  (event) => process.stderr.write(`Video queue: ${event}.\n`),
+);
 
-function queueConnectionString() {
-  return env.VIDEO_QUEUE_DATABASE_URL || env.DATABASE_URL;
-}
-
-async function boss() {
-  // API processes only submit jobs. The deployment-owned `video:queue:prepare`
-  // command creates/migrates pg-boss, so a compromised web role cannot change
-  // the queue schema during a request.
-  queue ??= new PgBoss({
-    connectionString: queueConnectionString(),
-    schema: 'pgboss',
-    migrate: false,
-    createSchema: false,
-    supervise: false,
-  });
-  if (!queueStarted) {
-    try {
-      await queue.start();
-      queueStarted = true;
-    } catch {
-      queue = undefined;
-      throw new ApiError(503, 'VIDEO_QUEUE_UNAVAILABLE', 'The video processing queue is temporarily unavailable.');
-    }
-  }
-  return queue;
-}
-
-export async function enqueueVideoTranscode(videoVersionId: string) {
-  const jobId = await (await boss()).send(VIDEO_TRANSCODE_QUEUE, { videoVersionId }, {
-    singletonKey: `video-version:${videoVersionId}`,
-    retryLimit: VIDEO_TRANSCODE_RETRY_LIMIT,
-    retryDelay: VIDEO_TRANSCODE_RETRY_DELAY_SECONDS,
-    expireInSeconds: VIDEO_TRANSCODE_EXPIRE_SECONDS,
-  });
-  return jobId;
-}
-
-export async function closeVideoQueue() {
-  if (queueStarted && queue) await queue.stop();
-  queue = undefined;
-  queueStarted = false;
-}
+export const enqueueVideoTranscode = producer.enqueue;
+export const closeVideoQueue = producer.close;

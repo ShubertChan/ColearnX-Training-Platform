@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/worker.ts",
+    "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit --target ES2023 --module NodeNext --moduleResolution NodeNext --strict --esModuleInterop --skipLibCheck src/worker.ts"
   },
   "dependencies": {
