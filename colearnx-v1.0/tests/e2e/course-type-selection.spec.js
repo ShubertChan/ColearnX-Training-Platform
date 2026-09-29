@@ -20,11 +20,12 @@ test("trainer can choose one offline instructor-led course and save its purchase
   await page.getByLabel("Course title").fill("Studio painting");
   await page.getByLabel("Public description").fill("A guided studio session.");
   await page.getByLabel("Price in points").fill("30");
-  await page.getByLabel("Course announcement for purchasers").fill("Contact me to agree a venue and time.");
+  await page.getByLabel("Course announcement for purchasers").fill("Contact me to agree a venue.");
   await page.getByLabel("Trainer contact for purchasers").fill("trainer@example.test");
+  await page.getByLabel("Start time (required)").fill("2026-10-01T10:00");
   await page.getByRole("button", { name: "Create draft" }).click();
   await expect.poll(() => creations).toHaveLength(1);
   expect(creations[0]).toMatchObject({
-    deliveryModes: ["local"], progressTrackingType: "none", fulfilmentInstructions: "Contact me to agree a venue and time.", trainerContact: "trainer@example.test", joinUrl: null,
+    deliveryModes: ["local"], progressTrackingType: "none", fulfilmentInstructions: "Contact me to agree a venue.", trainerContact: "trainer@example.test", joinUrl: null, startsAt: expect.any(String),
   });
 });
