@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { closeDatabase } from './db/database.js';
 import { primeCredentialVerifier } from './auth/credential-verify.js';
+import { closeVideoQueue } from './video/queue.js';
 
 const app = createApp();
 // Generates the argon2 decoy before the first request, so the first
@@ -17,7 +18,7 @@ const server = app.listen(env.PORT, () => { process.stdout.write(`CoLearnX API l
 
 async function shutdown(signal: string) {
   process.stdout.write(`Received ${signal}; shutting down.\n`);
-  server.close(async () => { await closeDatabase(); process.exit(0); });
+  server.close(async () => { await closeVideoQueue(); await closeDatabase(); process.exit(0); });
 }
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
