@@ -30,6 +30,8 @@ test("learning and live states are derived consistently", () => {
   assert.equal(getLiveStatus({ deliveryModes: ["live"], startsAt: "2026-08-29T10:00:00.000Z", duration: 60 }, new Date("2026-08-29T12:00:00.000Z")), "Ended");
 });
 
-test("delivery labels use the current three channels", () => {
-  assert.equal(getDeliveryLabel({ deliveryModes: ["cloud", "live"] }), "Cloud + Live");
+test("delivery labels use the public course types", () => {
+  assert.equal(getDeliveryLabel({ deliveryModes: ["cloud"], onlineVideo: true }), "Video course");
+  assert.equal(getDeliveryLabel({ deliveryModes: ["live"] }), "Instructor-led course · Online live");
+  assert.equal(getDeliveryLabel({ deliveryModes: ["local"] }), "Instructor-led course · Offline arrangement");
 });
