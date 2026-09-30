@@ -16,10 +16,10 @@ const buyer = '11111111-1111-4111-8111-111111111111';
 const item = '22222222-2222-4222-8222-222222222222';
 const version = '33333333-3333-4333-8333-333333333333';
 const now = new Date('2026-10-01T00:00:00.000Z');
-function fixture(startsAt: Date | null, actorId = buyer) {
+function fixture(startsAt: Date | null, actorId = buyer, published = false) {
   let issued = 0;
   const client = { query: async (sql: string) => {
-    if (sql.includes('JOIN orders o')) return { rows: [{ buyer_user_id: buyer, fulfilment_status: 'fulfilled', course_video_version_id: version, duration_seconds: '100', hls_master_key: `course-video-hls/${version}/master.m3u8`, starts_at: startsAt, server_time: now }], rowCount: 1 };
+    if (sql.includes('JOIN orders o')) return { rows: [{ buyer_user_id: buyer, fulfilment_status: 'fulfilled', course_video_version_id: version, duration_seconds: '100', hls_master_key: `course-video-hls/${version}/master.m3u8`, starts_at: startsAt, server_time: now, run_status: published ? 'published' : 'draft', publication_status: published ? 'published' : 'draft' }], rowCount: 1 };
     if (sql.includes('INSERT INTO course_video_progress_sessions')) issued++;
     if (sql.includes('MAX(interval_end_seconds)')) return { rows: [{ resume_at: '4' }], rowCount: 1 };
     return { rows: [{ course_video_version_id: version }], rowCount: 1 };
@@ -38,6 +38,19 @@ test('missing start time fails closed without issuing a session', async () => {
   await assert.rejects(f.handler(f.req, f.res), { status: 409, code: 'COURSE_START_REQUIRED' });
   assert.equal(f.issued(), 0);
 });
+
+test('a published undated course is not automatically classified as development data', async () => {
+  const f = fixture(null, buyer, true);
+  await assert.rejects(f.handler(f.req, f.res), { status: 409, code: 'COURSE_START_REQUIRED' });
+  assert.equal(f.issued(), 0);
+});
+
+test('publication does not bypass a recorded future start time', async () => {
+  const f = fixture(new Date(now.getTime() + 1), buyer, true);
+  await assert.rejects(f.handler(f.req, f.res), { status: 403, code: 'COURSE_NOT_STARTED' });
+  assert.equal(f.issued(), 0);
+});
+
 test('at and after the server-recorded start time playback retains version binding and resume position', async () => {
   for (const offset of [0, -1]) {
     const f = fixture(new Date(now.getTime() + offset));
