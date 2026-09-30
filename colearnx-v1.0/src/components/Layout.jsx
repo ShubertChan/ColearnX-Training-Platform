@@ -125,6 +125,7 @@ const titleMap = {
 };
 
 function titleFor(pathname) {
+  if (pathname.startsWith("/purchases/")) return ["Course learning", "Your protected video course"];
   if (titleMap[pathname]) return titleMap[pathname];
   if (pathname.startsWith("/checkout-success/"))
     return ["Order Details", "Review the selected course order and receipt"];

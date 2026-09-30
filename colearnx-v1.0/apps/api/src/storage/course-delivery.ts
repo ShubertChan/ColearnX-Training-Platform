@@ -20,6 +20,7 @@ import {
 } from './r2.js';
 import { canFinalizeStorageAssetDeletion, remainingSignedUploadTtlSeconds } from './storage-deletion.js';
 import { assertAccountStorageQuota, lockStorageAccount } from './storage-quota.js';
+import { assertVideoStarted, videoAvailability } from '../video/availability.js';
 
 const uploadIntentInput = z.object({
   filename: z.string().trim().min(1).max(512),
@@ -62,6 +63,11 @@ type DraftCourse = {
 };
 
 type PurchaseAccess = {
+  starts_at: Date | null;
+  server_time: Date;
+  title: string;
+  description: string;
+  trainer: string;
   order_item_id: string;
   course_run_id: string;
   enrolment_id: string;
@@ -156,11 +162,14 @@ function purposeFor(_course: DraftCourse, _metadata: UploadMetadata): 'cloud_dow
 }
 
 export async function assertCourseReadyForSubmission(client: Pick<PoolClient, 'query'>, courseRunId: string, ownerUserId: string) {
-  const course = await client.query<{ progress_tracking_type: 'none' | 'online_video' }>(
-    `SELECT cr.progress_tracking_type FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id
+  const course = await client.query<{ progress_tracking_type: 'none' | 'online_video'; starts_at: Date | null }>(
+    `SELECT cr.progress_tracking_type, cr.starts_at FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id
      WHERE cr.course_run_id = $1 AND c.owner_user_id = $2`, [courseRunId, ownerUserId],
   );
   if (!course.rowCount) throw new ApiError(404, 'COURSE_NOT_FOUND', 'Course offering was not found.');
+  if (course.rows[0].progress_tracking_type === 'online_video' && !course.rows[0].starts_at) {
+    throw new ApiError(409, 'COURSE_START_REQUIRED', 'Set a video-course start time before submitting or publishing.');
+  }
   const options = await client.query<{ delivery_type: string; fulfilment_instructions: string | null; trainer_contact: string | null }>(
     `SELECT delivery_type, fulfilment_instructions, trainer_contact FROM course_delivery_options WHERE course_run_id = $1`, [courseRunId],
   );
@@ -357,10 +366,13 @@ export async function deleteCourseUploadIntent(req: Request, res: Response) {
 
 async function purchaseAccess(client: Pick<PoolClient, 'query'>, orderItemId: string, actorId: string) {
   const result = await client.query<PurchaseAccess>(`SELECT oi.order_item_id, oi.course_run_id, ce.enrolment_id,
-      oi.fulfilment_status, cr.progress_tracking_type, cr.total_duration_seconds, oi.delivery_snapshot_json
+      oi.fulfilment_status, cr.progress_tracking_type, cr.total_duration_seconds, oi.delivery_snapshot_json,
+      cr.starts_at, clock_timestamp() AS server_time, oi.item_title_snapshot AS title, c.description, trainer.full_name AS trainer
     FROM order_items oi JOIN orders o ON o.order_id = oi.order_id
     JOIN course_enrolments ce ON ce.order_item_id = oi.order_item_id
     JOIN course_runs cr ON cr.course_run_id = oi.course_run_id
+    JOIN courses c ON c.course_id = cr.course_id
+    JOIN users trainer ON trainer.user_id = c.owner_user_id
     WHERE oi.order_item_id = $1 AND o.buyer_user_id = $2 AND oi.item_type = 'course_run'
       AND oi.fulfilment_status IN ('paid', 'reserved', 'fulfilled')`, [orderItemId, actorId]);
   if (!result.rowCount) throw new ApiError(404, 'COURSE_DELIVERY_NOT_FOUND', 'Authorised course delivery was not found.');
@@ -397,22 +409,24 @@ async function currentProgress(client: PoolClient, access: PurchaseAccess, prefe
 }
 
 export async function getCourseDelivery(req: Request, res: Response) {
+  res.set('Cache-Control', 'private, no-store');
   const actor = res.locals.actor as Actor;
   const orderItemId = parse(uuid, req.params.orderItemId);
   const delivery = await withTransaction(async (client) => {
     const access = await purchaseAccess(client, orderItemId, actor.id);
+    const metadata = { title: access.title, description: access.description, trainer: access.trainer, startsAt: access.starts_at, serverTime: access.server_time };
     const assets = await client.query<CourseAsset>(`SELECT course_delivery_asset_id, course_run_id, owner_user_id, asset_purpose,
       bucket_name, object_key, original_filename, declared_content_type, declared_byte_size, verified_content_type,
       verified_byte_size, etag, asset_status, upload_expires_at FROM course_delivery_assets
       WHERE course_run_id = $1 AND asset_purpose = 'cloud_download' AND asset_status = 'ready' ORDER BY created_at ASC`, [access.course_run_id]);
     if (access.progress_tracking_type !== 'online_video') {
-      return { ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse), onlineVideo: false, progressTrackingType: 'none' };
+      return { ...metadata, ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse), onlineVideo: false, progressTrackingType: 'none' };
     }
     const video = await client.query<{ course_video_version_id: string; duration_seconds: string }>(`SELECT cv.course_video_version_id, cv.duration_seconds::text
       FROM order_items oi JOIN course_video_versions cv ON cv.course_video_version_id = oi.course_video_version_id
       WHERE oi.order_item_id = $1 AND cv.video_status IN ('ready', 'superseded') AND cv.duration_seconds IS NOT NULL`, [orderItemId]);
     if (!video.rowCount) {
-      return { ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse), onlineVideo: true,
+      return { ...metadata, ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse), onlineVideo: true,
         progressTrackingType: 'online_video', video: null, videoVersionId: null, playerState: 'processing' };
     }
     const durationSeconds = Number(video.rows[0].duration_seconds);
@@ -420,9 +434,9 @@ export async function getCourseDelivery(req: Request, res: Response) {
     const watchedSeconds = Math.min(durationSeconds, Math.max(0, Number(state.progress.watched_seconds ?? 0)));
     const watchedRatio = durationSeconds > 0 ? watchedSeconds / durationSeconds : 0;
     return {
-      ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse), onlineVideo: true,
+      ...metadata, ...fulfilment(access.delivery_snapshot_json), assets: assets.rows.map(assetResponse), onlineVideo: true,
       progressTrackingType: 'online_video', video: { id: video.rows[0].course_video_version_id, status: 'ready' },
-      videoVersionId: video.rows[0].course_video_version_id, playerState: 'ready',
+      videoVersionId: video.rows[0].course_video_version_id, playerState: videoAvailability(access.starts_at, access.server_time),
       progress: { uniqueContentWatchedSeconds: watchedSeconds, durationSeconds, watchedRatio },
       uniqueContentWatchedSeconds: watchedSeconds, durationSeconds, watchedRatio,
     };
@@ -476,6 +490,7 @@ export async function recordCourseProgress(req: Request, res: Response) {
     if (access.progress_tracking_type !== 'online_video' || !access.total_duration_seconds) {
       throw new ApiError(409, 'COURSE_PROGRESS_NOT_TRACKED', 'This course does not use platform-hosted online-video progress.');
     }
+    assertVideoStarted(access.starts_at, access.server_time);
     if (input.totalDurationSeconds !== access.total_duration_seconds) {
       throw new ApiError(409, 'COURSE_DURATION_MISMATCH', 'The player duration does not match the server-recorded course duration.');
     }

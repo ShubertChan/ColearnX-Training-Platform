@@ -6,6 +6,7 @@ import { usePlatform } from "../context/PlatformContext";
 import CourseFilesUploader from "../components/uploads/CourseFilesUploader";
 import { hostedVideoEnabled } from "../config/features";
 import { canSubmitCourse } from "../utils/courseSubmission";
+import { localDateTime } from "../utils/courseSchedule";
 import PrivateAssetUploader from "../components/uploads/PrivateAssetUploader";
 import { Button, Card, FormField } from "../components/ui";
 
@@ -26,7 +27,7 @@ export default function CourseEditorPage() {
       if (!current) return;
       const item = items.find((row) => row.id === requested && row.kind === "course" && row.status === "Draft");
       if (!item) throw new Error("This course draft is unavailable. Return to My listings and choose an editable draft.");
-      setForm({ ...initial, ...item, pricePoints: item.price }); setDraft({ id: item.id });
+      setForm({ ...initial, ...item, startsAt: localDateTime(item.startsAt), endsAt: localDateTime(item.endsAt), pricePoints: item.price }); setDraft({ id: item.id });
     }).catch((error) => { if (current) setError(error.message); }).finally(() => { if (current) setBusy(false); });
     return () => { current = false; };
   }, [requested, draft?.id, refreshMyListings]);
@@ -39,12 +40,13 @@ export default function CourseEditorPage() {
   const teachingMode = form.deliveryModes.includes("local") ? "local" : "live";
   const coordination = !videoCourse;
   const needsFile = form.deliveryModes.includes("cloud") && !form.onlineVideo;
-  const canSubmit = canSubmitCourse({ files, video, onlineVideo: form.onlineVideo, needsFile, videoEnabled: hostedVideoEnabled });
+  const canSubmit = Boolean(form.startsAt) && canSubmitCourse({ files, video, onlineVideo: form.onlineVideo, needsFile, videoEnabled: hostedVideoEnabled });
   const create = async (event) => {
     event.preventDefault(); setError("");
     const deliveryMode = videoCourse ? "cloud" : teachingMode;
     if (coordination && (!form.fulfilmentInstructions.trim() || !form.trainerContact.trim())) return setError("Enter a course announcement and Trainer contact details.");
     if (coordination && !form.startsAt) return setError("Enter a confirmed start time for this instructor-led course. It is required to calculate the 72-hour refund deadline.");
+    if (videoCourse && !form.startsAt) return setError("Enter a start time for this video course. Learners cannot watch before it opens.");
     let joinUrl = null;
     if (teachingMode === "live" && form.joinUrl.trim()) {
       try { const url = new URL(form.joinUrl); if (!["http:", "https:"].includes(url.protocol)) throw Error(); joinUrl = url.href; }
@@ -90,7 +92,8 @@ export default function CourseEditorPage() {
         <FormField label="Course announcement for purchasers"><textarea required value={form.fulfilmentInstructions} onChange={(e) => change("fulfilmentInstructions", e.target.value)} /></FormField><FormField label="Trainer contact for purchasers"><input required value={form.trainerContact} onChange={(e) => change("trainerContact", e.target.value)} /></FormField>{teachingMode === "live" && <FormField label="Live-session link (optional)"><input type="url" value={form.joinUrl} onChange={(e) => change("joinUrl", e.target.value)} /></FormField>}
       </>}
       <FormField label="Capacity (optional)"><input min={1} type="number" value={form.capacity || ""} onChange={(e) => change("capacity", e.target.value)} /></FormField>
-      <div className="form-grid two"><FormField label={coordination ? "Start time (required)" : "Start time (optional)"}><input type="datetime-local" required={coordination} value={form.startsAt || ""} onChange={(e) => change("startsAt", e.target.value)} /></FormField><FormField label="End time (optional)"><input type="datetime-local" value={form.endsAt || ""} onChange={(e) => change("endsAt", e.target.value)} /></FormField></div>
+      <div className="form-grid two"><FormField label="Start time (required)"><input type="datetime-local" required value={form.startsAt || ""} onChange={(e) => change("startsAt", e.target.value)} /></FormField><FormField label="End time (optional)"><input type="datetime-local" value={form.endsAt || ""} onChange={(e) => change("endsAt", e.target.value)} /></FormField></div>
+      {videoCourse && <p className="editor-policy-note">Set when learners can start watching. Video playback remains locked until this time; dates use your device’s local time.</p>}
       {coordination && <p className="editor-policy-note">Confirm the start time before saving an instructor-led course. It determines the 72-hour refund deadline for both online and offline sessions.</p>}
     </fieldset>{!draft && <Button type="submit" disabled={busy || Boolean(requested)}>{busy ? "Saving…" : "Create draft"}</Button>}</form>
     {error && <p role="alert" className="form-error">{error}</p>}

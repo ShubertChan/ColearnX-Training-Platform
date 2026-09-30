@@ -27,6 +27,9 @@ const courseInput = z.object({
   joinUrl: z.string().url().max(2000).nullable().optional(),
   progressTrackingType: z.enum(['none', 'online_video']).default('none'),
 }).superRefine((value, context) => {
+  if (value.progressTrackingType === 'online_video' && !value.startsAt) {
+    context.addIssue({ code: 'custom', path: ['startsAt'], message: 'Video courses require a start time. Playback is locked until that time.' });
+  }
   const needsCoordination = value.deliveryModes.some((mode) => mode === 'local' || mode === 'live');
   if (needsCoordination && (!value.fulfilmentInstructions || !value.trainerContact)) {
     context.addIssue({ code: 'custom', path: ['fulfilmentInstructions'], message: 'Local and Live delivery require buyer-only instructions and Trainer contact details.' });
@@ -158,9 +161,10 @@ export async function updateCourse(req: Request, res: Response) {
     await client.query(`UPDATE courses SET category_id = $2, title = $3, description = $4, updated_at = now()
       WHERE course_id = $1`, [draft.rows[0].course_id, input.categoryId ?? null, input.title, input.description]);
     await client.query(`UPDATE course_runs SET price_points = $2, capacity = $3, starts_at = $4, ends_at = $5,
-      timezone = $6, primary_delivery_type = $7, progress_tracking_type = $8, total_duration_seconds = $9
+      timezone = $6, primary_delivery_type = $7, progress_tracking_type = $8,
+      total_duration_seconds = CASE WHEN $8 = 'online_video' THEN total_duration_seconds ELSE NULL END
       WHERE course_run_id = $1`, [id, input.pricePoints, input.capacity ?? null, input.startsAt ?? null, input.endsAt ?? null,
-      input.timezone ?? null, input.deliveryModes[0], input.progressTrackingType, null]);
+      input.timezone ?? null, input.deliveryModes[0], input.progressTrackingType]);
     await client.query('DELETE FROM course_delivery_options WHERE course_run_id = $1', [id]);
     await client.query(`INSERT INTO course_delivery_options
       (course_run_id, delivery_type, access_mode, is_primary, option_status, fulfilment_instructions, trainer_contact, join_url)
