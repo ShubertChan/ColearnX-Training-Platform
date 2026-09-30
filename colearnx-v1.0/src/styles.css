@@ -3406,6 +3406,8 @@ tbody tr[role="button"]:focus-visible {
 .course-video-uploader { margin: 24px 0; padding: 22px; border: 1px solid #dce5e1; border-radius: 16px; background: #f8fbfa; }
 .video-file-picker { display: grid; gap: 10px; font-weight: 600; }
 .video-file-picker input { max-width: 100%; }
+.course-upload-picker { display: grid; gap: 12px; min-width: 0; }
+.course-upload-guidance { margin: 0; color: var(--muted); line-height: 1.5; }
 .video-version { padding-top: 16px; border-top: 1px solid #dce5e1; }
 .video-metadata { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 12px; overflow-wrap: anywhere; }
 .video-metadata img { width: 132px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 9px; }
@@ -3419,6 +3421,9 @@ tbody tr[role="button"]:focus-visible {
 .admin-video-review { min-width: 0; width: 100%; }
 .admin-video-review > label { display: grid; gap: 8px; }
 @media (max-width: 640px) {
+  .course-upload-picker .upload-zone { flex-wrap: wrap; }
+  .course-upload-picker .upload-zone > div { min-width: 0; flex-basis: calc(100% - 43px); }
+  .course-upload-picker .upload-zone > .button { width: 100%; text-align: center; }
   .course-video-uploader { padding: 14px; }
   .video-metadata { flex-direction: column; }
   .video-metadata img { width: 100%; max-width: 280px; }
