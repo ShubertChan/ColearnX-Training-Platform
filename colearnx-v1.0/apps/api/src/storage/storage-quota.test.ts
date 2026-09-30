@@ -69,3 +69,49 @@ test('combined pending uploads reject a fourth account upload', async () => {
     ? [{ used_bytes: '3', pending_uploads: '3' }] : [] }) } as unknown as PoolClient;
   await assert.rejects(assertAccountStorageQuota(client, 'multi-role-account', 1, limits), { code: 'CONTENT_UPLOAD_PENDING_LIMIT' });
 });
+
+function abandonedUploadsFixture(options: { exists?: boolean; storageUnavailable?: boolean; unexpired?: boolean;
+  table?: 'storage_assets' | 'course_delivery_assets'; withinSafetyWindow?: boolean } = {}) {
+  let usedBytes = 240;
+  let released = 0;
+  const table = options.table ?? 'storage_assets';
+  const client = { query: async (sql: string) => {
+    if (sql.includes('account_assets')) return { rows: [{ used_bytes: String(usedBytes), pending_uploads: '0' }] };
+    if (sql.includes(`quota:expired:${table}`)) {
+      assert.match(sql, /owner_user_id = \$1/);
+      assert.match(sql, /verified_byte_size IS NULL/);
+      assert.match(sql, /upload_expires_at <= now\(\) -/);
+      assert.match(sql, /FOR UPDATE SKIP LOCKED/);
+      if (table === 'course_delivery_assets') assert.match(sql, /asset_purpose = 'cloud_download'/);
+      else assert.match(sql, /NOT EXISTS/);
+      return { rows: options.unexpired ? [] : [{
+      asset_id: 'old-failed-upload', bucket_name: 'test-bucket', object_key: 'content/failed.mp4',
+      upload_expires_at: new Date(Date.now() - (options.withinSafetyWindow ? 30_000 : 61_000)),
+      }] };
+    }
+    if (sql.includes(`quota:release:${table}`)) { usedBytes = 40; released++; }
+    return { rows: [] };
+  } } as unknown as PoolClient;
+  const findObject = async () => {
+    if (options.storageUnavailable) throw new Error('Storage network failure');
+    return options.exists ? { contentLength: 200 } : null;
+  };
+  return { client, findObject, released: () => released };
+}
+
+test('an expired upload confirmed absent from storage no longer blocks a new upload', async () => {
+  for (const table of ['storage_assets', 'course_delivery_assets'] as const) {
+    const f = abandonedUploadsFixture({ table });
+    await assertAccountStorageQuota(f.client, 'account', 50, limits, { findObject: f.findObject });
+    assert.equal(f.released(), 1);
+  }
+});
+
+test('quota recovery preserves uploaded objects, uncertain storage errors and live upload authorisations', async () => {
+  for (const options of [{ exists: true }, { storageUnavailable: true }, { unexpired: true }, { withinSafetyWindow: true }]) {
+    const f = abandonedUploadsFixture(options);
+    await assert.rejects(assertAccountStorageQuota(f.client, 'account', 50, limits, { findObject: f.findObject }),
+      { code: 'CONTENT_STORAGE_QUOTA_EXCEEDED' });
+    assert.equal(f.released(), 0);
+  }
+});
