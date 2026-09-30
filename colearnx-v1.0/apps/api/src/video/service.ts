@@ -9,6 +9,7 @@ import { ApiError, ok } from '../lib/http.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 import { intervalFromHeartbeat, mergeIntervals, uniqueWatchedSeconds, type Heartbeat, type PlaybackEvent } from './progress.js';
 import { enqueueVideoTranscode } from './queue.js';
+import { assertVideoStarted } from './availability.js';
 import {
   VIDEO_MAX_PARTS,
   VIDEO_PART_SIZE_BYTES,
@@ -159,14 +160,14 @@ export async function getCourseVideo(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   if (!actor.roles.includes('trainer') && !actor.roles.includes('admin')) throw new ApiError(403, 'VIDEO_ACCESS_DENIED', 'Trainer or Administrator access is required.');
   const courseRunId = parse(uuid, req.params.id);
-  const result = await query<VideoVersion & { owner_user_id: string; run_status: string; publication_status: string; references: string }>(`SELECT cv.course_video_version_id, cv.course_run_id, cv.source_asset_id, cv.video_status, cv.source_upload_id,
+  const result = await query<VideoVersion & { owner_user_id: string; run_status: string; publication_status: string; references: string; starts_at: Date | null }>(`SELECT cv.course_video_version_id, cv.course_run_id, cv.source_asset_id, cv.video_status, cv.source_upload_id,
       cv.source_upload_part_size_bytes, cv.duration_seconds::text, cv.width, cv.height, cv.hls_master_key, cv.failure_code,
-      cv.failure_message, cv.version_no, cv.is_current, cv.created_at, c.owner_user_id, cr.run_status, c.publication_status,
+      cv.failure_message, cv.version_no, cv.is_current, cv.created_at, c.owner_user_id, cr.run_status, c.publication_status, cr.starts_at,
       count(oi.order_item_id)::text AS references
     FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id
     LEFT JOIN course_video_versions cv ON cv.course_run_id = cr.course_run_id
     LEFT JOIN order_items oi ON oi.course_video_version_id = cv.course_video_version_id
-    WHERE cr.course_run_id = $1 GROUP BY cv.course_video_version_id, c.owner_user_id, cr.run_status, c.publication_status
+    WHERE cr.course_run_id = $1 GROUP BY cv.course_video_version_id, c.owner_user_id, cr.run_status, c.publication_status, cr.starts_at
     ORDER BY cv.version_no DESC NULLS LAST`, [courseRunId]);
   if (!result.rowCount || (result.rows[0].owner_user_id !== actor.id && !actor.roles.includes('admin'))) throw new ApiError(404, 'COURSE_NOT_FOUND', 'Course offering was not found.');
   const versions = result.rows.filter((row) => row.course_video_version_id).map((row) => versionResponse(row, Number(row.references) > 0));
@@ -174,7 +175,7 @@ export async function getCourseVideo(req: Request, res: Response) {
   const courseEditable = !['cancelled', 'archived'].includes(result.rows[0].run_status) && !['archived'].includes(result.rows[0].publication_status);
   return ok(res, {
     canUpload: actor.roles.includes('trainer') && result.rows[0].owner_user_id === actor.id && courseEditable && !versions.some((row) => ['upload_pending', 'queued', 'transcoding'].includes(row.status)),
-    canSubmit: actor.roles.includes('trainer') && result.rows[0].owner_user_id === actor.id && result.rows[0].run_status === 'draft' && Boolean(reviewVersion?.status === 'ready'),
+    canSubmit: actor.roles.includes('trainer') && result.rows[0].owner_user_id === actor.id && result.rows[0].run_status === 'draft' && Boolean(result.rows[0].starts_at && reviewVersion?.status === 'ready'),
     reviewVersionId: reviewVersion?.id ?? null,
     versions,
   });
@@ -417,9 +418,9 @@ function gatewayManifestUrl(versionId: string, masterKey: string) {
   return `${origin}/v1/hls/${encodeURIComponent(versionId)}/${assetPath}`;
 }
 
-async function createPlaybackSessionForVersion(client: PoolClient, actor: Actor, orderItemId: string, versionId: string, preview = false) {
-  const row = await client.query<{ order_item_id: string; course_video_version_id: string; duration_seconds: string; hls_master_key: string; fulfilment_status: string; buyer_user_id: string }>(`SELECT oi.order_item_id, oi.course_video_version_id,
-      cv.duration_seconds::text, cv.hls_master_key, oi.fulfilment_status, o.buyer_user_id
+async function createPlaybackSessionForVersion(client: PoolClient, actor: Actor, orderItemId: string, versionId: string) {
+  const row = await client.query<{ order_item_id: string; course_video_version_id: string; duration_seconds: string; hls_master_key: string; fulfilment_status: string; buyer_user_id: string; starts_at: Date | null; server_time: Date }>(`SELECT oi.order_item_id, oi.course_video_version_id,
+      cv.duration_seconds::text, cv.hls_master_key, oi.fulfilment_status, o.buyer_user_id, cr.starts_at, clock_timestamp() AS server_time
     FROM order_items oi
     JOIN orders o ON o.order_id = oi.order_id
     JOIN users buyer ON buyer.user_id = o.buyer_user_id AND buyer.account_status = 'active'
@@ -427,12 +428,15 @@ async function createPlaybackSessionForVersion(client: PoolClient, actor: Actor,
       AND ce.learner_user_id = o.buyer_user_id
       AND ce.enrolment_status IN ('active', 'confirmed', 'in_progress')
     JOIN course_video_versions cv ON cv.course_video_version_id = oi.course_video_version_id
+    JOIN course_runs cr ON cr.course_run_id = oi.course_run_id AND cr.course_run_id = cv.course_run_id
     WHERE oi.order_item_id = $1 AND oi.course_video_version_id = $2 AND cv.video_status IN ('ready', 'superseded')
-    FOR SHARE OF oi, ce, cv, buyer`, [orderItemId, versionId]);
+    FOR SHARE OF oi, ce, cv, buyer, cr`, [orderItemId, versionId]);
   const access = row.rows[0];
-  if (!access || (!preview && (access.buyer_user_id !== actor.id || !['fulfilled', 'paid'].includes(access.fulfilment_status)))) {
+  if (!access || access.buyer_user_id !== actor.id || !['fulfilled', 'paid'].includes(access.fulfilment_status)) {
     throw new ApiError(403, 'PLAYBACK_UNAUTHORISED', 'This purchase is not authorised to play the requested video.');
   }
+  // The database clock is authoritative; no browser time is accepted.
+  assertVideoStarted(access.starts_at, access.server_time);
   const expiresAt = new Date(Date.now() + env.VIDEO_PLAYBACK_TTL_SECONDS * 1000);
   const sessionId = randomUUID();
   const durationSeconds = Number(access.duration_seconds);
@@ -441,7 +445,7 @@ async function createPlaybackSessionForVersion(client: PoolClient, actor: Actor,
   await client.query(`INSERT INTO course_video_progress_sessions
     (order_item_id, course_video_version_id, session_id, playback_expires_at, session_status, last_sequence, last_seen_at)
     VALUES ($1, $2, $3, $4, 'active', 0, now())`, [orderItemId, versionId, sessionId, expiresAt]);
-  const token = signPlaybackToken({ sub: actor.id, orderItemId, videoVersionId: versionId, sessionId, exp: Math.floor(expiresAt.getTime() / 1000), scope: preview ? 'preview' : 'play' });
+  const token = signPlaybackToken({ sub: actor.id, orderItemId, videoVersionId: versionId, sessionId, exp: Math.floor(expiresAt.getTime() / 1000), scope: 'play' });
   return {
     sessionId, videoVersionId: versionId, manifestUrl: gatewayManifestUrl(versionId, row.rows[0].hls_master_key), expiresAt: expiresAt.toISOString(),
     durationSeconds, resumeAt: Math.min(durationSeconds, Math.max(0, Number(resume.rows[0]?.resume_at ?? 0))),
@@ -449,11 +453,11 @@ async function createPlaybackSessionForVersion(client: PoolClient, actor: Actor,
   };
 }
 
-export async function createPlaybackSession(req: Request, res: Response) {
+async function handlePlaybackSession(req: Request, res: Response, dependencies: { withTransaction: typeof withTransaction }) {
   requireHostedVideo();
   const actor = res.locals.actor as Actor;
   const orderItemId = parse(uuid, req.params.orderItemId);
-  const session = await withTransaction(async (client) => {
+  const session = await dependencies.withTransaction(async (client) => {
     const version = await client.query<{ course_video_version_id: string | null }>('SELECT course_video_version_id FROM order_items WHERE order_item_id = $1', [orderItemId]);
     if (!version.rows[0]?.course_video_version_id) throw new ApiError(409, 'VIDEO_NOT_READY', 'This order does not have a ready hosted video.');
     return createPlaybackSessionForVersion(client, actor, orderItemId, version.rows[0].course_video_version_id);
@@ -461,6 +465,11 @@ export async function createPlaybackSession(req: Request, res: Response) {
   res.set('Cache-Control', 'private, no-store');
   return ok(res, session, 201);
 }
+
+export function createPlaybackSessionHandler(dependencies = { withTransaction }) {
+  return (req: Request, res: Response) => handlePlaybackSession(req, res, dependencies);
+}
+export const createPlaybackSession = createPlaybackSessionHandler();
 
 export async function createPreviewPlaybackSession(req: Request, res: Response) {
   requireHostedVideo();
@@ -498,9 +507,10 @@ export async function recordVideoProgress(req: Request, res: Response) {
   const progress = await withTransaction(async (client) => {
     // Every heartbeat and refund request locks the order item first. This keeps
     // an eligibility snapshot from racing an accepted interval write.
-    const order = await client.query<{ course_video_version_id: string | null }>(`SELECT oi.course_video_version_id
+    const order = await client.query<{ course_video_version_id: string | null; starts_at: Date | null; server_time: Date }>(`SELECT oi.course_video_version_id, cr.starts_at, clock_timestamp() AS server_time
       FROM order_items oi
       JOIN orders o ON o.order_id = oi.order_id
+      JOIN course_runs cr ON cr.course_run_id = oi.course_run_id
       JOIN course_enrolments ce ON ce.order_item_id = oi.order_item_id
         AND ce.learner_user_id = o.buyer_user_id
         AND ce.enrolment_status IN ('active', 'confirmed', 'in_progress')
@@ -508,6 +518,7 @@ export async function recordVideoProgress(req: Request, res: Response) {
       FOR UPDATE OF oi`, [orderItemId, actor.id]);
     const boundVersionId = order.rows[0]?.course_video_version_id;
     if (!boundVersionId) throw new ApiError(403, 'PLAYBACK_UNAUTHORISED', 'This playback session is not authorised.');
+    assertVideoStarted(order.rows[0].starts_at, order.rows[0].server_time);
 
     const session = await client.query<{ course_video_version_id: string; session_status: string; playback_expires_at: Date | null; last_sequence: number; last_position_seconds: string | null; last_playback_rate: string | null; last_client_monotonic_ms: string | null; last_event: PlaybackEvent | null; last_heartbeat_at: Date | null; server_received_at: Date }>(`SELECT
       ps.course_video_version_id, ps.session_status, ps.playback_expires_at, ps.last_sequence,
