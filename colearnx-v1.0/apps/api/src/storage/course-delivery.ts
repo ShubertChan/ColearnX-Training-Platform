@@ -200,14 +200,14 @@ export async function listCourseAssets(req: Request, res: Response) {
   return ok(res, { assets: assets.rows.map(assetResponse) });
 }
 
-export async function createCourseUploadIntent(req: Request, res: Response) {
+async function handleCourseUploadIntent(req: Request, res: Response, dependencies = { withTransaction, signUpload }) {
   const actor = res.locals.actor as Actor;
   requireTrainer(actor);
   const courseRunId = parse(uuid, req.params.courseRunId);
   const key = parse(idempotencyKey, req.get('idempotency-key'));
   const metadata = validateUploadMetadata(parse(uploadIntentInput, req.body) as UploadMetadata);
   const requestFingerprint = fingerprint({ courseRunId, ...metadata });
-  const outcome = await withTransaction(async (client) => {
+  const outcome = await dependencies.withTransaction(async (client) => {
     await lockStorageAccount(client, actor.id);
     const course = await lockDraftCourse(client, actor.id, courseRunId);
     await assertTrainerOperational(client, actor.id);
@@ -219,9 +219,22 @@ export async function createCourseUploadIntent(req: Request, res: Response) {
       }
       const assetId = existing.rows[0].response_body?.assetId;
       if (!assetId) throw new ApiError(409, 'UPLOAD_INTENT_NOT_REUSABLE', 'The upload intent cannot be replayed.');
-      const asset = await pendingAsset(client, assetId, courseRunId, actor.id);
-      if (asset.asset_status !== 'pending' || expired(asset.upload_expires_at)) {
+      let asset = await pendingAsset(client, assetId, courseRunId, actor.id);
+      if (asset.asset_status === 'ready') return asset;
+      if (asset.asset_status !== 'pending') {
         throw new ApiError(409, 'UPLOAD_INTENT_EXPIRED', 'The upload intent has expired. Start a new upload.');
+      }
+      if (expired(asset.upload_expires_at)) {
+        await assertAccountStorageQuota(client, actor.id, 0, {
+          maxBytes: env.CONTENT_STORAGE_QUOTA_BYTES, maxPendingUploads: env.CONTENT_PENDING_UPLOAD_LIMIT,
+        });
+        asset = await pendingAsset(client, assetId, courseRunId, actor.id);
+        if (asset.asset_status !== 'pending') {
+          throw new ApiError(409, 'UPLOAD_INTENT_EXPIRED', 'The upload intent has expired. Start a new upload.');
+        }
+        asset.upload_expires_at = new Date(Date.now() + env.R2_SIGNED_UPLOAD_TTL_SECONDS * 1000);
+        await client.query(`UPDATE course_delivery_assets SET upload_expires_at = $2, updated_at = now()
+          WHERE course_delivery_asset_id = $1`, [asset.course_delivery_asset_id, asset.upload_expires_at]);
       }
       return asset;
     }
@@ -250,14 +263,21 @@ export async function createCourseUploadIntent(req: Request, res: Response) {
     });
     return asset;
   });
+  if (outcome.asset_status === 'ready') return ok(res, assetResponse(outcome));
   const ttl = remainingSignedUploadTtlSeconds(outcome.upload_expires_at);
   if (ttl < 1) throw new ApiError(409, 'UPLOAD_INTENT_EXPIRED', 'The upload intent has expired. Start a new upload.');
-  const uploadUrl = await signUpload({ bucketName: outcome.bucket_name, objectKey: outcome.object_key }, outcome.declared_content_type, ttl);
+  const uploadUrl = await dependencies.signUpload({ bucketName: outcome.bucket_name, objectKey: outcome.object_key }, outcome.declared_content_type, ttl);
   return ok(res, {
     assetId: outcome.course_delivery_asset_id, uploadUrl, method: 'PUT',
     requiredHeaders: { 'Content-Type': outcome.declared_content_type }, expiresAt: outcome.upload_expires_at.toISOString(),
   }, 201);
 }
+
+export function createCourseUploadIntentHandler(dependencies = { withTransaction, signUpload }) {
+  return (req: Request, res: Response) => handleCourseUploadIntent(req, res, dependencies);
+}
+
+export const createCourseUploadIntent = createCourseUploadIntentHandler();
 
 export async function completeCourseUploadTransaction(client: PoolClient,
   input: { actorId: string; courseRunId: string; assetId: string; requestId?: string },

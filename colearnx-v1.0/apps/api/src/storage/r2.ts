@@ -131,16 +131,20 @@ export async function signUpload(locator: ObjectLocator, mediaType: string, expi
   }
 }
 
-export async function headUploadedObject(locator: ObjectLocator): Promise<HeadedObject> {
+export async function findStoredObject(locator: ObjectLocator): Promise<HeadedObject | null> {
   try {
     const object = await storageClient().send(new HeadObjectCommand({ Bucket: locator.bucketName, Key: locator.objectKey }));
     return { contentType: object.ContentType, contentLength: object.ContentLength, etag: object.ETag?.replaceAll('"', '') };
   } catch (error) {
-    if (httpStatus(error) === 404) {
-      throw new ApiError(409, 'UPLOAD_OBJECT_MISMATCH', 'The uploaded file could not be verified.');
-    }
+    if (httpStatus(error) === 404) return null;
     throw unavailable();
   }
+}
+
+export async function headUploadedObject(locator: ObjectLocator): Promise<HeadedObject> {
+  const object = await findStoredObject(locator);
+  if (!object) throw new ApiError(409, 'UPLOAD_OBJECT_NOT_FOUND', 'The file has not reached storage. Retry the upload.');
+  return object;
 }
 
 export async function signDownload(locator: ObjectLocator, mediaType: string, filename: string, mode: 'attachment' | 'inline') {

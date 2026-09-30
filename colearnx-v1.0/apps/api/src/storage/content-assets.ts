@@ -151,7 +151,7 @@ function readIntentRecord(value: unknown): UploadIntentRecord | undefined {
     : undefined;
 }
 
-export async function createUploadIntent(req: Request, res: Response) {
+async function handleContentUploadIntent(req: Request, res: Response, dependencies = { withTransaction, signUpload }) {
   const actor = res.locals.actor as Actor;
   requireCreator(actor);
   const contentVersionId = parse(uuid, req.params.contentVersionId);
@@ -159,7 +159,7 @@ export async function createUploadIntent(req: Request, res: Response) {
   const metadata = validateUploadMetadata(parse(uploadIntentInput, req.body) as UploadMetadata);
   const requestFingerprint = fingerprint({ contentVersionId, ...metadata });
 
-  const outcome = await withTransaction(async (client) => {
+  const outcome = await dependencies.withTransaction(async (client) => {
     await lockStorageAccount(client, actor.id);
     await lockOwnedDraftVersion(client, actor.id, contentVersionId);
     const existing = await client.query<{ request_fingerprint: string; response_body: unknown }>(`SELECT request_fingerprint, response_body
@@ -172,9 +172,24 @@ export async function createUploadIntent(req: Request, res: Response) {
       }
       const record = readIntentRecord(existing.rows[0].response_body);
       if (!record) throw new ApiError(409, 'UPLOAD_INTENT_NOT_REUSABLE', 'The upload intent cannot be replayed.');
-      const replay = await pendingAsset(client, record.assetId, contentVersionId, actor.id);
-      if (replay.asset_status !== 'pending' || expired(replay.upload_expires_at)) {
+      let replay = await pendingAsset(client, record.assetId, contentVersionId, actor.id);
+      if (replay.asset_status === 'ready') return { asset: replay, discarded: [] as AssetRow[] };
+      if (replay.asset_status !== 'pending') {
         throw new ApiError(409, 'UPLOAD_INTENT_EXPIRED', 'The upload intent has expired. Start a new upload.');
+      }
+      if (expired(replay.upload_expires_at)) {
+        // Reopening an expired reservation consumes an active-upload slot, but
+        // must not reserve its bytes a second time.
+        await assertAccountStorageQuota(client, actor.id, 0, {
+          maxBytes: env.CONTENT_STORAGE_QUOTA_BYTES, maxPendingUploads: env.CONTENT_PENDING_UPLOAD_LIMIT,
+        });
+        replay = await pendingAsset(client, record.assetId, contentVersionId, actor.id);
+        if (replay.asset_status !== 'pending') {
+          throw new ApiError(409, 'UPLOAD_INTENT_EXPIRED', 'The upload intent has expired. Start a new upload.');
+        }
+        replay.upload_expires_at = new Date(Date.now() + env.R2_SIGNED_UPLOAD_TTL_SECONDS * 1000);
+        await client.query(`UPDATE storage_assets SET upload_expires_at = $2, updated_at = now()
+          WHERE storage_asset_id = $1`, [replay.storage_asset_id, replay.upload_expires_at]);
       }
       return { asset: replay, discarded: [] as AssetRow[] };
     }
@@ -212,17 +227,24 @@ export async function createUploadIntent(req: Request, res: Response) {
 
   await Promise.all(outcome.discarded.map((discarded) => bestEffortDelete(discarded)));
   const asset = outcome.asset;
+  if (asset.asset_status === 'ready') return ok(res, assetResponse(asset));
   const expiresInSeconds = remainingSignedUploadTtlSeconds(asset.upload_expires_at);
   if (expiresInSeconds < 1) {
     throw new ApiError(409, 'UPLOAD_INTENT_EXPIRED', 'The upload intent has expired. Start a new upload.');
   }
-  const uploadUrl = await signUpload(
+  const uploadUrl = await dependencies.signUpload(
     { bucketName: asset.bucket_name, objectKey: asset.object_key },
     asset.declared_content_type,
     expiresInSeconds,
   );
   return ok(res, pendingAssetResponse(asset, uploadUrl), 201);
 }
+
+export function createContentUploadIntentHandler(dependencies = { withTransaction, signUpload }) {
+  return (req: Request, res: Response) => handleContentUploadIntent(req, res, dependencies);
+}
+
+export const createUploadIntent = createContentUploadIntentHandler();
 
 function mismatch(head: HeadedObject, asset: AssetRow) {
   return head.contentLength !== Number(asset.declared_byte_size) || !contentTypeMatches(asset.declared_content_type, head.contentType);
