@@ -18,9 +18,9 @@ function assetApi(prefix) {
       if (!Array.isArray(assets)) throw new Error("The file service returned an incomplete list.");
       return prefix === "/courses" ? assets.filter(asset => !isVideoAsset(asset)) : assets;
     },
-    request: (id, file) => apiClient.post(`${base(id)}/upload-intents`, {
+    request: (id, file, { requestKey = key() } = {}) => apiClient.post(`${base(id)}/upload-intents`, {
       filename: file.name, mediaType: getPrivateAssetMediaType(file), sizeBytes: file.size,
-    }, options()).then(unwrap),
+    }, { headers: { "Idempotency-Key": requestKey } }).then(unwrap),
     complete: (id, assetId) => apiClient.post(`${base(id)}/upload-intents/${encodeURIComponent(assetId)}/complete`, {}, options()).then(unwrap),
     remove: (id, assetId) => apiClient.delete(`${base(id)}/upload-intents/${encodeURIComponent(assetId)}`, options()),
   };
