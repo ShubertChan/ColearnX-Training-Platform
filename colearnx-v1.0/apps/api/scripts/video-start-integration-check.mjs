@@ -2,6 +2,8 @@
  * VIDEO_START_CHECK_DATABASE_URL=postgresql://owner@127.0.0.1:port/colearnx_release_check_video_<unique>
  * node --import tsx scripts/video-start-integration-check.mjs
  * Uses the real non-owner colearnx_app login and real HTTP handlers. No cloud I/O.
+ * Set VIDEO_START_CHECK_BROWSER=true to include real browser clicks against the
+ * production frontend, real API and database. Media uses a local HLS fixture.
  */
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
@@ -11,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
+import argon2 from 'argon2';
 
 const ownerUrl = new URL(process.env.VIDEO_START_CHECK_DATABASE_URL || 'invalid');
 assert.ok(['postgres:', 'postgresql:'].includes(ownerUrl.protocol));
@@ -18,17 +21,19 @@ assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(ownerUrl.hostname), 'Remo
 assert.match(decodeURIComponent(ownerUrl.pathname.slice(1)), /^colearnx_release_check_video_[a-z0-9_]+$/);
 assert.equal(ownerUrl.search, ''); assert.equal(ownerUrl.hash, '');
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const browserCheck = process.env.VIDEO_START_CHECK_BROWSER === 'true';
+const browserOrigin = 'http://127.0.0.1:56295';
 const password = randomBytes(32).toString('hex');
 const runtimeUrl = new URL(ownerUrl); runtimeUrl.username = 'colearnx_app'; runtimeUrl.password = password;
 const operatingEnvironment = {};
-for (const key of ['PATH', 'Path', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'USERPROFILE']) if (process.env[key]) operatingEnvironment[key] = process.env[key];
+for (const key of ['PATH', 'Path', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'SystemDrive', 'COMSPEC', 'USERNAME', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE']) if (process.env[key]) operatingEnvironment[key] = process.env[key];
 for (const key of Object.keys(process.env)) delete process.env[key];
 Object.assign(process.env, operatingEnvironment, {
   NODE_ENV: 'development', DATABASE_URL: runtimeUrl.href, DATABASE_SSL: 'false', DB_POOL_MAX: '4',
   DOTENV_CONFIG_PATH: process.platform === 'win32' ? 'NUL' : '/dev/null', DOTENV_CONFIG_QUIET: 'true',
-  APP_ORIGIN: 'http://localhost:5173', API_ORIGIN: 'http://localhost:3001', LOG_LEVEL: 'silent',
+  APP_ORIGIN: browserCheck ? browserOrigin : 'http://localhost:5173', API_ORIGIN: browserCheck ? browserOrigin : 'http://localhost:3001', LOG_LEVEL: 'silent',
   ACCESS_TOKEN_SECRET: randomBytes(32).toString('hex'), REFRESH_TOKEN_SECRET: randomBytes(32).toString('hex'), CSRF_SECRET: randomBytes(32).toString('hex'),
-  ENABLE_HOSTED_VIDEO: 'true', VIDEO_PLAYBACK_TOKEN_SECRET: randomBytes(32).toString('hex'), VIDEO_PLAYBACK_GATEWAY_ORIGIN: 'http://localhost:8787',
+  ENABLE_HOSTED_VIDEO: 'true', VIDEO_PLAYBACK_TOKEN_SECRET: randomBytes(32).toString('hex'), VIDEO_PLAYBACK_GATEWAY_ORIGIN: browserCheck ? browserOrigin : 'http://localhost:8787',
   OBJECT_STORAGE_PROVIDER: 'disabled', EMAIL_PROVIDER: 'disabled', PWNED_PASSWORDS_ENABLED: 'false', REDIS_URL: '',
 });
 const owner = new Pool({ connectionString: ownerUrl.href, ssl: false, max: 1 });
@@ -54,16 +59,20 @@ try {
   assert.equal((await owner.query("SELECT rolsuper FROM pg_roles WHERE rolname = 'colearnx_app'")).rows[0].rolsuper, false);
   pass('fresh schema and real restricted runtime login');
   const { createApp } = await import('../src/app.ts'); const app = createApp();
-  const trainer = randomUUID(), buyer = randomUUID(), outsider = randomUUID();
-  await owner.query("INSERT INTO roles (role_code, role_name, description) VALUES ('member','Member','Fixture'),('trainer','Trainer','Fixture')");
+  const trainer = randomUUID(), buyer = randomUUID(), outsider = randomUUID(), admin = randomUUID();
+  await owner.query("INSERT INTO roles (role_code, role_name, description) VALUES ('member','Member','Fixture'),('trainer','Trainer','Fixture'),('admin','Administrator','Fixture')");
+  const loginPassword = randomBytes(24).toString('hex');
+  const passwordHash = browserCheck ? await argon2.hash(loginPassword) : 'fixture-not-a-login-hash';
   const tokens = new Map();
-  for (const [id, role, label] of [[trainer, 'trainer', 'Trainer'], [buyer, 'member', 'Buyer'], [outsider, 'member', 'Other']]) {
-    await owner.query("INSERT INTO users (user_id,full_name,email,password_hash) VALUES ($1,$2,$3,'fixture-not-a-login-hash')", [id, `Fixture ${label}`, `${label.toLowerCase()}@example.test`]);
+  for (const [id, role, label] of [[trainer, 'trainer', 'Trainer'], [buyer, 'member', 'Buyer'], [outsider, 'member', 'Other'], [admin, 'admin', 'Admin']]) {
+    await owner.query("INSERT INTO users (user_id,full_name,email,password_hash,email_verified_at) VALUES ($1,$2,$3,$4,now())", [id, `Fixture ${label}`, `${label.toLowerCase()}@example.test`, passwordHash]);
     await owner.query('INSERT INTO user_roles (user_id,role_id) SELECT $1,role_id FROM roles WHERE role_code = $2', [id, role]);
+    await owner.query('INSERT INTO point_accounts (user_id) VALUES ($1)',[id]);
     const session = randomUUID();
     await owner.query("INSERT INTO refresh_sessions (session_id,user_id,token_hash,expires_at) VALUES ($1,$2,$3,now()+interval '1 hour')", [session,id,createHash('sha256').update(randomBytes(32)).digest('hex')]);
     tokens.set(id, jwt.sign({ sub: id, sid: session }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10m' }));
   }
+  await owner.query("INSERT INTO user_mfa_secrets (user_id,secret_encrypted,confirmed_at) VALUES ($1,'fixture-enrolled-admin',now())", [admin]);
   await owner.query("INSERT INTO trainer_certifications (trainer_user_id,certification_name,certification_status) VALUES ($1,'Fixture','approved')", [trainer]);
   const post = (actor, path, body = {}) => request(app).post(`/api/v1${path}`).set('Authorization', `Bearer ${tokens.get(actor)}`).send(body);
   const get = (actor, path) => request(app).get(`/api/v1${path}`).set('Authorization', `Bearer ${tokens.get(actor)}`);
@@ -107,7 +116,24 @@ try {
   assert.equal((await post(buyer, playbackPath)).body.error.code,'COURSE_START_REQUIRED');
   assert.equal((await post(trainer, `/courses/${run}/submit`)).body.error.code,'COURSE_START_REQUIRED');
   assert.equal((await get(trainer, `/courses/${run}/video`)).body.data.canSubmit,false);
-  pass('legacy missing schedule fails closed at delivery, playback and submission');
+  pass('missing schedule fails closed at delivery, playback and submission');
+  await owner.query("UPDATE courses SET publication_status='submitted' WHERE course_id=$1",[course]);
+  await owner.query("UPDATE course_runs SET run_status='submitted' WHERE course_run_id=$1",[run]);
+  assert.equal((await post(admin, `/admin/course-runs/${run}/decision`, {decision:'published',reason:'Verify start-time requirement'})).body.error.code,'COURSE_START_REQUIRED');
+  assert.ok((await get(admin, '/admin/course-submissions')).body.data.some(row => row.id === run));
+  pass('Administrator publication rejects an undated submitted video without changing its review state');
+  await owner.query("UPDATE courses SET publication_status='published' WHERE course_id=$1",[course]);
+  await owner.query("UPDATE course_runs SET run_status='published' WHERE course_run_id=$1",[run]);
+  const undated = await get(buyer, deliveryPath);
+  assert.equal(undated.body.data.startsAt,null); assert.equal(undated.body.data.playerState,'schedule_required');
+  assert.equal((await post(buyer, playbackPath)).body.error.code,'COURSE_START_REQUIRED');
+  pass('publication history never automatically bypasses a missing start time');
+  await owner.query("UPDATE course_runs SET starts_at=now()+interval '1 day' WHERE course_run_id=$1",[run]);
+  assert.equal((await get(buyer, deliveryPath)).body.data.playerState,'scheduled');
+  assert.equal((await post(buyer, playbackPath)).body.error.code,'COURSE_NOT_STARTED');
+  pass('publication never bypasses an explicit future start time');
+  await owner.query("UPDATE courses SET publication_status='draft' WHERE course_id=$1",[course]);
+  await owner.query("UPDATE course_runs SET run_status='draft' WHERE course_run_id=$1",[run]);
   await owner.query('UPDATE course_runs SET starts_at=clock_timestamp() WHERE course_run_id=$1',[run]);
   assert.equal((await get(buyer, deliveryPath)).body.data.playerState,'ready');
   const session = await post(buyer, playbackPath); assert.equal(session.status,201,JSON.stringify(session.body));
@@ -124,9 +150,20 @@ try {
   const submittedUpdate = await request(app).patch(`/api/v1/courses/${run}`).set('Authorization', `Bearer ${tokens.get(trainer)}`).send({ ...input, startsAt:'2099-02-01T00:00:00.000Z' });
   assert.equal(submittedUpdate.body.error.code,'COURSE_NOT_DRAFT');
   pass('submitted course cannot bypass review through a schedule update');
+  assert.equal((await post(admin, `/admin/course-runs/${run}/decision`, {decision:'published',reason:'Verified scheduled video ready for learners'})).status,200);
+  assert.equal((await get(buyer, `/courses/${run}`)).body.data.status,'published');
+  pass('Administrator can publish a prepared video with a saved start time');
+  if(browserCheck) {
+    const { checkVideoLearningBrowser } = await import('./video-start-browser-check.mjs');
+    await checkVideoLearningBrowser({app,root,origin:browserOrigin,loginPassword,item,
+      setStart: value => owner.query('UPDATE course_runs SET starts_at=$2 WHERE course_run_id=$1',[run,value]),
+      listings: async () => (await get(trainer,'/my/listings')).body.data,
+      delivery: async () => (await get(buyer,deliveryPath)).body.data,
+      pass});
+  }
   await owner.query("UPDATE course_enrolments SET enrolment_status='refunded' WHERE order_item_id=$1",[item]);
   assert.equal((await post(buyer, playbackPath)).body.error.code,'PLAYBACK_UNAUTHORISED');
   pass('refunded enrolment cannot renew playback');
   assert.equal(externalCalls,0); pass('no external HTTP or cloud object access');
-  process.stdout.write(`${checks} database/API checks passed. Fixture data retained.\n`);
+  process.stdout.write(`${checks} database/API${browserCheck ? '/browser' : ''} checks passed. Fixture data retained.\n`);
 } finally { globalThis.fetch=originalFetch; if(runtime) await runtime.end(); await owner.end(); }

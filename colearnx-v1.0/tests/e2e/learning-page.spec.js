@@ -66,6 +66,33 @@ test("native video controls play and pause on the dedicated page", async ({ page
   expect(state.calls.some(c => c.path.endsWith("/progress") && c.input.event === "playing")).toBe(true);
 });
 
+test("server-confirmed progress stays visible in the sidebar after syncing and reloading", async ({ page }) => {
+  const supported = await page.evaluate(() => Boolean(window.MediaSource?.isTypeSupported('video/mp4; codecs="avc1.42E01E"')));
+  test.skip(!supported, "This browser build has no header-authorized H.264 HLS support.");
+  const state = await playableFixture(page);
+  await page.goto("/#/purchases/order-item/watch");
+  const sync = page.getByRole("button", { name: "Sync viewing progress", exact: true });
+  await expect(sync).toBeVisible();
+  state.ratio = 0.2;
+  const syncProgress = async () => {
+    const [response] = await Promise.all([
+      page.waitForResponse(response => response.url().endsWith("/order-items/order-item/progress") && response.request().method() === "POST"),
+      sync.click(),
+    ]);
+    expect(await response.json()).toMatchObject({ data: { progress: { watchedRatio: 0.2 } } });
+  };
+  await syncProgress();
+  const sidebar = page.getByLabel("Your learning progress", { exact: true });
+  const confirmed = sidebar.getByLabel("Server-confirmed unique viewing progress: 20%", { exact: true });
+  await expect(confirmed).toBeVisible();
+  await expect(sidebar.getByText("Progress appears after the server confirms your viewing.", { exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(sync).toBeVisible();
+  await syncProgress();
+  await expect(confirmed).toBeVisible();
+  await expect(sidebar.getByText("Progress appears after the server confirms your viewing.", { exact: true })).toHaveCount(0);
+});
+
 test("before the start time no playback session or video is requested; server refresh unlocks it", async ({ page }) => {
   const state = await mockVideoApi(page, "member"); state.startsAt = "2099-10-01T10:00:00.000Z";
   await page.goto("/#/purchases/order-item/watch");
