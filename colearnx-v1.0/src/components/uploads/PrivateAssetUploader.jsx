@@ -29,6 +29,8 @@ function localItem(file, validation) {
     id: globalThis.crypto?.randomUUID?.() || `${file.name}-${Date.now()}-${Math.random()}`,
     file,
     assetId: "",
+    requestKey: globalThis.crypto.randomUUID(),
+    attempted: false,
     filename: file.name,
     mediaType: validation.mediaType,
     sizeBytes: file.size,
@@ -149,46 +151,59 @@ export default function PrivateAssetUploader({
 
     const active = { id, intent: null, transfer: null };
     activeTransfer.current = active;
-    patchItem(id, { status: "preparing", error: "", progress: 0 });
+    patchItem(id, { status: "preparing", error: "", progress: 0, attempted: true });
+    const markReady = (asset) => {
+      if (asset.status !== "ready") throw new Error("The file could not be verified. Choose it again and retry.");
+      patchItem(id, {
+        file: null, assetId: asset.assetId, filename: asset.filename,
+        mediaType: asset.mediaType, sizeBytes: asset.sizeBytes, status: "ready", progress: 100,
+      });
+    };
     try {
-      const intent = await assetApi.request(contentVersionId, item.file);
+      // Keep the same reservation even if the response to creating it was lost.
+      const intent = await assetApi.request(contentVersionId, item.file, { requestKey: item.requestKey });
       active.intent = intent;
-      if (cancelledIds.current.has(id)) {
-        await cleanupIntent(intent.assetId);
+      if (cancelledIds.current.has(id)) return;
+      if (intent.status === "ready") {
+        markReady(intent);
         return;
       }
-      patchItem(id, { assetId: intent.assetId, status: "uploading" });
+      patchItem(id, { assetId: intent.assetId });
+      // A failed PUT/completion response can still mean the server has the file.
+      // Only resend bytes after the server has confirmed that it is absent.
+      if (item.attempted) {
+        try {
+          const asset = await assetApi.complete(contentVersionId, intent.assetId);
+          if (!cancelledIds.current.has(id)) markReady(asset);
+          return;
+        } catch (error) {
+          if (error.code !== "UPLOAD_OBJECT_NOT_FOUND") throw error;
+        }
+      }
+      if (cancelledIds.current.has(id)) return;
+      patchItem(id, { status: "uploading" });
       const transfer = uploadFileToPresignedUrl({
-            uploadUrl: intent.uploadUrl,
-            file: item.file,
-            requiredHeaders: intent.requiredHeaders,
-            onProgress: ({ loaded, total }) => patchItem(id, {
-              progress: total ? Math.round((loaded / total) * 100) : 0,
-            }),
-          });
+        uploadUrl: intent.uploadUrl,
+        file: item.file,
+        requiredHeaders: intent.requiredHeaders,
+        onProgress: ({ loaded, total }) => patchItem(id, {
+          progress: total ? Math.round((loaded / total) * 100) : 0,
+        }),
+      });
       active.transfer = transfer;
       await transfer.promise;
       if (cancelledIds.current.has(id)) return;
       patchItem(id, { status: "verifying", progress: 100 });
       const asset = await assetApi.complete(contentVersionId, intent.assetId);
       if (cancelledIds.current.has(id)) return;
-      if (asset.status !== "ready") throw new Error("The file could not be verified. Choose it again and retry.");
-      patchItem(id, {
-        file: null,
-        assetId: asset.assetId,
-        filename: asset.filename,
-        mediaType: asset.mediaType,
-        sizeBytes: asset.sizeBytes,
-        status: "ready",
-        progress: 100,
-      });
+      markReady(asset);
     } catch (error) {
-      if (active.intent?.assetId) await cleanupIntent(active.intent.assetId);
       if (!cancelledIds.current.has(id)) {
         const safe = getSafeUploadError(error);
         patchItem(id, { status: "error", error: safe.message, progress: 0 });
       }
     } finally {
+      if (cancelledIds.current.has(id) && active.intent?.assetId) await cleanupIntent(active.intent.assetId);
       cancelledIds.current.delete(id);
       if (activeTransfer.current?.id === id) activeTransfer.current = null;
       setItems((current) => [...current]);
@@ -218,7 +233,18 @@ export default function PrivateAssetUploader({
         error: validation.message,
       };
     });
-    if (nextItems.length) setItems((current) => [...current, ...nextItems]);
+    if (nextItems.length) setItems((current) => {
+      const merged = [...current];
+      for (const next of nextItems) {
+        const duplicate = next.file ? merged.findIndex((item) => item.file
+          && item.filename === next.filename && item.sizeBytes === next.sizeBytes
+          && item.mediaType === next.mediaType && item.file.lastModified === next.file.lastModified) : -1;
+        if (duplicate >= 0) {
+          if (merged[duplicate].status === "error") merged[duplicate] = { ...merged[duplicate], status: "queued", error: "", progress: 0 };
+        } else merged.push(next);
+      }
+      return merged;
+    });
   };
 
   const removeItem = async (id) => {
@@ -244,7 +270,7 @@ export default function PrivateAssetUploader({
   };
 
   const retryItem = (id) => {
-    patchItem(id, { assetId: "", status: "queued", error: "", progress: 0 });
+    patchItem(id, { status: "queued", error: "", progress: 0 });
   };
 
   const hasQueuedFiles = items.some((item) => item.status === "queued");
