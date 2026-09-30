@@ -7,7 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { usePlatform } from "../context/PlatformContext";
 import { getCourseDelivery, requestCourseDownloadUrl } from "../api/courseDelivery";
 import { hostedVideoEnabled } from "../config/features";
-import { isVideoAsset } from "../utils/videoContract";
+import { confirmedProgress, isVideoAsset } from "../utils/videoContract";
 import CourseVideoPlayer from "../components/CourseVideoPlayer";
 import { Button, Progress } from "../components/ui";
 import "@fontsource/geist/latin-400.css";
@@ -60,6 +60,10 @@ export default function VideoLearningPage() {
   const scheduled = record?.playerState === "scheduled";
   const progress = record?.progress || record;
   const ratio = Number.isFinite(progress?.watchedRatio) ? Math.max(0, Math.min(1, progress.watchedRatio)) : null;
+  const updateProgress = value => {
+    const confirmed = confirmedProgress(value);
+    if (confirmed) setRecord(current => current ? { ...current, progress: confirmed } : current);
+  };
   const attachments = (record?.assets || []).filter(asset => !isVideoAsset(asset) && (!asset.status || asset.status === "ready"));
   const download = async asset => {
     const request = downloadGeneration.current;
@@ -84,7 +88,7 @@ export default function VideoLearningPage() {
         <div className="course-learning-screen">
           {missingStart || record.playerState === "schedule_required" ? <div className="course-learning-locked"><LockKeyhole size={32} /><h2>Start time not set</h2><p>Your Trainer needs to set a start time before this course can be watched.</p></div>
             : scheduled ? <div className="course-learning-locked"><CalendarDays size={32} /><h2>Your course opens soon</h2><p>Available from <time dateTime={record.startsAt}>{dateLabel(record.startsAt)}</time></p><small>Times are shown in your local timezone. This page will check again when the course opens.</small></div>
-            : hostedVideoEnabled ? <CourseVideoPlayer orderItemId={orderItemId} record={record} showHeading={false} showProgress={false} onRecorded={value => setRecord(current => current ? { ...current, progress: value } : current)} />
+            : hostedVideoEnabled ? <CourseVideoPlayer orderItemId={orderItemId} record={record} showHeading={false} showProgress={false} onRecorded={updateProgress} />
             : <div className="course-learning-locked"><h2>Video temporarily unavailable</h2><p>Playback is not enabled for this deployment.</p></div>}
         </div>
         <aside className="course-learning-info" aria-label="Your learning progress">
