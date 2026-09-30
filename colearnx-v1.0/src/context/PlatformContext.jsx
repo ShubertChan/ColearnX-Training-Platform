@@ -106,7 +106,7 @@ export const mapContent = (content) => ({
   price: Number(content.pricePoints || 0),
   creator: content.owner?.displayName || "CoLearnX creator",
   ownerId: content.owner?.id || null,
-  category: content.category?.name || "General",
+  category: content.category?.name || "",
   rating: "—",
   refundPolicyPreview: content.refundPolicyPreview || content.purchasePolicy?.refund || null,
   isPublished: content.status === "published",

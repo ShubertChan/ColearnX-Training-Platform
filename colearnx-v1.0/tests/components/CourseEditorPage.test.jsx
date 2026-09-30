@@ -50,13 +50,21 @@ test("video course saves the existing video delivery contract", async () => {
   fireEvent.change(screen.getByLabelText("Live-session link (optional)"), { target: { value: "https://meeting.example/live" } });
   fireEvent.click(screen.getByRole("radio", { name: /Video course/ }));
   expect(screen.queryByLabelText("Live-session link (optional)")).toBeNull();
-  expect(screen.getByLabelText("Start time (optional)").required).toBe(false);
+  expect(screen.getByLabelText("Start time (required)").required).toBe(true);
   fillCoreFields();
+  fireEvent.change(screen.getByLabelText("Start time (required)"), { target: { value: "2026-10-01T10:00" } });
   fireEvent.click(screen.getByRole("button", { name: "Create draft" }));
   await waitFor(() => expect(createCourse).toHaveBeenCalledTimes(1));
   expect(createCourse).toHaveBeenCalledWith(expect.objectContaining({
-    deliveryModes: ["cloud"], progressTrackingType: "online_video", fulfilmentInstructions: null, trainerContact: null, joinUrl: null, startsAt: null,
+    deliveryModes: ["cloud"], progressTrackingType: "online_video", fulfilmentInstructions: null, trainerContact: null, joinUrl: null, startsAt: new Date("2026-10-01T10:00").toISOString(),
   }));
+});
+
+test("video courses reject a missing start time before creating a draft", () => {
+  renderEditor(); fillCoreFields();
+  fireEvent.submit(screen.getByRole("button", { name: "Create draft" }).closest("form"));
+  expect(createCourse).not.toHaveBeenCalled();
+  expect(screen.getByRole("alert").textContent).toContain("start time");
 });
 
 test("instructor-led selection keeps exactly one delivery mode and sends offline announcement details", async () => {

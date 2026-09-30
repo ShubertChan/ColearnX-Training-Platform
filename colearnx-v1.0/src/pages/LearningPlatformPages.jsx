@@ -4,11 +4,9 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { usePlatform } from "../context/PlatformContext";
 import { listContentAssets, requestContentDownloadUrl } from "../api/uploads";
 import { getCourseDelivery, requestCourseDownloadUrl } from "../api/courseDelivery";
-import { hostedVideoEnabled } from "../config/features";
 import { isVideoAsset } from "../utils/videoContract";
 import { refundPurchase } from "../utils/refundPurchase";
 import VideoEvidence from "../components/video/VideoEvidence";
-import CourseVideoPlayer from "../components/CourseVideoPlayer";
 import { cartItemKey, deliveryDisclosures, hasPurchasePolicy, refundDisclosure } from "../utils/purchaseDisclosure";
 import { getCourseTypeLabel, isVideoCourse } from "../utils/coursePresentation";
 import { Badge, Button, Card, EmptyState, FormField, Modal, Progress } from "../components/ui";
@@ -138,8 +136,7 @@ function CourseDeliveryPanel({ item }) {
             {joinUrl && <div><dt>Join link</dt><dd><a href={joinUrl} target="_blank" rel="noreferrer">Open meeting or group link</a></dd></div>}</dl>
           <small>{modes.includes("live") ? "This is an online live course; the Trainer and learner arrange the session themselves." : "This is an offline course; the Trainer and learner arrange fulfilment themselves."}</small>
         </section>}
-        {(delivery.video || delivery.onlineVideo || delivery.progressTrackingType === "online_video" || item.onlineVideo) && (hostedVideoEnabled ? expanded && <CourseVideoPlayer orderItemId={item.id} record={delivery}
-            onRecorded={(record) => setDelivery((current) => ({ ...current, progress: record }))} /> : <p>Online video is temporarily unavailable.</p>)}
+        {(videoCourse || delivery.video) && <Link className="button primary sm" to={`/purchases/${encodeURIComponent(item.id)}/watch`}>Watch course <ArrowRight size={15} /></Link>}
       </>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <Button variant="ghost" size="sm" disabled={loading} onClick={() => void load()}>{loading ? "Refreshing…" : "Refresh protected delivery"}</Button>
@@ -151,7 +148,7 @@ export function PurchasesPage() {
   const { orders } = usePlatform();
   const items = useMemo(() => orders.flatMap((order) => order.items.map((item) => ({ ...item, order }))).filter((item) => ["paid", "reserved", "fulfilled"].includes(item.fulfilmentStatus)), [orders]);
   if (!items.length) return <EmptyState icon={BookOpen} title="No purchases yet" description="Purchased courses and resources appear here after checkout." action={<Link className="button primary" to="/courses">Explore courses</Link>} />;
-  return <div className="stack">{items.map((item) => <Card key={item.id} className="learning-row"><span className="list-icon">{item.kind === "course" ? <GraduationCap size={18} /> : <FileArchive size={18} />}</span><div><b>{item.title}</b><small>{item.kind === "course" ? getCourseTypeLabel(item) : "Digital content"} · {item.price} points</small><p className="learning-policy">{item.kind === "content" ? "Request a short-lived, purchase-authorised download link." : deliveryDisclosures(item).join(" ")}</p></div>{item.kind === "content" ? <ContentDownloadButton contentVersionId={item.productId} /> : <CourseDeliveryPanel item={item} />}<RefundLink item={item} /><Link className="button secondary sm" to={`/checkout-success/${item.order.id}`}>View receipt</Link></Card>)}</div>;
+  return <div className="stack">{items.map((item) => <Card key={item.id} className="learning-row"><span className="list-icon">{item.kind === "course" ? <GraduationCap size={18} /> : <FileArchive size={18} />}</span><div><b>{item.title}</b><small>{item.kind === "course" ? getCourseTypeLabel(item) : "Digital content"} · {item.price} points</small><p className="learning-policy">{item.kind === "content" ? "Request a short-lived, purchase-authorised download link." : deliveryDisclosures(item).join(" ")}</p></div>{item.kind === "content" ? <ContentDownloadButton contentVersionId={item.productId} /> : isVideoCourse(item) || item.courseVideoVersionId ? <Link className="button primary sm" to={`/purchases/${encodeURIComponent(item.id)}/watch`}>Watch course <ArrowRight size={15} /></Link> : <CourseDeliveryPanel item={item} />}<RefundLink item={item} /><Link className="button secondary sm" to={`/checkout-success/${item.order.id}`}>View receipt</Link></Card>)}</div>;
 }
 
 export function RefundPage() {
