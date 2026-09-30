@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { createCourse, submitCourse } from "../api/catalog";
 import { courseAssetApi } from "../api/uploads";
 import { usePlatform } from "../context/PlatformContext";
-import CourseVideoUploader from "../components/uploads/CourseVideoUploader";
+import CourseFilesUploader from "../components/uploads/CourseFilesUploader";
 import { hostedVideoEnabled } from "../config/features";
 import { canSubmitCourse } from "../utils/courseSubmission";
 import PrivateAssetUploader from "../components/uploads/PrivateAssetUploader";
@@ -94,8 +94,11 @@ export default function CourseEditorPage() {
       {coordination && <p className="editor-policy-note">Confirm the start time before saving an instructor-led course. It determines the 72-hour refund deadline for both online and offline sessions.</p>}
     </fieldset>{!draft && <Button type="submit" disabled={busy || Boolean(requested)}>{busy ? "Saving…" : "Create draft"}</Button>}</form>
     {error && <p role="alert" className="form-error">{error}</p>}
-    {draft && <>{form.onlineVideo && hostedVideoEnabled && <CourseVideoUploader key={`video:${draft.id}`} courseId={draft.id} onStateChange={setVideo} disabled={submitted || busy} />}<PrivateAssetUploader key={draft.id} contentVersionId={draft.id} assetApi={courseAssetApi} label="Course attachments" onAssetsChange={updateFiles} disabled={submitted || busy} />
-      <p>Video courses require a processed, ready main video. Attachments are optional for video courses and remain separate. Instructor-led courses show their course announcement only to purchasers.</p>
+    {draft && <>{form.onlineVideo
+      ? hostedVideoEnabled ? <CourseFilesUploader key={draft.id} courseId={draft.id} onVideoChange={setVideo} onAssetsChange={updateFiles} disabled={submitted || busy} />
+        : <p role="status">Video uploads are not enabled for this deployment.</p>
+      : <PrivateAssetUploader key={draft.id} contentVersionId={draft.id} assetApi={courseAssetApi} label="Course attachments" onAssetsChange={updateFiles} disabled={submitted || busy} />}
+      {!form.onlineVideo && <p>Instructor-led courses show their course announcement only to purchasers.</p>}
       <Button disabled={busy || submitted || !canSubmit} onClick={() => void submit()}>{submitted ? "Submitted for review" : busy ? "Submitting…" : "Submit for administrator review"}</Button>
       {submitted && <Button variant="secondary" onClick={() => { setDraft(null); setForm(initial); setSubmitted(false); setParams({}); }}>Create another course</Button>}</>}
   </Card><Card><h3>Private delivery</h3><p>Video-course files are uploaded directly with a short-lived signed URL. The service must confirm each file before review is enabled.</p><p>Instructor-led course announcements and contact details are separate from the public description and displayed only through protected purchase endpoints.</p><p>Saved metadata can be revised in Publishing tools. No local change is presented as published until the service accepts it.</p></Card></div>;

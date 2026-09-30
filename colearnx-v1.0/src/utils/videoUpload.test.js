@@ -1,6 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { approvedUploadUrl, readUpload, saveUpload, sameVideoFile, uploadStorageKey, uploadVideo } from "./videoUpload.js";
+import { approvedUploadUrl, identifyVideoFile, isVideoSource, readUpload, saveUpload, sameVideoFile, uploadStorageKey, uploadVideo } from "./videoUpload.js";
+
+test("main-video validation rejects documents, images, archives and empty videos before reading file bytes", async () => {
+  for (const file of [
+    new File(["document"], "notes.pdf", { type: "application/pdf" }),
+    new File(["document"], "notes.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
+    new File(["archive"], "files.zip", { type: "application/zip" }),
+    new File(["image"], "image.png", { type: "image/png" }),
+    new File([], "empty.mp4", { type: "video/mp4" }),
+  ]) {
+    assert.equal(isVideoSource(file), false);
+    await assert.rejects(identifyVideoFile(file), { code: "VIDEO_INVALID_SOURCE" });
+  }
+});
+
+test("main-video validation accepts video MIME types and the existing video-extension fallback", async () => {
+  for (const name of ["lesson.mp4", "lesson.mov", "lesson.m4v", "lesson.webm", "lesson.MKV"]) {
+    const file = new File(["fixture-video"], name, { type: "application/octet-stream", lastModified: 123 });
+    assert.equal(isVideoSource(file), true);
+    const identity = await identifyVideoFile(file);
+    assert.equal(identity.name, name);
+    assert.equal(identity.lastModified, 123);
+    assert.equal(identity.fingerprint.length, 64);
+  }
+  assert.equal(isVideoSource(new File(["fixture-video"], "lesson", { type: "video/mp4" })), true);
+});
 
 test("upload destinations require the exact deployment-configured origin", () => {
   const origin = "https://account.r2.cloudflarestorage.com";
