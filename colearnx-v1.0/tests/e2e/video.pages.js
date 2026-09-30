@@ -7,7 +7,7 @@ export class TrainerVideoPage {
 }
 export class LearnerVideoPage {
   constructor(page) { this.page = page; }
-  async open() { await this.page.goto("/#/purchases"); await this.page.getByRole("button", { name: "Open delivery", exact: true }).click(); }
+  async open() { await this.page.goto("/#/purchases"); await this.page.getByRole("link", { name: "Watch course", exact: true }).click(); }
   player() { return this.page.getByRole("region", { name: "Online course video" }); }
   async seekTo(seconds) { await this.page.getByLabel("Course video", { exact: true }).evaluate((video, value) => { video.currentTime = value; }, seconds); }
   async pause() { await this.page.getByLabel("Course video", { exact: true }).evaluate(video => video.pause()); }

@@ -10,8 +10,9 @@ const messages = {
   expired: "Playback authorisation expired. Renew it to continue.", unauthorised: "This video is unavailable for this account or purchase.",
   network_error: "Video playback was interrupted. Check your connection and retry.", unsupported: "This browser cannot play this video. Try a browser with HLS support.",
   unavailable: "This video is unavailable. Refresh delivery for its latest status.",
+  scheduled: "This course has not started yet. Refresh the course after its start time.", schedule_required: "The Trainer must set a start time before this video can be watched.",
 };
-export default function CourseVideoPlayer({ orderItemId, record, onRecorded, onReady, previewCourseId, previewVersionId }) {
+export default function CourseVideoPlayer({ orderItemId, record, onRecorded, onReady, previewCourseId, previewVersionId, showHeading = true, showProgress = true }) {
   const videoRef = useRef(null), reporterRef = useRef(null), callbackRef = useRef(onRecorded);
   callbackRef.current = onRecorded;
   const readyRef = useRef(onReady); readyRef.current = onReady;
@@ -98,7 +99,7 @@ export default function CourseVideoPlayer({ orderItemId, record, onRecorded, onR
           media.crossOrigin = "use-credentials"; media.src = manifest; media.load();
         } else fail("unsupported");
       } catch (error) {
-        if (!disposed) fail(error.code === "PLAYBACK_EXPIRED" ? "expired" : [401, 403].includes(error.status) || error.code === "PLAYBACK_UNAUTHORISED" ? "unauthorised" : error.code === "VIDEO_NOT_READY" ? "processing" : "network_error");
+        if (!disposed) fail(error.code === "COURSE_NOT_STARTED" ? "scheduled" : error.code === "COURSE_START_REQUIRED" ? "schedule_required" : error.code === "PLAYBACK_EXPIRED" ? "expired" : [401, 403].includes(error.status) || error.code === "PLAYBACK_UNAUTHORISED" ? "unauthorised" : error.code === "VIDEO_NOT_READY" ? "processing" : "network_error");
       } finally { loading = false; }
     };
     const listen = (name, handler) => { media.addEventListener(name, handler); events.push([name, handler]); };
@@ -119,18 +120,19 @@ export default function CourseVideoPlayer({ orderItemId, record, onRecorded, onR
     const visibility = () => { if (document.hidden) void report(media.seeking ? "seeking" : media.paused ? "pause" : "playing"); };
     const leaving = () => { void report("pause"); };
     document.addEventListener("visibilitychange", visibility); window.addEventListener("pagehide", leaving);
-    if (["upload_pending", "queued", "transcoding"].includes(versionStatus) || playbackState === "processing") setState("processing");
+    if (!preview && ["scheduled", "schedule_required"].includes(playbackState)) setState(playbackState);
+    else if (["upload_pending", "queued", "transcoding"].includes(versionStatus) || playbackState === "processing") setState("processing");
     else if (playbackState === "unauthorised") setState("unauthorised");
     else if (["failed", "delete_pending", "deleted"].includes(versionStatus)) setState("unavailable");
     else void open();
     return () => { disposed = true; abort.abort(); detach(); clearInterval(interval); events.forEach(([name, handler]) => media.removeEventListener(name, handler)); document.removeEventListener("visibilitychange", visibility); window.removeEventListener("pagehide", leaving); };
   }, [orderItemId, previewCourseId, previewVersionId, preview, expectedVersion, versionStatus, playbackState, attempt]);
   return <section className="video-player" aria-label={preview ? "Video review preview" : "Online course video"}>
-    <b>{preview ? "Review preview" : "Online video"}</b>
+    {showHeading && <b>{preview ? "Review preview" : "Online video"}</b>}
     <video ref={videoRef} controls playsInline preload="metadata" controlsList="nodownload" disablePictureInPicture aria-label="Course video" hidden={state !== "ready" && state !== "loading"} />
     {messages[state] && <p role={state === "loading" || state === "processing" ? "status" : "alert"}>{messages[state]}</p>}
     {!preview && <>
-      {progress ? <><Progress value={Math.round(progress.watchedRatio * 10000) / 100} label="Server-confirmed unique viewing progress" /><small>{progress.uniqueContentWatchedSeconds.toFixed(3)} of {progress.durationSeconds.toFixed(3)} seconds confirmed. Seeking and repeat viewing do not add duplicate progress.</small></> : <p>Waiting for confirmed viewing progress.</p>}
+      {showProgress && (progress ? <><Progress value={Math.round(progress.watchedRatio * 10000) / 100} label="Server-confirmed unique viewing progress" /><small>{progress.uniqueContentWatchedSeconds.toFixed(3)} of {progress.durationSeconds.toFixed(3)} seconds confirmed. Seeking and repeat viewing do not add duplicate progress.</small></> : <p>Waiting for confirmed viewing progress.</p>)}
       {progressError && <p role="alert" className="form-error">{progressError}</p>}
       {state === "ready" && <Button type="button" variant="secondary" size="sm" onClick={() => { const v = videoRef.current; void reporterRef.current?.report(v.seeking ? "seeking" : v.paused ? "pause" : "playing", v); }}>Sync viewing progress</Button>}
     </>}

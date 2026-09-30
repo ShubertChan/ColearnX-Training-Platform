@@ -18,9 +18,12 @@ async function dropFiles(page, files) {
 }
 
 test("video draft has one lower upload entry and uses it for the required main video", async ({ page }, testInfo) => {
+  // Windows WebKit's first intercepted session restore can be substantially
+  // slower than later pages. Still wait for the real heading, never a sleep.
+  if (testInfo.project.name === "webkit") test.setTimeout(120000);
   const state = await mockVideoApi(page), trainer = new TrainerVideoPage(page);
   await trainer.open("course");
-  await expect(page.getByRole("heading", { name: "Main course video", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Main course video", exact: true })).toBeVisible({ timeout: testInfo.project.name === "webkit" ? 60000 : 20000 });
   await expect(page.locator('input[type="file"]')).toHaveCount(1);
   await expect(page.getByRole("region", { name: "Course video upload", exact: true }).locator('input[type="file"]')).toHaveCount(0);
   await expect(page.getByRole("radio", { name: "Optional attachments", exact: true })).toHaveCount(0);

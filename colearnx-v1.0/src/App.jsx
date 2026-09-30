@@ -1,6 +1,8 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, Link, useLocation } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 import Layout from "./components/Layout";
+const VideoLearningPage = lazy(() => import("./pages/VideoLearningPage"));
 import PublicLayout from "./components/PublicLayout";
 import AdminMfaGate from "./components/AdminMfaGate";
 import { EmptyState } from "./components/ui";
@@ -66,7 +68,7 @@ function Workspace({ children }) {
   if (accountError) return <EmptyState title="Session temporarily unavailable" description={accountError} action={<button className="button primary" onClick={() => void retrySession()}>Retry session</button>} />;
   const required = location.pathname === "/home" ? ["wallet", "orders", "applications"]
     : ["/wallet", "/transactions"].includes(location.pathname) ? ["wallet"]
-    : ["/orders", "/purchases"].includes(location.pathname) || location.pathname.startsWith("/refund/") ? ["orders"]
+    : ["/orders", "/purchases"].includes(location.pathname) || location.pathname.startsWith("/purchases/") || location.pathname.startsWith("/refund/") ? ["orders"]
     : location.pathname === "/cart" ? ["wallet", "catalog"]
     : location.pathname === "/role-application" ? ["applications", "certification"]
     : location.pathname.startsWith("/checkout-success") && !orders.length ? ["orders"] : [];
@@ -219,6 +221,10 @@ export default function App() {
             <BuyerOnly><PurchasesPage /></BuyerOnly>
           </Workspace>
         }
+      />
+      <Route
+        path="/purchases/:orderItemId/watch"
+        element={<Workspace><BuyerOnly><Suspense fallback={<p role="status">Loading course…</p>}><VideoLearningPage /></Suspense></BuyerOnly></Workspace>}
       />
       <Route
         path="/refund/:id"

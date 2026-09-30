@@ -6,6 +6,7 @@ import { hostedVideoEnabled } from "../config/features";
 import TrainerVideoManagement from "../components/video/TrainerVideoManagement";
 import VideoOperations from "../components/video/VideoOperations";
 import * as api from "../api/workflows";
+import { courseUpdatePayload, localDateTime } from "../utils/courseSchedule";
 
 function useRequest(loader) {
   const revision = useRef(0);
@@ -58,14 +59,16 @@ function ResourceCombination({ courseId }) {
 }
 function ListingManagement({ item }) {
   const { refreshMyListings } = usePlatform();
-  const [form, setForm] = useState({ title: item.title, description: item.description || "", pricePoints: item.price, fulfilmentInstructions: item.fulfilmentInstructions || "", trainerContact: item.trainerContact || "", joinUrl: item.joinUrl || "" });
+  const [form, setForm] = useState({ title: item.title, description: item.description || "", pricePoints: item.price, startsAt: localDateTime(item.startsAt), endsAt: localDateTime(item.endsAt), fulfilmentInstructions: item.fulfilmentInstructions || "", trainerContact: item.trainerContact || "", joinUrl: item.joinUrl || "" });
   const [reason, setReason] = useState(""), [action, setAction] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState(""), [success, setSuccess] = useState("");
   const coordination = item.kind === "course" && item.deliveryModes.some((mode) => ["live", "local"].includes(mode));
+  const videoCourse = item.onlineVideo || item.progressTrackingType === "online_video";
+  const startRequired = coordination || videoCourse;
   const valid = form.title.trim() && Number.isInteger(Number(form.pricePoints)) && Number(form.pricePoints) >= 0 && (!coordination || (form.fulfilmentInstructions.trim() && form.trainerContact.trim()));
   const mutate = async () => {
     setBusy(true); setError("");
-    const payload = { ...form, title: form.title.trim(), pricePoints: Number(form.pricePoints), changeSummary: reason.trim() };
     try {
+      const payload = item.kind === "course" && action !== "retire" ? courseUpdatePayload(item, form, reason) : { title: form.title.trim(), description: form.description, pricePoints: Number(form.pricePoints), changeSummary: reason.trim() };
       if (form.joinUrl) { const url = new URL(form.joinUrl); if (!["http:", "https:"].includes(url.protocol)) throw new Error("Use an HTTP or HTTPS join link."); }
       if (action === "edit") await api.updateListing(item.kind, item.id, payload);
       else if (action === "version") await api.createListingVersion(item.kind, item.id, payload);
@@ -78,10 +81,11 @@ function ListingManagement({ item }) {
   return <div className="stack"><Card><div className="card-heading"><h3>Manage {item.title}</h3><Badge>{item.status}</Badge></div>
     <fieldset disabled={busy} className="editor-fields"><FormField label="Title"><input value={form.title} maxLength={200} onChange={(e) => setForm({ ...form, title: e.target.value })} /></FormField><FormField label="Public description"><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></FormField><FormField label="Price in points"><input type="number" min={0} step={1} value={form.pricePoints} onChange={(e) => setForm({ ...form, pricePoints: e.target.value })} /></FormField>
     {coordination && <><FormField label="Buyer-only fulfilment instructions"><textarea value={form.fulfilmentInstructions} onChange={(e) => setForm({ ...form, fulfilmentInstructions: e.target.value })} /></FormField><FormField label="Trainer contact"><input value={form.trainerContact} onChange={(e) => setForm({ ...form, trainerContact: e.target.value })} /></FormField><FormField label="Meeting or group URL"><input type="url" value={form.joinUrl} onChange={(e) => setForm({ ...form, joinUrl: e.target.value })} /></FormField></>}
+    {item.kind === "course" && <><div className="form-grid two"><FormField label={startRequired ? "Start time (required)" : "Start time (optional)"}><input type="datetime-local" required={startRequired} disabled={item.status !== "Draft"} value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} /></FormField><FormField label="End time (optional)"><input type="datetime-local" disabled={item.status !== "Draft"} value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} /></FormField></div><small>{item.status === "Draft" ? videoCourse ? "Dates use your device’s local time. Video playback stays locked until the confirmed start time." : "Dates use your device’s local time. Instructor-led start times determine the refund deadline." : "Published course times cannot be changed directly. Contact the Administrator to review a schedule change."}</small></>}
     <FormField label="Reason or change summary (at least 5 characters)"><textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={4000} /></FormField></fieldset>
     <p>Major changes create a new version for review. The server decides which changes are permitted and preserves existing purchase records.</p>
     {success && <p role="status">{success}</p>}
-    <div className="button-row">{[["edit", "Review metadata update"], ["version", "Create major-update version"], ["retire", item.kind === "course" ? "Cancel course" : "Archive resource"]].map(([key, label]) => <Button key={key} variant={key === "retire" ? "danger" : "secondary"} disabled={busy || !valid || reason.trim().length < 5} onClick={() => { setError(""); setAction(key); }}>{label}</Button>)}
+    <div className="button-row">{[["edit", "Review metadata update"], ["version", "Create major-update version"], ["retire", item.kind === "course" ? "Cancel course" : "Archive resource"]].map(([key, label]) => <Button key={key} variant={key === "retire" ? "danger" : "secondary"} disabled={busy || !valid || reason.trim().length < 5 || (key === "edit" && item.kind === "course" && item.status !== "Draft")} onClick={() => { setError(""); setAction(key); }}>{label}</Button>)}
       {item.status === "Draft" && <Link className="button secondary" to={`/${item.kind === "course" ? "trainer/course-editor" : "creator/content-editor"}?draft=${encodeURIComponent(item.id)}`}>Manage draft files</Link>}
     </div></Card>
     {item.kind === "course" && item.onlineVideo && hostedVideoEnabled && <TrainerVideoManagement courseId={item.id} />}

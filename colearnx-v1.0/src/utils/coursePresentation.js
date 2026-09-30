@@ -2,7 +2,7 @@ const normaliseModes = (value) =>
   (Array.isArray(value) ? value : []).map((mode) => String(mode).toLowerCase());
 
 export function isVideoCourse(course = {}) {
-  return Boolean(course.onlineVideo || course.progressTrackingType === "online_video");
+  return Boolean(course.onlineVideo || course.progressTrackingType === "online_video" || course.courseVideoVersionId);
 }
 
 export function getCourseTypeLabel(course = {}) {
