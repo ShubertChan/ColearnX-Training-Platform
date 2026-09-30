@@ -15,6 +15,13 @@ async function openUploader(page, kind, scenario) {
     if (kind === "content" && path === "/content" && request.method() === "POST") {
       return reply(route, { id: "content", contentVersionId: "version" }, 201);
     }
+    // General course attachments belong to instructor-led courses. Online
+    // video drafts now expose only the main-video multipart uploader.
+    if (kind === "course" && path === "/my/listings") return reply(route, [{
+      id: "course", kind: "course", title: "Live design workshop", description: "Instructor-led course",
+      pricePoints: 100, deliveryModes: ["live"], progressTrackingType: "none", status: "draft",
+      startsAt: "2026-10-01T10:00:00.000Z", fulfilmentInstructions: "Join the live session.", trainerContact: "trainer@example.test",
+    }]);
     if (path === `${base}/assets`) return reply(route, { assets: [] });
     if (path === `${base}/upload-intents`) {
       const key = request.headers()["idempotency-key"];
