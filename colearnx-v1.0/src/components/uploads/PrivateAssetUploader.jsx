@@ -6,7 +6,6 @@ import {
   FileUp,
   LoaderCircle,
   RefreshCw,
-  UploadCloud,
   X,
 } from "lucide-react";
 import {
@@ -21,6 +20,7 @@ import {
 import {
   uploadFileToPresignedUrl,
 } from "../../utils/uploadFile";
+import UploadDropzone from "./UploadDropzone";
 
 const activeStatuses = new Set(["preparing", "uploading", "verifying", "deleting"]);
 
@@ -80,9 +80,9 @@ export default function PrivateAssetUploader({
   disabled = false,
   assetApi = contentAssetApi,
   label = "Content files",
+  renderPicker,
 }) {
   const [items, setItems] = useState([]);
-  const [dragActive, setDragActive] = useState(false);
   const [listError, setListError] = useState("");
   const [listAttempt, setListAttempt] = useState(0);
   const [listing, setListing] = useState(false);
@@ -279,42 +279,9 @@ export default function PrivateAssetUploader({
     <section className="private-uploader" aria-label={label}>
       {listing && <p role="status">Loading private files…</p>}
       {listError && <div className="form-error" role="alert">{listError} <button className="button secondary sm" type="button" onClick={() => setListAttempt((value) => value + 1)}>Retry file list</button></div>}
-      <label
-        className={`upload-zone private ${dragActive ? "drag-active" : ""} ${disabled ? "disabled" : ""}`}
-        onDragEnter={(event) => {
-          event.preventDefault();
-          if (!disabled) setDragActive(true);
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onDragLeave={(event) => {
-          event.preventDefault();
-          setDragActive(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragActive(false);
-          addFiles(event.dataTransfer.files);
-        }}
-      >
-        <UploadCloud size={30} aria-hidden="true" />
-        <div>
-          <b>Drop files here</b>
-          <p>PDF, DOCX, ZIP and images up to 25 MiB · MP4 up to 100 MiB · 500 MiB total</p>
-        </div>
-        <span className="button secondary">Choose files</span>
-        <input
-          className="visually-hidden"
-          aria-label={`Choose ${label.toLowerCase()}`}
-          type="file"
-          accept={PRIVATE_ASSET_ACCEPT}
-          multiple
-          disabled={disabled}
-          onChange={(event) => {
-            addFiles(event.target.files);
-            event.target.value = "";
-          }}
-        />
-      </label>
+      {renderPicker ? renderPicker({ addFiles, disabled }) : <UploadDropzone onFiles={addFiles}
+        inputLabel={`Choose ${label.toLowerCase()}`} accept={PRIVATE_ASSET_ACCEPT} disabled={disabled}
+        hint="PDF, DOCX, ZIP and images up to 25 MiB · MP4 up to 100 MiB · 500 MiB total" />}
 
       {!contentVersionId && hasQueuedFiles && (
         <small className="upload-gate-note">Files start uploading after the draft is created.</small>

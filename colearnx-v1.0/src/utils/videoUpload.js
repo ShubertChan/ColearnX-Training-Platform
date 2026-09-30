@@ -1,5 +1,7 @@
 import * as api from "../api/video.js";
 
+export const VIDEO_UPLOAD_ACCEPT = "video/*,.mp4,.mov,.m4v,.webm,.mkv";
+export const isVideoSource = file => Boolean(file?.size > 0 && (file.type?.startsWith("video/") || /\.(mp4|mov|m4v|webm|mkv)$/i.test(file.name)));
 const abortError = () => new DOMException("Upload paused", "AbortError");
 const check = signal => { if (signal?.aborted) throw abortError(); };
 export const uploadStorageKey = (accountId, courseId) => `colearnx-video-upload:${accountId}:${courseId}`;
@@ -18,7 +20,7 @@ export function saveUpload(storage, key, value) {
   } catch { return false; }
 }
 export async function identifyVideoFile(file) {
-  if (!file.size || (!file.type.startsWith("video/") && !/\.(mp4|mov|m4v|webm|mkv)$/i.test(file.name))) throw Object.assign(new Error("Choose a non-empty video file."), { code: "VIDEO_INVALID_SOURCE" });
+  if (!isVideoSource(file)) throw Object.assign(new Error("Choose a non-empty video file."), { code: "VIDEO_INVALID_SOURCE" });
   // Bounded file samples avoid allocating a multi-gigabyte source in memory.
   const block = 1024 * 1024;
   const samples = await Promise.all([0, Math.max(0, Math.floor(file.size / 2) - block / 2), Math.max(0, file.size - block)].map(start => file.slice(start, start + block).arrayBuffer()));
