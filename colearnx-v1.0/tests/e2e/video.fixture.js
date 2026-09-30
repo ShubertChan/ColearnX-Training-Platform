@@ -37,7 +37,7 @@ export async function mockVideoApi(page, role = "trainer") {
       if (state.playback) { state.sessions++; data = { sessionId: `session-${state.sessions}`, videoVersionId: "purchased-old", manifestUrl: "/fixture-media/master.m3u8", expiresAt: new Date(Date.now() + state.ttl).toISOString(), durationSeconds: state.duration, resumeAt: 1, authorization: { type: "header", token: `media-token-${state.sessions}` } }; }
       else { status = 403; data = null; }
     }
-    else if (path === "/order-items/order-item/progress") data = evidence();
+    else if (path === "/order-items/order-item/progress") data = { progress: { uniqueContentWatchedSeconds: state.ratio * state.duration, durationSeconds: state.duration, watchedRatio: state.ratio } };
     else if (path === "/admin/course-submissions") data = [{ ...course, reviewVideoVersionId: "new-version" }];
     else if (path === "/refund-requests") data = { id: "refund", status: "pending" };
     await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(status === 403 ? { error: { code: "PLAYBACK_UNAUTHORISED", message: "Purchase is not authorised" } } : { data, meta: { requestId: "fixture" } }) });
