@@ -8,8 +8,8 @@ import { parse, uuid } from '../lib/validation.js';
 import { loadSystemPointAccount, postPointTransaction } from '../points/ledger.js';
 import { evaluateRefund, type RefundDecision } from './policy.js';
 import { uniqueWatchedSeconds } from '../video/progress.js';
+import { refundRequestSchema } from './request-schema.js';
 
-const requestSchema = z.object({ orderItemId: uuid, reason: z.string().trim().min(5).max(2000) });
 const decisionSchema = z.object({ decision: z.enum(['approved', 'rejected']), reason: z.string().trim().min(3).max(2000) });
 const reviewListSchema = z.object({ status: z.enum(['pending', 'approved', 'rejected', 'cancelled']).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) });
 
@@ -87,7 +87,7 @@ async function loadEvidence(client: Pick<PoolClient, 'query'>, orderItemId: stri
 
 export async function createRefundRequest(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
-  const input = parse(requestSchema, req.body);
+  const input = parse(refundRequestSchema, req.body);
   const response = await withTransaction(async (client) => {
     const evidence = await loadEvidence(client, input.orderItemId, actor.id);
     if (!evidence) throw new ApiError(404, 'ORDER_ITEM_NOT_FOUND', 'This purchased item was not found.');

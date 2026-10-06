@@ -27,7 +27,15 @@ export function confirmedProgress(data) {
   const value = data?.progress || data;
   const fields = [value?.uniqueContentWatchedSeconds, value?.durationSeconds, value?.watchedRatio];
   if (fields.some(v => typeof v !== "number" || !Number.isFinite(v)) || fields[0] < 0 || fields[1] <= 0 || fields[0] > fields[1] || fields[2] < 0 || fields[2] > 1) return null;
-  return { uniqueContentWatchedSeconds: fields[0], durationSeconds: fields[1], watchedRatio: fields[2] };
+  // Derive every displayed percentage from the same verified totals. A stale
+  // or rounded ratio must not disagree with the seconds shown alongside it.
+  return { uniqueContentWatchedSeconds: fields[0], durationSeconds: fields[1], watchedRatio: fields[0] / fields[1] };
+}
+
+export const videoProgressPercent = progress => Number((progress.watchedRatio * 100).toFixed(2));
+
+export function formatProgressSeconds(seconds) {
+  return `${Number(seconds.toFixed(3))} ${seconds === 1 ? "second" : "seconds"}`;
 }
 export function formatVideoDuration(seconds) {
   if (!Number.isFinite(seconds) || seconds <= 0) return "Awaiting verified duration";

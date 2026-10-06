@@ -5,7 +5,7 @@ import { usePlatform } from "../context/PlatformContext";
 import { listContentAssets, requestContentDownloadUrl } from "../api/uploads";
 import { getCourseDelivery, requestCourseDownloadUrl } from "../api/courseDelivery";
 import { isVideoAsset } from "../utils/videoContract";
-import { refundPurchase } from "../utils/refundPurchase";
+import { refundPurchase, refundReasonError } from "../utils/refundPurchase";
 import VideoEvidence from "../components/video/VideoEvidence";
 import { cartItemKey, deliveryDisclosures, hasPurchasePolicy, refundDisclosure } from "../utils/purchaseDisclosure";
 import { getCourseTypeLabel, isVideoCourse } from "../utils/coursePresentation";
@@ -25,12 +25,13 @@ export function CartPage() {
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const checkoutItems = useRef([]);
   const catalogue = useMemo(() => [
     ...courses.map((item) => ({ ...item, kind: "course", seller: item.trainer })),
     ...contents.map((item) => ({ ...item, kind: "content", seller: item.creator })),
   ], [contents, courses]);
-  const items = cart.map((entry) => catalogue.find((item) => cartItemKey(item) === cartItemKey(entry))).filter((item) => item && !item.purchased);
-  useEffect(() => setSelected((current) => current.filter((key) => items.some((item) => cartItemKey(item) === key))), [cart]);
+  const items = busy ? checkoutItems.current : cart.map((entry) => catalogue.find((item) => cartItemKey(item) === cartItemKey(entry))).filter((item) => item && !item.purchased);
+  useEffect(() => { if (!busy) setSelected((current) => current.filter((key) => items.some((item) => cartItemKey(item) === key))); }, [cart, busy]);
   const selectedItems = items.filter((item) => selected.includes(cartItemKey(item)) && hasPurchasePolicy(item));
   const blockedPolicyCount = items.filter((item) => !hasPurchasePolicy(item)).length;
   const warnedAboutPolicy = useRef(false);
@@ -43,12 +44,15 @@ export function CartPage() {
   }, [blockedPolicyCount, notify]);
   const total = selectedItems.reduce((sum, item) => sum + item.price, 0);
   const pay = async () => {
+    checkoutItems.current = items;
     setBusy(true); setError("");
     try {
       const order = await checkout(selectedItems.map(({ kind, id }) => ({ kind, id })));
+      // Hash-router navigation commits asynchronously. Keep the confirmation
+      // mounted until the receipt replaces it, even after the cart is cleared.
       if (order) navigate(`/checkout-success/${order.id}`);
-    } catch (checkoutError) { setError(checkoutError.message); }
-    finally { setBusy(false); }
+      else setBusy(false);
+    } catch (checkoutError) { setError(checkoutError.message); setBusy(false); }
   };
   if (!items.length) return <EmptyState icon={ShoppingCart} title="Your cart is empty" description="Add a published course or resource, then review everything before points are deducted." action={<div className="button-row"><Link className="button primary" to="/courses">Browse courses</Link><Link className="button secondary" to="/contents">Browse resources</Link></div>} />;
   return <><div className="content-grid cart-layout"><Card className="cart-list"><div className="card-heading"><div><span className="eyebrow">Draft cart</span><h3>{items.length} course/resource item{items.length === 1 ? "" : "s"}</h3></div></div>{items.map((item) => { const key = cartItemKey(item); return <div className="cart-row" key={key}><input type="checkbox" aria-label={`Select ${item.title} for checkout`} checked={selected.includes(key)} onChange={() => setSelected((current) => current.includes(key) ? current.filter((value) => value !== key) : [...current, key])} /><span className="cart-thumb">{item.kind === "course" ? <GraduationCap size={17} /> : <FileArchive size={17} />}</span><div><b>{item.title}</b><small>{item.seller} · {item.kind === "course" ? getCourseTypeLabel(item) : item.type}</small><span className="cart-policy">{deliveryDisclosures(item)[0]} {refundDisclosure(item)}</span></div><strong>{item.price} pts</strong><button className="icon-button danger" onClick={() => removeFromCart(item.kind, item.id)} aria-label={`Remove ${item.title}`}><Trash2 size={16} /></button></div>; })}</Card><Card className="order-summary"><span className="eyebrow">Checkout summary</span><h3>Points payment</h3><div className="summary-row"><span>Selected items</span><b>{selectedItems.length}</b></div><div className="summary-row"><span>Total</span><b>{total} points</b></div><div className="summary-row"><span>Available balance</span><b>{balance} points</b></div>{balance < total && <p className="form-error">Your available balance is insufficient.</p>}<Button className="wide" disabled={busy || !selectedItems.length || balance < total} onClick={() => { setAccepted(false); setConfirming(true); }}>Review final order <ArrowRight size={16} /></Button></Card></div>{confirming && <Modal title="Confirm points purchase" onClose={() => !busy && setConfirming(false)} footer={<><Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>Back</Button><Button disabled={busy || !accepted} onClick={pay}>{busy ? "Processing…" : `Pay ${total} points`}</Button></>}><div className="checkout-confirmation"><p>Review the seller, delivery and purchase-time policy before points are deducted.</p>{selectedItems.map((item) => <div className="confirmation-item" key={cartItemKey(item)}><div><b>{item.title}</b><span>{item.seller} · {item.price} points</span></div><ul>{deliveryDisclosures(item).map((line) => <li key={line}>{line}</li>)}</ul><small>{refundDisclosure(item)}</small></div>)}<div className="summary-row total"><span>Balance after payment</span><b>{balance - total} points</b></div><label className="check-label policy-confirmation"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>I have reviewed the items, delivery method and refund policy. Clicking Pay creates a financial transaction.</span></label>{error && <p className="form-error" role="alert">{error}</p>}</div></Modal>}</>;
@@ -160,11 +164,16 @@ export function RefundPage() {
   useEffect(() => { let current = true; setEvidence(null); if (course?.orderItemId) getCourseDelivery(course.orderItemId).then(value => { if (current) { setEvidence(value); setEvidenceError(""); } }).catch(() => { if (current) setEvidenceError("Current refund evidence is unavailable. The service will recheck your request."); }); return () => { current = false; }; }, [course?.orderItemId]);
   if (!course?.purchased) return <EmptyState icon={AlertCircle} title="Purchase not found" description="Only a server-recorded purchase can be considered for a refund." />;
   const submit = async (event) => {
-    event.preventDefault(); setBusy(true); setError("");
-    const payload = JSON.stringify({ orderItemId: course.orderItemId, reason });
+    event.preventDefault();
+    if (busy) return;
+    const validationError = refundReasonError(reason);
+    if (validationError) { setError(validationError); return; }
+    const normalizedReason = reason.trim();
+    setBusy(true); setError("");
+    const payload = JSON.stringify({ orderItemId: course.orderItemId, reason: normalizedReason });
     if (request.current?.payload !== payload) request.current = { payload, key: crypto.randomUUID() };
-    try { const result = await submitRefund({ course, reason, requestKey: request.current.key }); if (!result?.id) throw new Error("The service did not confirm the refund request."); navigate("/orders"); }
+    try { const result = await submitRefund({ course, reason: normalizedReason, requestKey: request.current.key }); if (!result?.id) throw new Error("The service did not confirm the refund request."); navigate("/orders"); }
     catch (refundError) { setError(refundError.message); } finally { setBusy(false); }
   };
-  return <Card><span className="eyebrow">Refund request</span><h2>{course.title}</h2><p>{refundDisclosure(course)} The service checks the purchase-time policy, unique viewing progress and protected attachment downloads.</p>{evidence && <VideoEvidence evidence={evidence} />}{evidenceError && <p role="status">{evidenceError}</p>}<form onSubmit={submit}><FormField label="Reason for request"><textarea required minLength="3" value={reason} onChange={(event) => setReason(event.target.value)} /></FormField>{error && <p className="form-error">{error}</p>}<div className="button-row"><Button variant="secondary" type="button" onClick={() => navigate(-1)}>Cancel</Button><Button type="submit" disabled={busy || evidence?.refundEligibility?.eligible === false}>{busy ? "Submitting…" : "Submit for review"}</Button></div></form></Card>;
+  return <Card><span className="eyebrow">Refund request</span><h2>{course.title}</h2><p>{refundDisclosure(course)} The service checks the purchase-time policy, unique viewing progress and protected attachment downloads.</p>{evidence && <VideoEvidence evidence={evidence} />}{evidenceError && <p role="status">{evidenceError}</p>}<form onSubmit={submit}><FormField label="Reason for request" hint="3–2000 characters, excluding leading and trailing spaces."><textarea required minLength="3" maxLength="2000" value={reason} onChange={(event) => setReason(event.target.value)} /></FormField>{error && <p className="form-error" role="alert">{error}</p>}<div className="button-row"><Button variant="secondary" type="button" onClick={() => navigate(-1)}>Cancel</Button><Button type="submit" disabled={busy || evidence?.refundEligibility?.eligible === false}>{busy ? "Submitting…" : "Submit for review"}</Button></div></form></Card>;
 }

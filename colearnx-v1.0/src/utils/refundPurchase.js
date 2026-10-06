@@ -1,5 +1,12 @@
 const activeStatuses = new Set(["paid", "reserved", "fulfilled"]);
 
+export function refundReasonError(reason) {
+  const length = reason.trim().length;
+  if (length < 3) return "Enter at least 3 characters for the refund reason.";
+  if (length > 2000) return "The refund reason must be no more than 2000 characters.";
+  return "";
+}
+
 export function refundPurchase(orders, productId, orderItemId) {
   const items = orders.flatMap(order => order.items || []).filter(item =>
     item.kind === "course" && item.productId === productId && activeStatuses.has(item.fulfilmentStatus));
