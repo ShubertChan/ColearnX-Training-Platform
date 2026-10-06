@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canSubmitVideo, confirmedProgress, isVideoAsset, mediaUrl, validatePlaybackSession, videoError, videoSummary } from "./videoContract.js";
+import { canSubmitVideo, confirmedProgress, formatProgressSeconds, isVideoAsset, mediaUrl, validatePlaybackSession, videoError, videoProgressPercent, videoSummary } from "./videoContract.js";
+
+test("34-second video progress uses verified seconds instead of an inconsistent ratio", () => {
+  const progress = confirmedProgress({ uniqueContentWatchedSeconds: 1, durationSeconds: 34, watchedRatio: 0.035 });
+  assert.equal(progress.watchedRatio, 1 / 34);
+  assert.equal(videoProgressPercent(progress), 2.94);
+  assert.equal(formatProgressSeconds(progress.uniqueContentWatchedSeconds), "1 second");
+  assert.equal(videoProgressPercent(confirmedProgress({ uniqueContentWatchedSeconds: 1.19, durationSeconds: 34, watchedRatio: 0.035 })), 3.5);
+  assert.equal(formatProgressSeconds(1.19), "1.19 seconds");
+});
 
 test("review readiness follows the candidate version, never an older ready video", () => {
   const data = { canSubmit: true, reviewVersionId: "new", versions: [{ id: "old", status: "ready", durationSeconds: 10 }, { id: "new", status: "transcoding" }] };

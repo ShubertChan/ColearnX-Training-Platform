@@ -7,7 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { usePlatform } from "../context/PlatformContext";
 import { getCourseDelivery, requestCourseDownloadUrl } from "../api/courseDelivery";
 import { hostedVideoEnabled } from "../config/features";
-import { confirmedProgress, isVideoAsset } from "../utils/videoContract";
+import { confirmedProgress, formatProgressSeconds, isVideoAsset, videoProgressPercent } from "../utils/videoContract";
 import CourseVideoPlayer from "../components/CourseVideoPlayer";
 import { Button, Progress } from "../components/ui";
 import "@fontsource/geist/latin-400.css";
@@ -58,8 +58,8 @@ export default function VideoLearningPage() {
   }, { scope, dependencies: [Boolean(record)], revertOnUpdate: true });
   const missingStart = record && !Number.isFinite(Date.parse(record.startsAt));
   const scheduled = record?.playerState === "scheduled";
-  const progress = record?.progress || record;
-  const ratio = Number.isFinite(progress?.watchedRatio) ? Math.max(0, Math.min(1, progress.watchedRatio)) : null;
+  const progress = confirmedProgress(record);
+  const percent = progress ? videoProgressPercent(progress) : null;
   const updateProgress = value => {
     const confirmed = confirmedProgress(value);
     if (confirmed) setRecord(current => current ? { ...current, progress: confirmed } : current);
@@ -94,7 +94,7 @@ export default function VideoLearningPage() {
         <aside className="course-learning-info" aria-label="Your learning progress">
           <div className="course-learning-info-heading"><ShieldCheck size={18} /><span>Purchased access</span></div>
           <h2>Your progress</h2>
-          {ratio !== null ? <><strong className="course-learning-percent">{Number((ratio * 100).toFixed(1))}<span>% watched</span></strong><Progress value={Math.round(ratio * 1000) / 10} label="Server-confirmed unique viewing progress" /><p>{durationLabel(progress.uniqueContentWatchedSeconds)} of {durationLabel(progress.durationSeconds)} confirmed</p></> : <p>Progress appears after the server confirms your viewing.</p>}
+          {percent !== null ? <><strong className="course-learning-percent">{percent}<span>% watched</span></strong><Progress value={percent} label="Server-confirmed unique viewing progress" /><p>{formatProgressSeconds(progress.uniqueContentWatchedSeconds)} of {formatProgressSeconds(progress.durationSeconds)} confirmed</p></> : <p>Progress appears after the server confirms your viewing.</p>}
           <small>Only unique viewing counts. Skipping ahead or replaying does not add duplicate progress.</small>
           {record.startsAt && <dl><dt>Course opens</dt><dd><time dateTime={record.startsAt}>{dateLabel(record.startsAt)}</time></dd></dl>}
           {record.durationSeconds > 0 && <dl><dt>Video length</dt><dd>{durationLabel(record.durationSeconds)}</dd></dl>}

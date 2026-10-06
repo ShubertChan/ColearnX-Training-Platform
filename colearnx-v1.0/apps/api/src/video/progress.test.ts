@@ -2,6 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { intervalFromHeartbeat, uniqueWatchedSeconds } from './progress.js';
 
+test('one second of a 34-second video earns exactly one second of unique viewing', () => {
+  const prior = { sequence: 1, event: 'playing' as const, positionSeconds: 0, playbackRate: 1, clientMonotonicMs: 0, serverReceivedAt: new Date('2026-09-19T00:00:00.000Z') };
+  const interval = intervalFromHeartbeat(prior, { sequence: 2, event: 'pause', positionSeconds: 1, playbackRate: 1, clientMonotonicMs: 1000 }, 34, new Date('2026-09-19T00:00:01.000Z'), 30);
+  assert.ok(interval);
+  const watched = uniqueWatchedSeconds([interval, interval], 34);
+  assert.equal(watched, 1);
+  assert.equal(Number((watched / 34 * 100).toFixed(2)), 2.94);
+});
+
 test('only contiguous, plausibly timed playback becomes a watch interval', () => {
   const receivedAt = new Date('2026-09-19T00:00:01.000Z');
   const prior = { sequence: 1, event: 'playing' as const, positionSeconds: 10, playbackRate: 1, clientMonotonicMs: 1_000, serverReceivedAt: receivedAt };
