@@ -302,7 +302,9 @@ export function PlatformProvider({ children }) {
     const revision = sessionRevision.current;
     const request = (datasetRequests.current[name] || 0) + 1;
     datasetRequests.current[name] = request;
-    setDataStates((current) => ({ ...current, [name]: "loading" }));
+    // Keep an already loaded page mounted while refreshing its data. In
+    // particular, unmounting WalletPage here cancels payment reconciliation.
+    setDataStates((current) => ({ ...current, [name]: ["ready", "refreshing"].includes(current[name]) ? "refreshing" : "loading" }));
     try {
       const result = await task();
       if (revision === sessionRevision.current && datasetRequests.current[name] === request) {
@@ -312,7 +314,7 @@ export function PlatformProvider({ children }) {
       return result;
     } catch (error) {
       if (revision === sessionRevision.current && datasetRequests.current[name] === request) {
-        setDataStates((current) => ({ ...current, [name]: "error" }));
+        setDataStates((current) => ({ ...current, [name]: current[name] === "refreshing" ? "ready" : "error" }));
         setDataErrors((current) => ({ ...current, [name]: error.message || "Could not refresh this section." }));
       }
       throw error;
@@ -450,6 +452,7 @@ export function PlatformProvider({ children }) {
       setOrders([]); setTransactions([]); setBalance(0);
       setPublishedItems([]); setTrainerCertifications([]); setAdminTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
       setApplications({ Trainer: "Not applied", Creator: "Not applied" });
+      setDataStates({ wallet: "loading", orders: "loading", applications: "loading", listings: "loading", certification: "loading", admin: "loading" });
       setDataErrors({}); setPurchaseSyncWarning("");
       let stored = [];
       try { stored = readAccountCart(window.localStorage, user.id); } catch { /* Storage can be disabled. */ }
@@ -674,7 +677,10 @@ export function PlatformProvider({ children }) {
     setCart((current) => current.filter((item) => !purchasedKeys.has(cartItemKey(item))));
     setPurchaseSyncWarning("");
     notify("Payment succeeded. Your order has been recorded.");
-    void Promise.allSettled([refreshWallet(), refreshCatalog(), refreshOrders()]).then((results) => {
+    // Ownership is derived from the confirmed order; catalogue refreshes are
+    // unnecessary here and can replace the checkout page before navigation.
+    void Promise.allSettled([refreshWallet(), refreshOrders()]).then((results) => {
+      if (revision !== sessionRevision.current) return;
       if (results.some((entry) => entry.status === "rejected" || entry.value === false)) setPurchaseSyncWarning("Payment succeeded, but some account data could not refresh. Your receipt is safe; retry synchronisation below.");
     });
     return order;

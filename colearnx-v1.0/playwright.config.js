@@ -12,6 +12,6 @@ export default defineConfig({
   webServer: {
     command: "node tests/e2e/server.mjs",
     url: "http://127.0.0.1:4178", reuseExistingServer: false,
-    env: { VITE_API_BASE_URL: "/api/v1", VITE_ENABLE_HOSTED_VIDEO: "true", VITE_MEDIA_ORIGINS: "http://127.0.0.1:4178", VITE_UPLOAD_ORIGINS: "https://fixture.r2.cloudflarestorage.com" },
+    env: { VITE_API_BASE_URL: "/api/v1", VITE_PAYMENTS_API_ENABLED: "true", VITE_ENABLE_HOSTED_VIDEO: "true", VITE_MEDIA_ORIGINS: "http://127.0.0.1:4178", VITE_UPLOAD_ORIGINS: "https://fixture.r2.cloudflarestorage.com" },
   },
 });

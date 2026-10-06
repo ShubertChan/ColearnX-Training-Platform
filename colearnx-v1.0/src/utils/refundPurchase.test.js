@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { refundPurchase, refundReviewEvidence } from "./refundPurchase.js";
+import { refundPurchase, refundReasonError, refundReviewEvidence } from "./refundPurchase.js";
+
+test("refund reasons use trimmed length and accept short Chinese reasons", () => {
+  for (const reason of ["不想学", "不想学了", "  abc  ", "a".repeat(2000)]) assert.equal(refundReasonError(reason), "");
+  for (const reason of ["", "   ", " a ", "ab"]) assert.match(refundReasonError(reason), /at least 3/);
+  assert.match(refundReasonError("a".repeat(2001)), /2000/);
+});
 
 test("refund selects the purchased order item without needing the public catalogue", () => {
   const orders = [{ items: [

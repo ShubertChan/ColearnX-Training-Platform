@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { recordCourseProgress } from "../api/courseDelivery";
 import { createPlaybackSession, createPreviewSession } from "../api/video";
-import { confirmedProgress, mediaUrl, validatePlaybackSession } from "../utils/videoContract";
+import { confirmedProgress, mediaUrl, validatePlaybackSession, videoProgressPercent } from "../utils/videoContract";
 import { createHeartbeatReporter } from "../utils/videoHeartbeat";
 import { Button, Progress } from "./ui";
 
@@ -132,7 +132,7 @@ export default function CourseVideoPlayer({ orderItemId, record, onRecorded, onR
     <video ref={videoRef} controls playsInline preload="metadata" controlsList="nodownload" disablePictureInPicture aria-label="Course video" hidden={state !== "ready" && state !== "loading"} />
     {messages[state] && <p role={state === "loading" || state === "processing" ? "status" : "alert"}>{messages[state]}</p>}
     {!preview && <>
-      {showProgress && (progress ? <><Progress value={Math.round(progress.watchedRatio * 10000) / 100} label="Server-confirmed unique viewing progress" /><small>{progress.uniqueContentWatchedSeconds.toFixed(3)} of {progress.durationSeconds.toFixed(3)} seconds confirmed. Seeking and repeat viewing do not add duplicate progress.</small></> : <p>Waiting for confirmed viewing progress.</p>)}
+      {showProgress && (progress ? <><Progress value={videoProgressPercent(progress)} label="Server-confirmed unique viewing progress" /><small>{progress.uniqueContentWatchedSeconds.toFixed(3)} of {progress.durationSeconds.toFixed(3)} seconds confirmed. Seeking and repeat viewing do not add duplicate progress.</small></> : <p>Waiting for confirmed viewing progress.</p>)}
       {progressError && <p role="alert" className="form-error">{progressError}</p>}
       {state === "ready" && <Button type="button" variant="secondary" size="sm" onClick={() => { const v = videoRef.current; void reporterRef.current?.report(v.seeking ? "seeking" : v.paused ? "pause" : "playing", v); }}>Sync viewing progress</Button>}
     </>}
