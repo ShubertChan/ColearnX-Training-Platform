@@ -3529,3 +3529,5 @@ tbody tr[role="button"]:focus-visible {
 
 .session-list li div { flex: 1; display: grid; }
 .session-list li span { font-size: 0.78rem; color: #6b7280; }
+
+.mfa-qr { display: inline-block; background: #ffffff; padding: 12px; border-radius: 12px; margin: 4px 0 14px; line-height: 0; }
