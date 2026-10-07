@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Copy, LaptopMinimal, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { Button, FormField } from "../components/ui";
+import { QRCodeSVG } from "qrcode.react";
 import {
   confirmMfaEnrolment, disableMfa, getMfaStatus, listSessions,
   revokeOtherSessions, revokeSession, rotateRecoveryCodes, startMfaEnrolment,
@@ -61,12 +62,16 @@ function MfaSection({ status, onChanged }) {
     return (
       <div className="security-panel">
         <h3>Finish setting up two-factor authentication</h3>
-        <p>Add this account to your authenticator app, then enter the code it shows to confirm it works.</p>
+        <p>Scan this QR code with your authenticator app, then enter the code it shows to confirm it works.</p>
+        {enrolment.otpauthUri && (
+          <div className="mfa-qr">
+            <QRCodeSVG value={enrolment.otpauthUri} size={184} />
+          </div>
+        )}
         <p className="security-hint">
-          Most apps can add the account from this link. If yours cannot, enter
-          the key below manually.
+          On a phone you can <a href={enrolment.otpauthUri}>open it directly</a>.
+          If you cannot scan, add the account manually with the key below.
         </p>
-        <p><a href={enrolment.otpauthUri}>Open in authenticator app</a></p>
         <FormField label="Setup key">
           <input readOnly value={enrolment.secret} onFocus={(event) => event.target.select()} />
         </FormField>
