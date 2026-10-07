@@ -27,6 +27,7 @@ import { addCartItem, listCart, removeCartItem } from './cart/cart.js';
 import { adjustPoints, cancelLiveCourseRun, completeLiveCourseRun, createTopUpPackage, retireTopUpPackage, setRevenueSharePolicy } from './admin/operations.js';
 import { changeUserRole, deleteUser, getUser, listUsers, reinstateUser, suspendUser } from './admin/users.js';
 import { listAuditLogs } from './admin/audit-logs.js';
+import { listSecurityEvents, securitySummary } from './admin/security-dashboard.js';
 import { activityReport } from './admin/activity-report.js';
 import { createReport, decideReport, listReports } from './reports/reports.js';
 import { publishingAnalytics } from './reports/publishing-analytics.js';
@@ -220,6 +221,13 @@ export function createApp() {
   api.get('/admin/reports', authenticate, requireRole('admin'), requireAdminMfa, listReports);
   api.post('/admin/reports/:id/decision', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, decideReport);
   api.get('/admin/audit-logs', authenticate, requireRole('admin'), requireAdminMfa, listAuditLogs);
+  // W6 security monitor (threat model F-12 ledger). Read-only, but step-up gated
+  // in addition to admin MFA: the event stream aggregates authentication and
+  // access-control telemetry across every account, so viewing it is treated as
+  // a high-sensitivity action (ASVS 3.7.1), consistent with the paid-content
+  // preview route above.
+  api.get('/admin/security/summary', authenticate, requireRole('admin'), requireAdminMfa, requireStepUp, securitySummary);
+  api.get('/admin/security/events', authenticate, requireRole('admin'), requireAdminMfa, requireStepUp, listSecurityEvents);
   api.get('/admin/activity-report', authenticate, requireRole('admin'), requireAdminMfa, activityReport);
   api.post('/admin/course-runs/:id/complete', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, completeLiveCourseRun);
   api.post('/admin/course-runs/:id/cancel', authenticate, requireRole('admin'), requireAdminMfa, mutationLimiter, cancelLiveCourseRun);
