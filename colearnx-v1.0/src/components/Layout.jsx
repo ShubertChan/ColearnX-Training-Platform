@@ -24,7 +24,8 @@ import {
   X,
   AlertTriangle,
   RotateCcw,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert
 } from "lucide-react";
 import { usePlatform } from "../context/PlatformContext";
 import { useAdminInbox } from "../context/AdminInboxContext";
@@ -62,6 +63,7 @@ const roleNavigation = {
     ["/admin/refunds", "Refund Review", ClipboardCheck],
     ["/admin/users", "Users & Roles", UserCheck],
     ["/admin/catalog", "Catalog Control", BookOpen],
+    ["/admin/security", "Security Monitor", ShieldAlert],
   ],
 };
 
@@ -122,6 +124,7 @@ const titleMap = {
   ],
   "/admin/users": ["Users & Roles", "Review accounts, permissions and access controls"],
   "/admin/catalog": ["Catalog Control", "Inspect course and content publication"],
+  "/admin/security": ["Security Monitor", "Authentication and access-control events across the platform"],
 };
 
 function titleFor(pathname) {
