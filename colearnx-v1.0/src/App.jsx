@@ -41,6 +41,7 @@ import {
 import { AdminUserDetailPage, AdminUsersPage } from "./pages/AdminUserManagementPages";
 import AdminInboxPage from "./pages/AdminInboxPage";
 import AdminCertificationsPage from "./pages/AdminCertificationsPage";
+import AdminSecurityDashboardPage from "./pages/AdminSecurityDashboardPage";
 import { intendedPath } from "./utils/frontendState";
 import { PublishingToolsPage, AdminOperationsPage } from "./pages/WorkflowPages";
 
@@ -350,6 +351,7 @@ export default function App() {
       />
       <Route path="/publishing-tools" element={<Workspace><Protected roles={["Trainer", "Creator"]}><PublishingAccess /></Protected></Workspace>} />
       <Route path="/admin/operations" element={<Workspace><Protected roles={["Admin"]}><AdminOperationsPage /></Protected></Workspace>} />
+      <Route path="/admin/security" element={<Workspace><Protected roles={["Admin"]}><AdminSecurityDashboardPage /></Protected></Workspace>} />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
