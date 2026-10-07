@@ -3531,3 +3531,128 @@ tbody tr[role="button"]:focus-visible {
 .session-list li span { font-size: 0.78rem; color: #6b7280; }
 
 .mfa-qr { display: inline-block; background: #ffffff; padding: 12px; border-radius: 12px; margin: 4px 0 14px; line-height: 0; }
+
+/* ------------------------------------------------------------------ */
+/* W6 security monitor (admin security dashboard)                      */
+/* ------------------------------------------------------------------ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sec-range {
+  margin: -6px 0 18px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Trend: routine volume in the brand accent, high/critical in the danger
+   status colour. The legend and the per-bar title keep identity off colour
+   alone. */
+.sec-trend-wrap { margin-top: 8px; }
+.sec-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 140px;
+  padding: 8px 4px 0;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.sec-trend-col {
+  flex: 1 1 0;
+  min-width: 3px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.sec-trend-stack {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.sec-bar { display: block; width: 100%; border-radius: 4px 4px 0 0; }
+.sec-bar.routine { background: var(--brand); }
+.sec-bar.severe { background: var(--danger); border-radius: 0 0 4px 4px; }
+.sec-trend-col:hover .sec-bar.routine { background: var(--brand-dark); }
+
+.sec-trend-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.sec-legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.sec-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sec-legend .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sec-legend .swatch.routine { background: var(--brand); }
+.sec-legend .swatch.severe { background: var(--danger); }
+
+/* Most-frequent event types */
+.sec-type-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.sec-type-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.sec-type-row:hover { border-color: var(--brand); }
+.sec-type-name { font-weight: 600; min-width: 0; }
+.sec-type-count { color: var(--brand-dark); font-variant-numeric: tabular-nums; }
+
+/* Event stream table */
+.sec-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.table-scroll { overflow-x: auto; }
+.sec-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+.sec-table th,
+.sec-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.sec-table th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.sec-table tbody tr:hover { background: var(--soft); }
+.sec-event-type { font-weight: 600; }
+.sec-source, .sec-table code { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 0.82rem; color: var(--muted); }
+.sec-decision { text-transform: capitalize; font-weight: 600; }
+.sec-decision.deny, .sec-decision.lock { color: var(--danger); }
+.sec-decision.challenge { color: var(--warning); }
+
+@media (max-width: 720px) {
+  .sec-type-row { grid-template-columns: 1fr auto; }
+  .sec-type-row .badge { grid-column: 2; }
+  .sec-type-count { grid-column: 2; text-align: right; }
+}
