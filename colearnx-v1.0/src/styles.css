@@ -839,6 +839,10 @@ main {
   grid-template-columns: minmax(0, 1.45fr) minmax(270px, 0.55fr);
   margin-top: 18px;
 }
+.profile-columns > .card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .form-grid {
   display: grid;
   gap: 13px;
@@ -902,7 +906,7 @@ select:disabled {
   border: 1px solid var(--line);
   border-radius: 11px;
 }
-.role-list > div > span {
+.role-list > div > span:first-child {
   display: grid;
   place-items: center;
   width: 34px;
@@ -914,6 +918,16 @@ select:disabled {
 .role-list b,
 .role-list small {
   display: block;
+  overflow-wrap: anywhere;
+}
+.role-list > div > div { min-width: 0; }
+.role-list > div > .badge {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  padding: 4px 8px;
+  white-space: normal;
+  text-align: center;
 }
 .role-list small {
   color: var(--muted);
@@ -2600,6 +2614,33 @@ tbody tr[role="button"]:focus-visible {
 .modal-body {
   padding: 20px;
 }
+.action-success-message { margin: 0; overflow-wrap: anywhere; }
+.modal > footer { flex-wrap: wrap; }
+.market-date-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dbe1ec;
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+.market-date-filter span { min-width: 0; overflow-wrap: anywhere; }
+.market-date-filter svg { flex-shrink: 0; }
+.market-calendar { max-width: 360px; margin: 0 auto; }
+.market-calendar-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.market-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.calendar-weekday { padding: 8px 0; text-align: center; font-size: 12px; color: var(--muted); }
+.calendar-day { min-height: 38px; padding: 8px 0; border: 1px solid transparent; border-radius: 8px; color: var(--ink); background: var(--surface); cursor: pointer; }
+.calendar-day:hover { background: #eef1ff; }
+.calendar-day[aria-current="date"] { border-color: var(--brand); }
+.calendar-day.selected { color: white; background: var(--brand); }
 .toast {
   position: fixed;
   right: 24px;
