@@ -28,17 +28,30 @@ export function VerifyEmailPage() {
   const [resending, setResending] = useState(false);
   const [expiresAt, setExpiresAt] = useState(location.state?.expiresAt || "");
   const [expiresIn, setExpiresIn] = useState(() => secondsUntil(location.state?.expiresAt));
+  const [resendAvailableAt, setResendAvailableAt] = useState(
+    location.state?.resendAvailableAt || "",
+  );
   const [cooldown, setCooldown] = useState(() =>
     secondsUntil(location.state?.resendAvailableAt),
   );
 
+  // Count down from the fixed resend-available timestamp, recomputing against
+  // the wall clock each tick -- the same shape as the expiry countdown below.
+  // The earlier version keyed the interval on `cooldown` itself and decremented
+  // by one, so every tick tore the timer down and rebuilt it; a re-render from
+  // the expiry interval or from typing the code could clear the pending tick
+  // before it fired and the counter stalled (stuck partway, never reaching 0).
+  // Keying on the timestamp means the interval is created once and self-heals
+  // across dropped ticks or a backgrounded tab.
   useEffect(() => {
-    if (!cooldown) return undefined;
-    const timer = window.setInterval(() => {
-      setCooldown((current) => Math.max(0, current - 1));
-    }, 1000);
+    if (!resendAvailableAt) return undefined;
+    setCooldown(secondsUntil(resendAvailableAt));
+    const timer = window.setInterval(
+      () => setCooldown(secondsUntil(resendAvailableAt)),
+      1000,
+    );
     return () => window.clearInterval(timer);
-  }, [cooldown]);
+  }, [resendAvailableAt]);
 
   useEffect(() => {
     if (!expiresAt) return undefined;
@@ -74,6 +87,7 @@ export function VerifyEmailPage() {
       setMessage("If this address has a pending CoLearnX registration, a new verification email will arrive shortly.");
       setExpiresAt(result.expiresAt || "");
       setExpiresIn(secondsUntil(result.expiresAt));
+      setResendAvailableAt(result.resendAvailableAt || "");
       setCooldown(secondsUntil(result.resendAvailableAt));
     } catch (resendError) {
       setError(resendError.message);
