@@ -12,10 +12,19 @@ import {
 } from './taxonomy.js';
 
 export type RequestFingerprint = {
-  ipHash: string;
+  // Null for an event raised by a background job rather than a request, where
+  // there is no client address to fingerprint.
+  ipHash: string | null;
   uaHash: string | null;
   requestId: string | null;
 };
+
+/**
+ * Fingerprint for an event raised by a scheduled job (W7 ledger audit and risk
+ * sweep), not by a request. No IP, user agent or request id exists, so all
+ * three are null and actor_ip_hash / actor_ua_hash are stored NULL.
+ */
+export const systemFingerprint = (): RequestFingerprint => ({ ipHash: null, uaHash: null, requestId: null });
 
 export type SecurityEventInput = {
   type: SecurityEventType;
