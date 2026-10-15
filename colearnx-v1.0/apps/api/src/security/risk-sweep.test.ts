@@ -54,9 +54,28 @@ test('the sweep flags only actors that trip a rule and passes window parameters 
 
   assert.equal(summary.actorsAssessed, 3); // clean, abuser, dealer
   assert.equal(summary.actorsFlagged, 2);  // abuser (refund velocity) + dealer (self purchase)
+  assert.equal(summary.recordFailures, 0);
   const byActor = new Map(flagged.map((f) => [f.actor, f]));
   assert.ok(!byActor.has('clean'));
   assert.deepEqual(byActor.get('abuser')?.hits, ['refund_velocity']);
   assert.deepEqual(byActor.get('dealer')?.hits, ['self_purchase']);
   assert.deepEqual(pool.windowParams[0], [14]);
+});
+
+test('a failed event write is counted, not swallowed, and the sweep still finishes', async () => {
+  const pool = fakePool({
+    refunds: [{ actor: 'abuser', n: '5' }],
+    selfPurchases: [{ actor: 'dealer', n: '1' }],
+    rapidRefunds: [],
+  });
+  const emitted: string[] = [];
+  const summary = await runRiskSweep(pool, async (verdict) => {
+    emitted.push(verdict.actorUserId);
+    // The security_events INSERT fails for the first flagged actor.
+    if (verdict.actorUserId === 'abuser') throw new Error('db write failed');
+  });
+  // Both flagged actors are still assessed; the lost write is reported.
+  assert.equal(summary.actorsFlagged, 2);
+  assert.equal(summary.recordFailures, 1);
+  assert.deepEqual(emitted.sort(), ['abuser', 'dealer']);
 });

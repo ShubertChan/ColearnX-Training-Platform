@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { env } from '../config/env.js';
 import { closeDatabase } from '../db/database.js';
-import { recordSecurityEvent, systemFingerprint } from './events.js';
+import { persistSecurityEvent, systemFingerprint } from './events.js';
 import { auditLedgerBalances } from './ledger-audit.js';
 
 /**
@@ -22,16 +22,29 @@ async function main() {
   });
   try {
     const summary = await auditLedgerBalances(pool, async ({ pointAccountId, actorUserId, accountStatus, discrepancies }) => {
-      await recordSecurityEvent(systemFingerprint(), {
-        type: 'finance.ledger_imbalance',
-        actorUserId,
-        decision: 'allow',
-        context: { pointAccountId, accountStatus, discrepancies },
-      });
+      try {
+        await persistSecurityEvent(systemFingerprint(), {
+          type: 'finance.ledger_imbalance',
+          actorUserId,
+          decision: 'allow',
+          context: { pointAccountId, accountStatus, discrepancies },
+        });
+      } catch (error) {
+        // Make the lost finding loud, then rethrow so the job counts it.
+        process.stderr.write(
+          `Failed to record ledger imbalance for account ${pointAccountId}: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+        throw error;
+      }
     });
     process.stdout.write(
-      `Ledger audit: checked ${summary.accountsChecked} point accounts, ${summary.imbalancedAccounts} imbalanced.\n`,
+      `Ledger audit: checked ${summary.accountsChecked} point accounts, ${summary.imbalancedAccounts} imbalanced, `
+      + `${summary.recordFailures} event write(s) failed.\n`,
     );
+    // A detected imbalance whose event could not be written is a failure of the
+    // job's whole purpose: exit non-zero so the scheduler does not treat it as a
+    // clean run.
+    if (summary.recordFailures > 0) process.exitCode = 1;
   } finally {
     await pool.end();
     await closeDatabase();

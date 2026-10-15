@@ -85,9 +85,12 @@ export type LedgerImbalance = {
 };
 export type LedgerAuditEmit = (imbalance: LedgerImbalance) => Promise<void>;
 
-export type LedgerAuditSummary = { accountsChecked: number; imbalancedAccounts: number };
+// recordFailures counts imbalanced accounts whose security event could NOT be
+// written. It is reported separately so the job never looks like it succeeded
+// when a finding was actually lost: the runner exits non-zero on any failure.
+export type LedgerAuditSummary = { accountsChecked: number; imbalancedAccounts: number; recordFailures: number };
 
-export async function auditLedgerBalances(pool: LedgerAuditPool, emit: LedgerAuditEmit): Promise<LedgerAuditSummary> {
+async function readLedgerBalances(pool: LedgerAuditPool): Promise<LedgerBalanceRow[]> {
   const client = await pool.connect();
   let snapshotOpen = false;
   try {
@@ -96,23 +99,7 @@ export async function auditLedgerBalances(pool: LedgerAuditPool, emit: LedgerAud
     const result = await client.query(LEDGER_AUDIT_QUERY);
     await client.query('COMMIT');
     snapshotOpen = false;
-    const rows = result.rows as LedgerBalanceRow[];
-    let imbalancedAccounts = 0;
-    // Emit after the snapshot is closed: recordSecurityEvent writes on a
-    // different connection and must not run inside this read-only transaction.
-    for (const row of rows) {
-      const discrepancies = diffAccountBalances(row);
-      if (discrepancies.length > 0) {
-        imbalancedAccounts += 1;
-        await emit({
-          pointAccountId: row.point_account_id,
-          actorUserId: row.user_id,
-          accountStatus: row.account_status,
-          discrepancies,
-        });
-      }
-    }
-    return { accountsChecked: rows.length, imbalancedAccounts };
+    return result.rows as LedgerBalanceRow[];
   } catch (error) {
     if (snapshotOpen) {
       try { await client.query('ROLLBACK'); } catch { /* the snapshot is already gone */ }
@@ -121,4 +108,30 @@ export async function auditLedgerBalances(pool: LedgerAuditPool, emit: LedgerAud
   } finally {
     client.release();
   }
+}
+
+export async function auditLedgerBalances(pool: LedgerAuditPool, emit: LedgerAuditEmit): Promise<LedgerAuditSummary> {
+  // Read the whole snapshot first; emit afterwards, since emit writes on a
+  // different connection and must not run inside the read-only transaction.
+  const rows = await readLedgerBalances(pool);
+  let imbalancedAccounts = 0;
+  let recordFailures = 0;
+  for (const row of rows) {
+    const discrepancies = diffAccountBalances(row);
+    if (discrepancies.length === 0) continue;
+    imbalancedAccounts += 1;
+    try {
+      await emit({
+        pointAccountId: row.point_account_id,
+        actorUserId: row.user_id,
+        accountStatus: row.account_status,
+        discrepancies,
+      });
+    } catch {
+      // The write failed; keep auditing the rest and report the loss. The
+      // emit callback is responsible for logging the specific error.
+      recordFailures += 1;
+    }
+  }
+  return { accountsChecked: rows.length, imbalancedAccounts, recordFailures };
 }
