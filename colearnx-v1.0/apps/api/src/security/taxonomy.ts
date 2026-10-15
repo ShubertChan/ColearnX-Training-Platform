@@ -78,6 +78,16 @@ export const securityEventSeverity = {
   'access.forbidden': 2,
   'access.origin_rejected': 1,
   'access.rate_limited': 1,
+
+  // --- fund-side risk (W7) ------------------------------------------------
+  // A point account's balance projection disagrees with the sum of its ledger
+  // entries (F-22). High: the ledger is authoritative for real balances, so a
+  // drift is either corruption or an unledgered write path.
+  'finance.ledger_imbalance': 3,
+  // The fund-side rule engine flagged an actor -- refund abuse, self-purchase
+  // or buy-then-refund churn (F-21). Medium by default; the sweep raises the
+  // severity with the risk score, so self-dealing pages an operator.
+  'finance.risk_flagged': 2,
 } as const;
 
 export type SecurityEventType = keyof typeof securityEventSeverity;
