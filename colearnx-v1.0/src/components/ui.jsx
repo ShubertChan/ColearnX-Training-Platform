@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/LanguageContext";
 import { useEffect, useId, useRef } from "react";
 import { CheckCircle2, X } from "lucide-react";
 
@@ -24,12 +25,13 @@ export function Card({ className = "", children }) {
 }
 
 export function Metric({ label, value, detail, icon: Icon }) {
+  const { t } = useTranslation();
   return (
     <Card className="metric-card">
       <span className="metric-icon">{Icon && <Icon size={19} />}</span>
       <div>
         <strong>{value}</strong>
-        <span>{label}</span>
+        <span>{t(label)}</span>
         {detail && <small>{detail}</small>}
       </div>
     </Card>
@@ -37,14 +39,15 @@ export function Metric({ label, value, detail, icon: Icon }) {
 }
 
 export function Progress({ value, label }) {
+  const { t } = useTranslation();
   const clamped = Math.max(0, Math.min(100, value));
   return (
     <div
       className="progress"
-      aria-label={`${label || "Progress"}: ${clamped}%`}
+      aria-label={`${label || t("Progress")}: ${clamped}%`}
     >
       <div>
-        <span>{label || "Progress"}</span>
+        <span>{label || t("Progress")}</span>
         <b>{clamped}%</b>
       </div>
       <div className="progress-track">
@@ -66,6 +69,7 @@ export function EmptyState({ icon: Icon, title, description, action }) {
 }
 
 export function Modal({ title, children, onClose, footer }) {
+  const { t } = useTranslation();
   const dialogRef = useRef(null);
   const onCloseRef = useRef(onClose);
   const titleId = useId();
@@ -120,7 +124,7 @@ export function Modal({ title, children, onClose, footer }) {
           </div>
           <button
             className="icon-button"
-            aria-label="Close dialog"
+            aria-label={t("Close dialog")}
             onClick={onClose}
           >
             <X size={20} />
@@ -147,9 +151,10 @@ export function SuccessPanel({ title, description, children }) {
 }
 
 export function FormField({ label, hint, children }) {
+  const { t } = useTranslation();
   return (
     <label className="form-field">
-      <span>{label}</span>
+      <span>{t(label)}</span>
       {children}
       {hint && <small>{hint}</small>}
     </label>
@@ -157,6 +162,7 @@ export function FormField({ label, hint, children }) {
 }
 
 export function Segmented({ options, value, onChange }) {
+  const { t } = useTranslation();
   return (
     <div className="segmented">
       {options.map((option) => (
@@ -165,7 +171,7 @@ export function Segmented({ options, value, onChange }) {
           className={(option.value ?? option) === value ? "active" : ""}
           onClick={() => onChange(option.value ?? option)}
         >
-          {option.label ?? option}
+          {t(option.label ?? option)}
         </button>
       ))}
     </div>

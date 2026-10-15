@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -29,6 +30,7 @@ import {
 } from "lucide-react";
 import { usePlatform } from "../context/PlatformContext";
 import { useAdminInbox } from "../context/AdminInboxContext";
+import LanguageSwitcher from "./LanguageSwitcher";
 import nextLogo from "../../assets/next-logo.jpg";
 
 const baseNavigation = [
@@ -155,6 +157,7 @@ function titleFor(pathname) {
 }
 
 export default function Layout({ children }) {
+  const { t } = useTranslation();
   const { unreadCount, errors: inboxErrors, arrivalCount, dismissArrival } = useAdminInbox();
   const {
     role,
@@ -228,9 +231,7 @@ export default function Layout({ children }) {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content" inert={mobile && open}
-        onClick={(event) => { event.preventDefault(); mainRef.current?.focus(); }}>
-        Skip to main content
-      </a>
+        onClick={(event) => { event.preventDefault(); mainRef.current?.focus(); }}>{t("Skip to main content")}</a>
       {mobile && open && (
         <div
           className="sidebar-scrim"
@@ -242,28 +243,28 @@ export default function Layout({ children }) {
         className={`sidebar ${open ? "open" : ""}`}
         inert={mobile && !open} aria-hidden={mobile && !open ? true : undefined}
         role={mobile && open ? "dialog" : undefined}
-        aria-modal={mobile && open ? true : undefined} aria-label="Workspace navigation">
+        aria-modal={mobile && open ? true : undefined} aria-label={t("Workspace navigation")}>
         <button
           type="button"
           className="brand"
           onClick={() => navigate(role === "Admin" ? "/admin" : "/home")}
-          aria-label="Go to CoLearnX home"
+          aria-label={t("Go to CoLearnX home")}
         >
           <img src={nextLogo} alt="neXt" />
           <div>
             <strong>CoLearnX</strong>
-            <span>Learning Platform</span>
+            <span>{t("Learning Platform")}</span>
           </div>
         </button>
         <button
           ref={closeRef}
           className="mobile-close"
           onClick={() => setOpen(false)}
-          aria-label="Close menu"
+          aria-label={t("Close menu")}
         >
           <X size={20} />
         </button>
-        <nav aria-label="Primary navigation">
+        <nav aria-label={t("Primary navigation")}>
           {nav.map(([to, label, Icon]) => (
             <NavLink
               key={`${role}-${to}`}
@@ -272,7 +273,7 @@ export default function Layout({ children }) {
               className={({ isActive }) => (isActive ? "active" : "")}
             >
               <Icon size={19} />
-              <span>{label}</span>
+              <span>{t(label)}</span>
               {to === "/admin/inbox" && unreadCount > 0 && <b className="nav-count inbox-count">{unreadCount > 99 ? "99+" : unreadCount}</b>}
               {to === "/cart" && cart.length > 0 && (
                 <b className="nav-count">{cart.length}</b>
@@ -283,7 +284,7 @@ export default function Layout({ children }) {
         <div className="sidebar-footer">
           {approvedRoles.length > 1 && (
             <label>
-              <span>Workspace role</span>
+              <span>{t("Workspace role")}</span>
               <div className="select-wrap">
                 <select
                   value={role}
@@ -291,7 +292,7 @@ export default function Layout({ children }) {
                 >
                   {approvedRoles.map((approvedRole) => (
                     <option key={approvedRole} value={approvedRole}>
-                      {approvedRole}
+                      {t(approvedRole)}
                     </option>
                   ))}
                 </select>
@@ -310,7 +311,7 @@ export default function Layout({ children }) {
             </span>
             <span>
               <b>{profile.name}</b>
-              <small>{role}</small>
+              <small>{t(role)}</small>
             </span>
             <CircleUserRound size={18} />
           </button>
@@ -319,8 +320,7 @@ export default function Layout({ children }) {
               account, not to a workspace, and each role sees a different nav —
               a fixed home here means no one has to relearn where it lives. */}
           <button className="sidebar-security" onClick={() => navigate("/security")}>
-            <ShieldCheck size={15} /> Account security
-          </button>
+            <ShieldCheck size={15} />{t(" Account security")}</button>
           <button
             className="sidebar-signout"
             onClick={() => {
@@ -328,8 +328,7 @@ export default function Layout({ children }) {
               navigate("/login");
             }}
           >
-            <LogOut size={15} /> Sign out
-          </button>
+            <LogOut size={15} />{t(" Sign out")}</button>
         </div>
       </aside>
       <main ref={mainRef} id="main-content" tabIndex={-1} inert={mobile && open}>
@@ -339,19 +338,20 @@ export default function Layout({ children }) {
               ref={menuRef}
               className="menu-button"
               onClick={() => setOpen(true)}
-              aria-label="Open menu"
+              aria-label={t("Open menu")}
               aria-expanded={mobile && open}
               aria-controls="workspace-navigation"
             >
               <Menu size={21} />
             </button>
             <div>
-              <h1>{title}</h1>
-              <p>{subtitle}</p>
+              <h1>{t(title)}</h1>
+              <p>{t(subtitle)}</p>
             </div>
           </div>
           <div className="topbar-actions">
-            {role === "Admin" && <button className={`icon-button inbox-button ${unreadCount ? "has-unread" : ""}`} aria-label={`Admin inbox, ${unreadCount} unread${inboxErrors.length ? ", refresh unavailable" : ""}`} onClick={() => { dismissArrival(); navigate("/admin/inbox"); }}><Mail size={23} />{unreadCount > 0 ? <b className="inbox-count">{unreadCount > 99 ? "99+" : unreadCount}</b> : inboxErrors.length > 0 ? <span className="inbox-count">!</span> : null}</button>}
+            <LanguageSwitcher />
+            {role === "Admin" && <button className={`icon-button inbox-button ${unreadCount ? "has-unread" : ""}`} aria-label={t("Admin inbox, {0} unread{1}", { 0: unreadCount, 1: inboxErrors.length ? ", refresh unavailable" : "" })} onClick={() => { dismissArrival(); navigate("/admin/inbox"); }}><Mail size={23} />{unreadCount > 0 ? <b className="inbox-count">{unreadCount > 99 ? "99+" : unreadCount}</b> : inboxErrors.length > 0 ? <span className="inbox-count">!</span> : null}</button>}
             {role !== "Admin" && <>
             <button
               className="balance-pill"
@@ -359,12 +359,11 @@ export default function Layout({ children }) {
             >
               <WalletCards size={18} />
               <span>
-                <b>{balance}</b> points
-              </span>
+                <b>{balance}</b>{t(" points")}</span>
             </button>
             <button
               className="icon-button"
-              aria-label="Receipts"
+              aria-label={t("Receipts")}
               onClick={() => navigate("/transactions")}
             >
               <ReceiptText size={19} />
@@ -373,14 +372,14 @@ export default function Layout({ children }) {
           </div>
         </header>
         <div className="page-content">
-          {role === "Admin" && arrivalCount > 0 && <div className="inbox-arrival" role="status"><Mail size={21} /><span><b>{arrivalCount} new application {arrivalCount === 1 ? "message" : "messages"}</b><small>New requests are waiting in your inbox.</small></span><button className="button secondary sm" onClick={() => { dismissArrival(); navigate("/admin/inbox"); }}>Open inbox</button><button className="icon-button" aria-label="Dismiss new mail notice" onClick={dismissArrival}><X size={18} /></button></div>}
-          {Object.keys(dataErrors).length > 0 && <div className="data-warning" role="status"><AlertTriangle size={18} /><div><b>Some workspace data could not be refreshed.</b><span>{Object.keys(dataErrors).join(", ")} · your signed-in session remains active.</span></div><button className="button secondary sm" onClick={() => void retryAccountData()}><RotateCcw size={14} /> Retry</button></div>}
+          {role === "Admin" && arrivalCount > 0 && <div className="inbox-arrival" role="status"><Mail size={21} /><span><b>{arrivalCount}{t(" new application ")}{arrivalCount === 1 ? t("message") : t("messages")}</b><small>{t("New requests are waiting in your inbox.")}</small></span><button className="button secondary sm" onClick={() => { dismissArrival(); navigate("/admin/inbox"); }}>{t("Open inbox")}</button><button className="icon-button" aria-label={t("Dismiss new mail notice")} onClick={dismissArrival}><X size={18} /></button></div>}
+          {Object.keys(dataErrors).length > 0 && <div className="data-warning" role="status"><AlertTriangle size={18} /><div><b>{t("Some workspace data could not be refreshed.")}</b><span>{Object.keys(dataErrors).join(", ")}{t(" · your signed-in session remains active.")}</span></div><button className="button secondary sm" onClick={() => void retryAccountData()}><RotateCcw size={14} />{t(" Retry")}</button></div>}
           {children}
         </div>
       </main>
       {toast && (
         <div className="toast" role="status">
-          {toast}
+          {t(toast)}
         </div>
       )}
     </div>
