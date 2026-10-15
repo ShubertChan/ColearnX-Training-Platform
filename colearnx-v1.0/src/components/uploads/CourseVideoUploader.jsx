@@ -1,3 +1,4 @@
+import { useTranslation } from "../../i18n/LanguageContext";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePlatform } from "../../context/PlatformContext";
 import { abortVideoParts, createVideoUpload, deleteVideo, getCourseVideo, retryVideo } from "../../api/video";
@@ -11,6 +12,7 @@ export default function CourseVideoUploader(props) {
   return <VideoUploadForm key={uploadStorageKey(profile.id, props.courseId)} {...props} accountId={profile.id} />;
 }
 function VideoUploadForm({ courseId, accountId, disabled = false, onStateChange, renderUploadArea }) {
+  const { t } = useTranslation();
   const storageKey = uploadStorageKey(accountId, courseId);
   const [saved, setSaved] = useState(() => readUpload(uploadStorage(), storageKey));
   const [summary, setSummary] = useState(null), [error, setError] = useState("");
@@ -72,24 +74,24 @@ function VideoUploadForm({ courseId, accountId, disabled = false, onStateChange,
     persist(null); setFile(null); setPercent(0);
   });
   const blocked = disabled || mutation || loading;
-  return <><section className="course-video-uploader stack" aria-label="Course video upload">
-    <div><h3>Main course video</h3><p>One video, up to 4 hours. Duration is verified after processing.{!renderUploadArea && " Course attachments are managed separately."}</p></div>
-    {loading && <p role="status">Loading video versions…</p>}
-    {!renderUploadArea && (summary?.canUpload || saved) && <label className="video-file-picker">{saved ? "Choose original video to resume" : "Choose course video"}<input type="file" accept={VIDEO_UPLOAD_ACCEPT} disabled={blocked || active} onChange={event => { const chosen = event.target.files?.[0]; event.target.value = ""; chooseFile(chosen); }} /></label>}
-    {saved && <div><p>{saved.file.name} · {active ? "Uploading" : "Upload paused. Select the original file to continue after reopening this page."}</p><Progress value={percent} label="Video upload" />
-      <div className="button-row">{active ? <Button type="button" variant="secondary" onClick={() => controller.current?.abort()}>Pause upload</Button> : <>
-        {file && <Button type="button" disabled={blocked} onClick={() => void start(file)}>Resume upload</Button>}
-        <Button type="button" variant="danger" disabled={blocked} onClick={cancel}>Cancel upload</Button></>}</div></div>}
-    {error && <p role="alert" className="form-error">{error}</p>}
-    {loadError && <p role="alert" className="form-error">{loadError}</p>}
-    {storageWarning && saved && <p role="status">Browser storage is unavailable. Keep this tab open to pause and resume this upload.</p>}
-    <Button type="button" variant="secondary" disabled={active || mutation || disabled} onClick={() => void refresh()}>Refresh video status</Button>
+  return <><section className="course-video-uploader stack" aria-label={t("Course video upload")}>
+    <div><h3>{t("Main course video")}</h3><p>{t("One video, up to 4 hours. Duration is verified after processing.")}{!renderUploadArea && t(" Course attachments are managed separately.")}</p></div>
+    {loading && <p role="status">{t("Loading video versions…")}</p>}
+    {!renderUploadArea && (summary?.canUpload || saved) && <label className="video-file-picker">{saved ? t("Choose original video to resume") : t("Choose course video")}<input type="file" accept={VIDEO_UPLOAD_ACCEPT} disabled={blocked || active} onChange={event => { const chosen = event.target.files?.[0]; event.target.value = ""; chooseFile(chosen); }} /></label>}
+    {saved && <div><p>{saved.file.name} · {active ? t("Uploading") : t("Upload paused. Select the original file to continue after reopening this page.")}</p><Progress value={percent} label={t("Video upload")} />
+      <div className="button-row">{active ? <Button type="button" variant="secondary" onClick={() => controller.current?.abort()}>{t("Pause upload")}</Button> : <>
+        {file && <Button type="button" disabled={blocked} onClick={() => void start(file)}>{t("Resume upload")}</Button>}
+        <Button type="button" variant="danger" disabled={blocked} onClick={cancel}>{t("Cancel upload")}</Button></>}</div></div>}
+    {error && <p role="alert" className="form-error">{t(error)}</p>}
+    {loadError && <p role="alert" className="form-error">{t(loadError)}</p>}
+    {storageWarning && saved && <p role="status">{t("Browser storage is unavailable. Keep this tab open to pause and resume this upload.")}</p>}
+    <Button type="button" variant="secondary" disabled={active || mutation || disabled} onClick={() => void refresh()}>{t("Refresh video status")}</Button>
     {summary?.versions.filter(v => v.status !== "deleted").map(v => <article className="video-version" key={v.id}><VideoMetadata version={v} />
-      <div className="button-row">{v.canRetry && v.status === "failed" && <Button type="button" variant="secondary" disabled={blocked || active} onClick={() => void mutate(() => retryVideo(courseId, v.id))}>Retry processing</Button>}
-        {v.canDelete && !v.hasOrderReferences && <Button type="button" variant="danger" disabled={blocked || active} onClick={() => { if (window.confirm("Delete this unused video version?")) void mutate(() => deleteVideo(courseId, v.id)); }}>Delete unused version</Button>}</div></article>)}
-    {summary && !summary.versions.length && <p>No video has been uploaded yet.</p>}
-    {summary?.versions.some(v => v.status === "queued") && <p>Waiting for processing. You can leave this page and return later.</p>}
-    {replacement && <Modal title="Replace course video" onClose={() => setReplacement(null)} footer={<><Button type="button" variant="secondary" onClick={() => setReplacement(null)}>Cancel</Button><Button type="button" onClick={() => { const next = replacement; setReplacement(null); void start(next, null); }}>Upload new version</Button></>}>
-      <p>{replacement.name}</p><p>The new version must finish processing and be reviewed. It applies to future purchases after publication. Existing buyers keep their purchased version.</p></Modal>}
+      <div className="button-row">{v.canRetry && v.status === "failed" && <Button type="button" variant="secondary" disabled={blocked || active} onClick={() => void mutate(() => retryVideo(courseId, v.id))}>{t("Retry processing")}</Button>}
+        {v.canDelete && !v.hasOrderReferences && <Button type="button" variant="danger" disabled={blocked || active} onClick={() => { if (window.confirm("Delete this unused video version?")) void mutate(() => deleteVideo(courseId, v.id)); }}>{t("Delete unused version")}</Button>}</div></article>)}
+    {summary && !summary.versions.length && <p>{t("No video has been uploaded yet.")}</p>}
+    {summary?.versions.some(v => v.status === "queued") && <p>{t("Waiting for processing. You can leave this page and return later.")}</p>}
+    {replacement && <Modal title={t("Replace course video")} onClose={() => setReplacement(null)} footer={<><Button type="button" variant="secondary" onClick={() => setReplacement(null)}>{t("Cancel")}</Button><Button type="button" onClick={() => { const next = replacement; setReplacement(null); void start(next, null); }}>{t("Upload new version")}</Button></>}>
+      <p>{replacement.name}</p><p>{t("The new version must finish processing and be reviewed. It applies to future purchases after publication. Existing buyers keep their purchased version.")}</p></Modal>}
   </section>{renderUploadArea?.({ chooseFile, disabled: blocked || active || !(summary?.canUpload || saved), resuming: Boolean(saved), loading, active, processing: summary?.versions.some(v => ["queued", "transcoding"].includes(v.status)) })}</>;
 }

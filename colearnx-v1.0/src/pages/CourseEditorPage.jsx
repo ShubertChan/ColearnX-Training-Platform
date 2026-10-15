@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/LanguageContext";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { createCourse, submitCourse } from "../api/catalog";
@@ -12,6 +13,7 @@ import { Button, Card, FormField } from "../components/ui";
 
 const initial = { title: "", description: "", pricePoints: "", capacity: "", startsAt: "", endsAt: "", deliveryModes: hostedVideoEnabled ? ["cloud"] : ["live"], fulfilmentInstructions: "", trainerContact: "", joinUrl: "", onlineVideo: hostedVideoEnabled };
 export default function CourseEditorPage() {
+  const { t } = useTranslation();
   const { refreshMyListings, notify } = usePlatform();
   const [params, setParams] = useSearchParams();
   const requested = params.get("draft");
@@ -74,35 +76,35 @@ export default function CourseEditorPage() {
     } catch (error) { setError(error.message); } finally { setBusy(false); }
   };
   return <div className="content-grid editor-layout"><Card>
-    <h2>{draft ? "Course draft" : "Create course"}</h2>
+    <h2>{draft ? t("Course draft") : t("Create course")}</h2>
     <form onSubmit={create} className="stack"><fieldset disabled={Boolean(draft) || busy || Boolean(requested)} className="editor-fields">
-      <FormField label="Course title"><input required maxLength={200} value={form.title} onChange={(e) => change("title", e.target.value)} /></FormField>
-      <FormField label="Public description"><textarea required value={form.description} onChange={(e) => change("description", e.target.value)} /></FormField>
-      <FormField label="Price in points"><input required min={0} step={1} type="number" value={form.pricePoints} onChange={(e) => change("pricePoints", e.target.value)} /></FormField>
-      <fieldset className="delivery-mode-picker"><legend>Course type</legend>
-        <label className="delivery-mode-option"><input type="radio" name="course-type" checked={videoCourse} disabled={!hostedVideoEnabled} onChange={() => selectCourseType("video")} /><span><b>Video course</b><small>Upload one protected course video for learners to watch on the platform.</small></span></label>
-        <label className="delivery-mode-option"><input type="radio" name="course-type" checked={!videoCourse} onChange={() => selectCourseType("teaching")} /><span><b>Instructor-led course</b><small>Teach learners live online or arrange an offline session directly.</small></span></label>
+      <FormField label={t("Course title")}><input required maxLength={200} value={form.title} onChange={(e) => change("title", e.target.value)} /></FormField>
+      <FormField label={t("Public description")}><textarea required value={form.description} onChange={(e) => change("description", e.target.value)} /></FormField>
+      <FormField label={t("Price in points")}><input required min={0} step={1} type="number" value={form.pricePoints} onChange={(e) => change("pricePoints", e.target.value)} /></FormField>
+      <fieldset className="delivery-mode-picker"><legend>{t("Course type")}</legend>
+        <label className="delivery-mode-option"><input type="radio" name="course-type" checked={videoCourse} disabled={!hostedVideoEnabled} onChange={() => selectCourseType("video")} /><span><b>{t("Video course")}</b><small>{t("Upload one protected course video for learners to watch on the platform.")}</small></span></label>
+        <label className="delivery-mode-option"><input type="radio" name="course-type" checked={!videoCourse} onChange={() => selectCourseType("teaching")} /><span><b>{t("Instructor-led course")}</b><small>{t("Teach learners live online or arrange an offline session directly.")}</small></span></label>
       </fieldset>
-      {!hostedVideoEnabled && <small>Video courses are not enabled for this deployment.</small>}
-      {videoCourse ? <p className="editor-policy-note">Upload a single main video after saving the draft. The service verifies its duration; the maximum is 4 hours.</p> : <>
-        <fieldset className="delivery-mode-picker"><legend>Teaching format</legend>
-          <label className="delivery-mode-option"><input type="radio" name="teaching-format" checked={teachingMode === "live"} onChange={() => selectTeachingMode("live")} /><span><b>Online — live session</b><small>Share the live-session details with purchasers after payment.</small></span></label>
-          <label className="delivery-mode-option"><input type="radio" name="teaching-format" checked={teachingMode === "local"} onChange={() => selectTeachingMode("local")} /><span><b>Offline — arrange directly</b><small>Share the venue and meeting arrangements with each learner after payment.</small></span></label>
+      {!hostedVideoEnabled && <small>{t("Video courses are not enabled for this deployment.")}</small>}
+      {videoCourse ? <p className="editor-policy-note">{t("Upload a single main video after saving the draft. The service verifies its duration; the maximum is 4 hours.")}</p> : <>
+        <fieldset className="delivery-mode-picker"><legend>{t("Teaching format")}</legend>
+          <label className="delivery-mode-option"><input type="radio" name="teaching-format" checked={teachingMode === "live"} onChange={() => selectTeachingMode("live")} /><span><b>{t("Online — live session")}</b><small>{t("Share the live-session details with purchasers after payment.")}</small></span></label>
+          <label className="delivery-mode-option"><input type="radio" name="teaching-format" checked={teachingMode === "local"} onChange={() => selectTeachingMode("local")} /><span><b>{t("Offline — arrange directly")}</b><small>{t("Share the venue and meeting arrangements with each learner after payment.")}</small></span></label>
         </fieldset>
-        <FormField label="Course announcement for purchasers"><textarea required value={form.fulfilmentInstructions} onChange={(e) => change("fulfilmentInstructions", e.target.value)} /></FormField><FormField label="Trainer contact for purchasers"><input required value={form.trainerContact} onChange={(e) => change("trainerContact", e.target.value)} /></FormField>{teachingMode === "live" && <FormField label="Live-session link (optional)"><input type="url" value={form.joinUrl} onChange={(e) => change("joinUrl", e.target.value)} /></FormField>}
+        <FormField label={t("Course announcement for purchasers")}><textarea required value={form.fulfilmentInstructions} onChange={(e) => change("fulfilmentInstructions", e.target.value)} /></FormField><FormField label={t("Trainer contact for purchasers")}><input required value={form.trainerContact} onChange={(e) => change("trainerContact", e.target.value)} /></FormField>{teachingMode === "live" && <FormField label={t("Live-session link (optional)")}><input type="url" value={form.joinUrl} onChange={(e) => change("joinUrl", e.target.value)} /></FormField>}
       </>}
-      <FormField label="Capacity (optional)"><input min={1} type="number" value={form.capacity || ""} onChange={(e) => change("capacity", e.target.value)} /></FormField>
-      <div className="form-grid two"><FormField label="Start time (required)"><input type="datetime-local" required value={form.startsAt || ""} onChange={(e) => change("startsAt", e.target.value)} /></FormField><FormField label="End time (optional)"><input type="datetime-local" value={form.endsAt || ""} onChange={(e) => change("endsAt", e.target.value)} /></FormField></div>
-      {videoCourse && <p className="editor-policy-note">Set when learners can start watching. Video playback remains locked until this time; dates use your device’s local time.</p>}
-      {coordination && <p className="editor-policy-note">Confirm the start time before saving an instructor-led course. It determines the 72-hour refund deadline for both online and offline sessions.</p>}
-    </fieldset>{!draft && <Button type="submit" disabled={busy || Boolean(requested)}>{busy ? "Saving…" : "Create draft"}</Button>}</form>
-    {error && <p role="alert" className="form-error">{error}</p>}
+      <FormField label={t("Capacity (optional)")}><input min={1} type="number" value={form.capacity || ""} onChange={(e) => change("capacity", e.target.value)} /></FormField>
+      <div className="form-grid two"><FormField label={t("Start time (required)")}><input type="datetime-local" required value={form.startsAt || ""} onChange={(e) => change("startsAt", e.target.value)} /></FormField><FormField label={t("End time (optional)")}><input type="datetime-local" value={form.endsAt || ""} onChange={(e) => change("endsAt", e.target.value)} /></FormField></div>
+      {videoCourse && <p className="editor-policy-note">{t("Set when learners can start watching. Video playback remains locked until this time; dates use your device’s local time.")}</p>}
+      {coordination && <p className="editor-policy-note">{t("Confirm the start time before saving an instructor-led course. It determines the 72-hour refund deadline for both online and offline sessions.")}</p>}
+    </fieldset>{!draft && <Button type="submit" disabled={busy || Boolean(requested)}>{busy ? t("Saving…") : t("Create draft")}</Button>}</form>
+    {error && <p role="alert" className="form-error">{t(error)}</p>}
     {draft && <>{form.onlineVideo
       ? hostedVideoEnabled ? <CourseFilesUploader key={draft.id} courseId={draft.id} onVideoChange={setVideo} onAssetsChange={updateFiles} disabled={submitted || busy} />
-        : <p role="status">Video uploads are not enabled for this deployment.</p>
-      : <PrivateAssetUploader key={draft.id} contentVersionId={draft.id} assetApi={courseAssetApi} label="Course attachments" onAssetsChange={updateFiles} disabled={submitted || busy} />}
-      {!form.onlineVideo && <p>Instructor-led courses show their course announcement only to purchasers.</p>}
-      <Button disabled={busy || submitted || !canSubmit} onClick={() => void submit()}>{submitted ? "Submitted for review" : busy ? "Submitting…" : "Submit for administrator review"}</Button>
-      {submitted && <Button variant="secondary" onClick={() => { setDraft(null); setForm(initial); setSubmitted(false); setParams({}); }}>Create another course</Button>}</>}
-  </Card><Card><h3>Private delivery</h3><p>Video-course files are uploaded directly with a short-lived signed URL. The service must confirm each file before review is enabled.</p><p>Instructor-led course announcements and contact details are separate from the public description and displayed only through protected purchase endpoints.</p><p>Saved metadata can be revised in Publishing tools. No local change is presented as published until the service accepts it.</p></Card></div>;
+        : <p role="status">{t("Video uploads are not enabled for this deployment.")}</p>
+      : <PrivateAssetUploader key={draft.id} contentVersionId={draft.id} assetApi={courseAssetApi} label={t("Course attachments")} onAssetsChange={updateFiles} disabled={submitted || busy} />}
+      {!form.onlineVideo && <p>{t("Instructor-led courses show their course announcement only to purchasers.")}</p>}
+      <Button disabled={busy || submitted || !canSubmit} onClick={() => void submit()}>{submitted ? t("Submitted for review") : busy ? t("Submitting…") : t("Submit for administrator review")}</Button>
+      {submitted && <Button variant="secondary" onClick={() => { setDraft(null); setForm(initial); setSubmitted(false); setParams({}); }}>{t("Create another course")}</Button>}</>}
+  </Card><Card><h3>{t("Private delivery")}</h3><p>{t("Video-course files are uploaded directly with a short-lived signed URL. The service must confirm each file before review is enabled.")}</p><p>{t("Instructor-led course announcements and contact details are separate from the public description and displayed only through protected purchase endpoints.")}</p><p>{t("Saved metadata can be revised in Publishing tools. No local change is presented as published until the service accepts it.")}</p></Card></div>;
 }

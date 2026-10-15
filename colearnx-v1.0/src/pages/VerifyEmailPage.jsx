@@ -1,8 +1,10 @@
+import { useTranslation } from "../i18n/LanguageContext";
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Mail, RotateCcw } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button, FormField } from "../components/ui";
 import { usePlatform } from "../context/PlatformContext";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import nextLogo from "../../assets/next-logo.jpg";
 
 const secondsUntil = (value) => {
@@ -12,6 +14,7 @@ const secondsUntil = (value) => {
 };
 
 export function VerifyEmailPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -101,22 +104,22 @@ export function VerifyEmailPage() {
       <section className="auth-story">
         <img src={nextLogo} alt="neXt" />
         <div>
-          <span className="eyebrow light">Account security</span>
-          <h1>Confirm that this email address belongs to you.</h1>
-          <p>We use email only for this step. No SMS or other messaging channel is used.</p>
+          <span className="eyebrow light">{t("Account security")}</span>
+          <h1>{t("Confirm that this email address belongs to you.")}</h1>
+          <p>{t("We use email only for this step. No SMS or other messaging channel is used.")}</p>
         </div>
         <ul>
-          <li><CheckCircle2 size={18} /> One-time email code</li>
-          <li><CheckCircle2 size={18} /> Short expiry and attempt limits</li>
-          <li><CheckCircle2 size={18} /> Sign in only after verification</li>
+          <li><CheckCircle2 size={18} />{t(" One-time email code")}</li>
+          <li><CheckCircle2 size={18} />{t(" Short expiry and attempt limits")}</li>
+          <li><CheckCircle2 size={18} />{t(" Sign in only after verification")}</li>
         </ul>
       </section>
-      <section className="auth-form-wrap">
+      <section className="auth-form-wrap"><LanguageSwitcher className="auth-language" />
         <form className="auth-form" onSubmit={submit}>
-          <span className="eyebrow">Email verification</span>
-          <h2>Enter your code</h2>
-          <p>Check your inbox for the eight-digit code. {expiresAt ? expiresIn > 0 ? `This code expires in ${expiresIn}s.` : "This code has expired; request a new one." : "The expiry time is set by the server."}</p>
-          <FormField label="Email address">
+          <span className="eyebrow">{t("Email verification")}</span>
+          <h2>{t("Enter your code")}</h2>
+          <p>{t("Check your inbox for the eight-digit code. ")}{expiresAt ? expiresIn > 0 ? t("This code expires in {0}s.", { 0: expiresIn }) : t("This code has expired; request a new one.") : t("The expiry time is set by the server.")}</p>
+          <FormField label={t("Email address")}>
             <div className="input-with-icon">
               <Mail size={18} />
               <input
@@ -124,11 +127,11 @@ export function VerifyEmailPage() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="name@example.com"
+                placeholder={t("name@example.com")}
               />
             </div>
           </FormField>
-          <FormField label="Verification code">
+          <FormField label={t("Verification code")}>
             <input
               required
               inputMode="numeric"
@@ -139,10 +142,10 @@ export function VerifyEmailPage() {
               placeholder="12345678"
             />
           </FormField>
-          {error && <div className="form-error" role="alert">{error}</div>}
+          {error && <div className="form-error" role="alert">{t(error)}</div>}
           {message && <div className="form-success" role="status">{message}</div>}
           <Button className="wide" type="submit" disabled={submitting}>
-            {submitting ? "Verifying…" : "Verify email"}
+            {submitting ? t("Verifying…") : t("Verify email")}
           </Button>
           <Button
             className="wide"
@@ -152,10 +155,9 @@ export function VerifyEmailPage() {
             onClick={resend}
           >
             <RotateCcw size={17} />
-            {resending ? "Sending…" : cooldown > 0 ? `Resend available in ${cooldown}s` : "Resend email code"}
+            {resending ? t("Sending…") : cooldown > 0 ? t("Resend available in {0}s", { 0: cooldown }) : t("Resend email code")}
           </Button>
-          <p className="auth-switch">
-            Already verified? <Link to="/login">Sign in</Link>
+          <p className="auth-switch">{t("Already verified? ")}<Link to="/login">{t("Sign in")}</Link>
           </p>
         </form>
       </section>
