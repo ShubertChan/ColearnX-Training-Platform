@@ -51,10 +51,25 @@ test('the audit reads in a read-only snapshot and emits once per imbalanced acco
   const fixture = fakePool([balanced, drifted]);
   const emitted: string[] = [];
   const summary = await auditLedgerBalances(fixture.pool, async (imbalance) => { emitted.push(imbalance.pointAccountId); });
-  assert.deepEqual(summary, { accountsChecked: 2, imbalancedAccounts: 1 });
+  assert.deepEqual(summary, { accountsChecked: 2, imbalancedAccounts: 1, recordFailures: 0 });
   assert.deepEqual(emitted, ['acc-2']);
   assert.deepEqual(fixture.calls, ['connect', 'begin', 'select', 'commit', 'release']);
   assert.equal(fixture.released, true);
+});
+
+test('a failed event write is counted, not swallowed, and does not abort the remaining audit', async () => {
+  const d1: LedgerBalanceRow = { ...balanced, point_account_id: 'acc-a', available_balance: '90' };
+  const d2: LedgerBalanceRow = { ...balanced, point_account_id: 'acc-b', frozen_balance: '99' };
+  const fixture = fakePool([d1, d2]);
+  const emitted: string[] = [];
+  const summary = await auditLedgerBalances(fixture.pool, async (imbalance) => {
+    emitted.push(imbalance.pointAccountId);
+    // The security_events INSERT fails for the first imbalanced account.
+    if (imbalance.pointAccountId === 'acc-a') throw new Error('db write failed');
+  });
+  // Both accounts are still visited; the lost write is reported, not hidden.
+  assert.deepEqual(emitted, ['acc-a', 'acc-b']);
+  assert.deepEqual(summary, { accountsChecked: 2, imbalancedAccounts: 2, recordFailures: 1 });
 });
 
 test('a query failure rolls back the snapshot and releases the connection', async () => {

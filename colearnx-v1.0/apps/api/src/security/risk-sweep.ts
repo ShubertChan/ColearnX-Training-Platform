@@ -25,7 +25,10 @@ export type RiskSweepPool = { connect(): Promise<SweepClient> };
 export type RiskSweepEmit = (verdict: ActorRiskVerdict, counts: ActorRiskInput) => Promise<void>;
 
 export type RiskSweepOptions = { windowDays?: number; rapidRefundSeconds?: number };
-export type RiskSweepSummary = { actorsAssessed: number; actorsFlagged: number };
+// recordFailures counts flagged actors whose security event could NOT be
+// written, so the job never reports success while a flag was lost; the runner
+// exits non-zero on any failure.
+export type RiskSweepSummary = { actorsAssessed: number; actorsFlagged: number; recordFailures: number };
 
 type ActorCountRow = { actor: string; n: string };
 
@@ -95,14 +98,20 @@ export async function runRiskSweep(pool: RiskSweepPool, emit: RiskSweepEmit, opt
     const rapidRefunds = (await client.query(RAPID_REFUND_SQL, [windowDays, rapidRefundSeconds])).rows as ActorCountRow[];
     const actors = mergeActorAggregates(refunds, selfPurchases, rapidRefunds);
     let actorsFlagged = 0;
+    let recordFailures = 0;
     for (const actor of actors) {
       const verdict = scoreActor(actor);
-      if (verdict) {
-        actorsFlagged += 1;
+      if (!verdict) continue;
+      actorsFlagged += 1;
+      try {
         await emit(verdict, actor);
+      } catch {
+        // The write failed; keep assessing the rest and report the loss. The
+        // emit callback is responsible for logging the specific error.
+        recordFailures += 1;
       }
     }
-    return { actorsAssessed: actors.length, actorsFlagged };
+    return { actorsAssessed: actors.length, actorsFlagged, recordFailures };
   } finally {
     client.release();
   }
