@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { env } from '../config/env.js';
 import { closeDatabase } from '../db/database.js';
-import { recordSecurityEvent, systemFingerprint } from './events.js';
+import { persistSecurityEvent, systemFingerprint } from './events.js';
 import { runRiskSweep } from './risk-sweep.js';
 
 /**
@@ -35,24 +35,36 @@ async function main() {
   });
   try {
     const summary = await runRiskSweep(pool, async (verdict, counts) => {
-      await recordSecurityEvent(systemFingerprint(), {
-        type: 'finance.risk_flagged',
-        severity: verdict.severity,
-        actorUserId: verdict.actorUserId,
-        decision: 'allow',
-        riskScore: verdict.riskScore,
-        ruleHits: verdict.ruleHits,
-        context: {
-          reasons: verdict.reasons,
-          refundCount: counts.refundCount,
-          selfPurchaseCount: counts.selfPurchaseCount,
-          rapidRefundCount: counts.rapidRefundCount,
-        },
-      });
+      try {
+        await persistSecurityEvent(systemFingerprint(), {
+          type: 'finance.risk_flagged',
+          severity: verdict.severity,
+          actorUserId: verdict.actorUserId,
+          decision: 'allow',
+          riskScore: verdict.riskScore,
+          ruleHits: verdict.ruleHits,
+          context: {
+            reasons: verdict.reasons,
+            refundCount: counts.refundCount,
+            selfPurchaseCount: counts.selfPurchaseCount,
+            rapidRefundCount: counts.rapidRefundCount,
+          },
+        });
+      } catch (error) {
+        // Make the lost flag loud, then rethrow so the job counts it.
+        process.stderr.write(
+          `Failed to record risk flag for actor ${verdict.actorUserId}: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+        throw error;
+      }
     }, { windowDays, rapidRefundSeconds });
     process.stdout.write(
-      `Risk sweep: assessed ${summary.actorsAssessed} actors, flagged ${summary.actorsFlagged}.\n`,
+      `Risk sweep: assessed ${summary.actorsAssessed} actors, flagged ${summary.actorsFlagged}, `
+      + `${summary.recordFailures} event write(s) failed.\n`,
     );
+    // A flagged actor whose event could not be written is a lost finding: exit
+    // non-zero so the scheduler does not treat it as a clean run.
+    if (summary.recordFailures > 0) process.exitCode = 1;
   } finally {
     await pool.end();
     await closeDatabase();

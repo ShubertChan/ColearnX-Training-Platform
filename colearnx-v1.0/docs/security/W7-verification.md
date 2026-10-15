@@ -35,7 +35,15 @@ W7 处置资金链路上两条一直空着的发现，用的全是前几周铺�
 规则、累加权重得 0–100 风险分、映射严重度。阈值和评分因此能被穷举单测。`risk-sweep.ts`
 只负责把聚合查出来喂给它、把判定写成事件。
 
-### 1.4 作业以运行时角色只读运行
+### 1.4 写入失败必须被上报，不能静默成功
+
+作业的唯一目的就是把发现写进 `security_events`。请求路径用的 `recordSecurityEvent`
+**故意永不抛错**（记日志失败不能把正常登录变成 500），但作业**不能**复用这个"吞错"行为，
+否则写库失败会被悄悄吞掉、作业还打印成功，发现就丢了。所以作业改用会抛错的
+`persistSecurityEvent`，逐条统计写入失败数（`recordFailures`）：有失败就在汇总里明确报出、
+并以**非零码退出**，让调度器不会把它当成一次干净的运行。
+
+### 1.5 作业以运行时角色只读运行
 
 对账与扫描只 `SELECT` 账本/订单/退款，并 `INSERT` 一条 `security_events`——这些
 `colearnx_app` 都有权限（009 给了 security_events 的 SELECT/INSERT）。无需 owner 连接，
@@ -90,6 +98,13 @@ npm --prefix apps/api run test          # 新增 ledger-audit / fraud-rules / ri
 ### 3.4 不误伤、不泄露
 
 确认正常用户（无命中）不产生事件；事件 context 里只有计数与原因文字，无邮箱/令牌/原始 IP。
+
+### 3.5 写库失败会被上报且非零退出
+
+临时让 `security_events` 的 INSERT 失败（例如回收 `colearnx_app` 的 INSERT 权限，或指向
+一个只读副本），构造一个会命中的账户/用户后跑作业，确认：输出里 `event write(s) failed`
+计数 > 0，进程**以非零码退出**，而不是打印一行干净的成功。单测已用假 pool 锁住这一点
+（emit 抛错时计入 `recordFailures` 且作业不中断）。
 
 ---
 
