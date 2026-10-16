@@ -192,15 +192,16 @@ release:smoke -- --api-only 是公开 API 只读检查。完整 release:smoke �
 | 课程开课时间数据库/API 检查 | 17 组通过，包含购买权限、服务端时间、审核与退款后撤权 |
 | Playwright Chromium 浏览器回归 | 56/56，本地生产包 + fixture；不代表真实支付/邮件/R2 云端验收 |
 | API 类型检查、API 构建 | 通过 |
+| Node 22 前端发布构建及 SHA-256 清单验证 | 通过，视频开启且两种 R2 上传来源保留 |
 | 视频 Worker / 网关类型检查 | 通过，不代表本次重新部署了视频服务 |
 | 视频 Worker / 网关单元测试 | Worker 13 通过、1 个 opt-in 数据库用例跳过；网关 13/13 |
-| Node 22.22.0 兼容复核 | 前端 164、组件 50、API 237、发布脚本 82 项通过；API/视频服务类型检查与 API 编译通过 |
+| Node 22.22.0 兼容复核 | 前端 164、组件 50、API 237、发布脚本 82、Chromium 56 项及数据库发布检查 25 组通过；API/视频服务类型检查与 API 编译通过 |
 | actionlint 1.7.12 | 两份工作流检查通过，未启用 shellcheck/pyflakes |
 | Wrangler 4.151.0 网关 dry-run | 本地打包通过，使用仅含公开绑定的 staging 配置；没有发布 Worker 或访问 R2 对象 |
 
 本轮未运行 Firefox/WebKit，也未重做真实支付、邮件、R2 上传或管理员验证器绑定。Windows 沙箱拒绝进程枚举，导致 Playwright 测试服务器清理卡住；确认 PID 和命令行后仅停止了临时 fixture 服务器，随后测试命令正常以 0 退出并汇总 56 项通过。CI 使用 Linux runner，不需要沿用该本机操作。
 
-本轮更新 API 锁文件中的 proxy-addr 2.0.8、ip-address 10.7.4、qs 6.16.1；媒体网关和独立发布工具均将 Wrangler 精确锁定为 4.151.0，修补其 Miniflare/Undici/Sharp 工具链告警。前端/API/转码服务生产依赖，以及媒体网关/发布工具完整依赖的 npm audit 均为 0 项。CI 新增后两类工具链扫描，避免只查生产依赖而漏掉发布工具。CI 以 high 为阻断阈值，不代表日后出现 moderate 可以忽略；大于 500 kB 的前端 chunk 提示仍需后续评估。
+本轮更新 API 锁文件中的 proxy-addr 2.0.8、ip-address 10.7.4、qs 6.16.1；媒体网关和独立发布工具均将 Wrangler 精确锁定为 4.151.0，修补其 Miniflare/Undici/Sharp 工具链告警。另修补前端构建工具链的 source-map-js 拒绝服务告警。前端、API、转码服务、媒体网关、发布工具五处的完整依赖 npm audit 均为 0 项（包含 devDependencies）。CI 全部扫描完整依赖，避免只查生产依赖而漏掉构建、测试和发布工具。CI 以 high 为阻断阈值，不代表日后出现 moderate 可以忽略；大于 500 kB 的前端 chunk 提示仍需后续评估。
 
 旧集成测试不再期待前端提交的视频时长直接写入数据库：创建/编辑时伪造时长仍应为 null；模拟受信服务写入后，另一条前端请求不能覆盖该值。另将本地测试角色显式设为 NOINHERIT/NOBYPASSRLS，与新上传权限测试保持一致，不放宽真实 API 权限。
 
