@@ -4,10 +4,26 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig, validateConfig, createManifest, verifyArtifact, requireCommit, migrationInventory, isPublicArtifactPath } from './artifact.mjs';
-import { pagesArguments } from './pages-deploy.mjs';
+import { pagesArguments, verifyCliVersion } from './pages-deploy.mjs';
 
 const config = await loadConfig();
 const commit = 'a'.repeat(40);
+
+test('Pages CLI must match an exact package pin, not a stale hardcoded version or range', () => {
+  verifyCliVersion('4.151.0', '4.151.0');
+  for (const pin of ['^4.151.0', '~4.151.0', 'latest', '', undefined]) {
+    assert.throws(() => verifyCliVersion('4.151.0', pin));
+  }
+  assert.throws(() => verifyCliVersion('4.129.1', '4.151.0'));
+});
+test('canonical staging configuration preserves hosted video and exact R2/gateway origins', () => {
+  assert.equal(config.hostedVideoEnabled, true);
+  assert.deepEqual(config.mediaOrigins, ['https://colearnx-media-gateway.a1719396704.workers.dev']);
+  assert.deepEqual(config.uploadOrigins, [
+    'https://f457ddb114ddef000e8d0c4cc4aa5a97.r2.cloudflarestorage.com',
+    'https://colearnx-staging-assets.f457ddb114ddef000e8d0c4cc4aa5a97.r2.cloudflarestorage.com',
+  ]);
+});
 async function fixture(t) {
   const directory = await mkdtemp(join(tmpdir(), 'colearnx-artifact-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
@@ -72,13 +88,13 @@ test('Pages command uses tested dist, exact SHA, fixed CLI and existing project'
 });
 
 test('video settings fail closed and are bound to the release artifact', async (t) => {
-  assert.throws(() => validateConfig({ ...config, hostedVideoEnabled: true }), /requires/);
+  assert.throws(() => validateConfig({ ...config, hostedVideoEnabled: true, mediaOrigins: [], uploadOrigins: [] }), /requires/);
   for (const origins of [['https://user:password@example.com'], ['https://example.com/path'], ['https://example.com', 'https://example.com']]) {
     assert.throws(() => validateConfig({ ...config, mediaOrigins: origins }));
   }
   const directory = await fixture(t);
   const manifest = await createManifest(directory, config, commit);
-  assert.equal(manifest.hostedVideoEnabled, false);
+  assert.equal(manifest.hostedVideoEnabled, config.hostedVideoEnabled);
   assert.deepEqual(manifest.requiredMigrations, await migrationInventory());
   await writeFile(join(directory, 'release.json'), JSON.stringify({ ...manifest, mediaOrigins: ['https://other.example'] }));
   await assert.rejects(verifyArtifact(directory, config, commit));

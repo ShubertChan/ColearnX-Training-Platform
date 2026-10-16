@@ -1,6 +1,6 @@
 # Staging CI/CD 操作指南
 
-更新：2026-09-20。适用于包含 `017_video_order_course_integrity.sql` 的代码版本。
+更新：2026-10-16。适用于包含 `018_upload_retry_expiry_permissions.sql` 的代码版本。
 
 采用 **自动检查 + 人工批准发布**：PR 和 main 更新自动测试、构建；负责人从 main 手动运行发布。API 和前端锁定同一个完整 Git SHA，Pages 上传该次 CI 已检查的产物，不在发布时重新构建。
 
@@ -14,7 +14,7 @@
 | 仓库根目录 `.github/workflows/deploy-staging.yml` | 仅手动发布；同一环境串行运行，先 API 后 Pages，失败停止后续发布。 |
 | `.node-version` | Node.js 22.22.0。 |
 | `deployment/staging.json` | 公开域名、项目、支付/视频开关和媒体/上传来源。 |
-| `deployment/package*.json` | 发布 CLI 独立锁文件，Wrangler 固定 4.129.1。 |
+| `deployment/package*.json` | 发布 CLI 独立锁文件，Wrangler 固定 4.151.0，并在发布前核对安装版本与精确版本声明一致。 |
 | `scripts/deployment/source-guard.mjs` | 核对仓库、main、完整 SHA 和迁移确认；拒绝排队期间 main 已变化的旧发布。 |
 | `scripts/deployment/artifact.mjs` | 干净源码构建；生成及校验 release.json、迁移清单和文件 SHA-256。 |
 | `scripts/deployment/render-deploy.mjs` | 对现有服务发布指定 SHA；轮询 Live，拒绝竞争部署，支持只读复核。 |
@@ -69,7 +69,7 @@ Settings → Environments 创建 `staging`，限制部署分支为 main。若套
 
 预检只读，不替用户修改配置。API 继续使用 Render 原有 Secrets：低权限 colearnx_app 的 DATABASE_URL、认证、R2、邮件和 Stripe test 配置。Owner 迁移连接不放入长期运行的 API。
 
-公开配置核对：`NODE_ENV=staging`、`APP_ORIGIN=https://staging.colearnx.net`、`API_ORIGIN=https://api-staging.colearnx.net`、`DATABASE_SSL=true`、`DB_POOL_MAX=5`、`TRUST_PROXY=1`。本轮保留 `ENABLE_HOSTED_VIDEO=false`。
+公开配置核对：`NODE_ENV=staging`、`APP_ORIGIN=https://staging.colearnx.net`、`API_ORIGIN=https://api-staging.colearnx.net`、`DATABASE_SSL=true`、`DB_POOL_MAX=5`、`TRUST_PROXY=1`。保留当前已接入的视频能力：`ENABLE_HOSTED_VIDEO=true`，继续沿用已有的私有存储、网关和转码配置。
 
 发布使用 Render API 的 commitId，不使用只取分支最新状态的 Hook。创建部署请求只发一次；超时等结果不明时先查平台，不自动重发可能重复创建部署的 POST。[Render 指定提交部署文档](https://api-docs.render.com/reference/create-deploy)
 
@@ -90,13 +90,16 @@ Settings → Environments 创建 `staging`，限制部署分支为 main。若套
   "pagesBranch": "main",
   "paymentsEnabled": true,
   "paymentProvider": "stripe",
-  "hostedVideoEnabled": false,
-  "mediaOrigins": [],
-  "uploadOrigins": []
+  "hostedVideoEnabled": true,
+  "mediaOrigins": ["https://colearnx-media-gateway.a1719396704.workers.dev"],
+  "uploadOrigins": [
+    "https://f457ddb114ddef000e8d0c4cc4aa5a97.r2.cloudflarestorage.com",
+    "https://colearnx-staging-assets.f457ddb114ddef000e8d0c4cc4aa5a97.r2.cloudflarestorage.com"
+  ]
 }
 ```
 
-支付沿用现有 sandbox 配置，开关本身不能证明 Stripe 使用 test key，密钥模式需在平台核对。视频启用前必须配齐独立转码进程、私有 HLS 存储、网关、权限及 CORS/CSP 来源，不能仅改布尔值。
+支付沿用现有 sandbox 配置，开关本身不能证明 Stripe 使用 test key，密钥模式需在平台核对。这里保留已部署的视频开关与准确的 CSP 来源，不新建网关或重建 R2；转码仍依赖原有进程实际运行。其他环境不能仅复制布尔值，必须独立确认转码、私有 HLS、网关、权限与 CORS。
 
 ## 4. 云端迁移的独立检查
 
@@ -108,10 +111,10 @@ Settings → Environments 创建 `staging`，限制部署分支为 main。若套
 
 ```text
 migrations_reviewed = true
-last_applied_migration = 017_video_order_course_integrity.sql
+last_applied_migration = 018_upload_retry_expiry_permissions.sql
 ```
 
-将来出现 018 时填写当时仓库最后的文件名。该输入是人工确认，不是自动验证：工作流不持有 Neon 凭据，不查询云端 ledger，同名确认仍需人核对 checksum。
+将来出现新迁移时填写当时仓库最后的文件名。该输入是人工确认，不是自动验证：工作流不持有 Neon 凭据，不查询云端 ledger，同名确认仍需人核对 checksum。本次测试/依赖/CI 修复不添加 SQL，不需要重跑 seed。
 
 ## 5. 发布执行顺序
 
@@ -148,10 +151,12 @@ npm run api:typecheck
 npm run release:test
 npm --prefix apps/video-worker run typecheck
 npm --prefix apps/media-gateway run typecheck
+npm --prefix apps/video-worker test
+npm --prefix apps/media-gateway test
 npm run api:build
 ```
 
-数据库测试另需隔离本地 PostgreSQL 16 与 RELEASE_CHECK_DATABASE_URL，数据库名须以 colearnx_release_check_ 开头。不要填 Neon/业务库连接，测试会修改测试库结构及合成数据。
+数据库测试另需隔离本地 PostgreSQL 16 与 RELEASE_CHECK_DATABASE_URL，数据库名须以 colearnx_release_check_ 开头。不要填 Neon/业务库连接，测试会修改测试库结构及合成数据。CI 还会为上传重试和视频开课时间各创建一个新的隔离数据库，分别运行现有 `test:integration:upload-retry` 和 `video-start-integration-check.mjs`，不会复用已经填充的业务库。视频 Worker 单元测试中另有一个 opt-in 队列数据库用例；未提供专用 COLEARNX_QUEUE_TEST_URL 时会明确跳过，不能记为通过。
 
 浏览器回归使用本地 fixture：
 
@@ -174,23 +179,30 @@ release:smoke -- --api-only 是公开 API 只读检查。完整 release:smoke �
 
 ## 7. 覆盖范围与本轮实测
 
-2026-09-20，本地 Node 22.22.0 / PostgreSQL 16：
+2026-10-16，本地 Node 24.15.0 / PostgreSQL 16.15（CI 仍固定 Node 22.22.0，尚需以真实 runner 结果确认）：
 
 | 检查 | 结果 |
 | --- | --- |
-| 部署脚本模拟网络测试 | 80/80 |
-| 前端 Node 单元测试 | 144/144 |
-| 前端组件测试 | 32/32 |
-| API 单元测试 | 176/176 |
-| 隔离数据库集成检查 | 25 组通过，覆盖 001–017、历史数据、权限、认证/MFA 和订单视频约束 |
-| API 类型检查、API/前端构建 | 通过 |
-| 视频 Worker / 网关类型检查 | 通过，不代表已部署或视频链路可用 |
-| actionlint 1.7.12 | 通过，未启用 shellcheck / pyflakes |
-| 公开线上 smoke | f1edca3 通过，包含 API/CORS/匿名权限及前端 6 个文件哈希 |
+| 部署脚本模拟网络测试 | 82/82 |
+| 前端 Node 单元测试 | 164/164 |
+| 前端组件测试 | 50/50 |
+| API 单元测试 | 237/237 |
+| 隔离数据库发布集成检查 | 25 组通过，覆盖 001–018、保留旧数据、权限、认证/MFA、视频时长可信边界和订单版本约束 |
+| 真实低权限上传重试集成检查 | 8 组通过，先复现 42501 再验证 018 最小字段授权、重复重试与配额 |
+| 课程开课时间数据库/API 检查 | 17 组通过，包含购买权限、服务端时间、审核与退款后撤权 |
+| Playwright Chromium 浏览器回归 | 56/56，本地生产包 + fixture；不代表真实支付/邮件/R2 云端验收 |
+| API 类型检查、API 构建 | 通过 |
+| 视频 Worker / 网关类型检查 | 通过，不代表本次重新部署了视频服务 |
+| 视频 Worker / 网关单元测试 | Worker 13 通过、1 个 opt-in 数据库用例跳过；网关 13/13 |
+| Node 22.22.0 兼容复核 | 前端 164、组件 50、API 237、发布脚本 82 项通过；API/视频服务类型检查与 API 编译通过 |
+| actionlint 1.7.12 | 两份工作流检查通过，未启用 shellcheck/pyflakes |
+| Wrangler 4.151.0 网关 dry-run | 本地打包通过，使用仅含公开绑定的 staging 配置；没有发布 Worker 或访问 R2 对象 |
 
-Playwright Chromium 步骤已加入工作流，本轮未实际执行该套浏览器自动化用例，不得把配置存在写成测试通过。网站登录入口已做浏览器只读检查；本轮未重做真实支付、邮件、R2 上传或管理员验证器绑定。
+本轮未运行 Firefox/WebKit，也未重做真实支付、邮件、R2 上传或管理员验证器绑定。Windows 沙箱拒绝进程枚举，导致 Playwright 测试服务器清理卡住；确认 PID 和命令行后仅停止了临时 fixture 服务器，随后测试命令正常以 0 退出并汇总 56 项通过。CI 使用 Linux runner，不需要沿用该本机操作。
 
-本轮生产依赖 audit：前端 0 项；API qs 传递依赖 1 项 moderate，high/critical 均为 0。CI 以 high 为阻断阈值，不表示 moderate 没风险；本轮不自动 audit fix。大于 500 kB 的前端 chunk 提示仍需后续评估。
+本轮更新 API 锁文件中的 proxy-addr 2.0.8、ip-address 10.7.4、qs 6.16.1；媒体网关和独立发布工具均将 Wrangler 精确锁定为 4.151.0，修补其 Miniflare/Undici/Sharp 工具链告警。前端/API/转码服务生产依赖，以及媒体网关/发布工具完整依赖的 npm audit 均为 0 项。CI 新增后两类工具链扫描，避免只查生产依赖而漏掉发布工具。CI 以 high 为阻断阈值，不代表日后出现 moderate 可以忽略；大于 500 kB 的前端 chunk 提示仍需后续评估。
+
+旧集成测试不再期待前端提交的视频时长直接写入数据库：创建/编辑时伪造时长仍应为 null；模拟受信服务写入后，另一条前端请求不能覆盖该值。另将本地测试角色显式设为 NOINHERIT/NOBYPASSRLS，与新上传权限测试保持一致，不放宽真实 API 权限。
 
 本地通过不等于 GitHub runner、Environment 审批和真实令牌链路已成功；首次云端 Actions 运行仍需验收。Actions、产物存储及已有云服务按额度计费，不保证无限免费。
 

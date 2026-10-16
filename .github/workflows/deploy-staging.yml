@@ -10,7 +10,7 @@ on:
         type: boolean
         default: false
       last_applied_migration:
-        description: Exact last migration filename verified in the cloud ledger (for example 017_video_order_course_integrity.sql)
+        description: Exact last migration filename verified in the cloud ledger (for example 018_upload_retry_expiry_permissions.sql)
         required: true
         type: string
 
@@ -120,7 +120,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_SEND_METRICS: 'false'
-        # Version fixed to the CLI already used for this staging project.
+        # Install and verify the reviewed exact CLI version from deployment/package-lock.json.
         run: node scripts/deployment/pages-deploy.mjs
       - name: Verify published version, assets, and API
         run: npm run release:smoke

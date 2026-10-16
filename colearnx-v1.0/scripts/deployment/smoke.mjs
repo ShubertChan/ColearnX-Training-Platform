@@ -105,7 +105,7 @@ async function checkApi(config, fetchImpl, signal) {
       const response = await request(fetchImpl, `${config.apiBaseUrl}/me`, { signal, headers }, 401, label);
       checkCors(response, config, label);
     })(),
-    ...['auth/mfa', 'admin/role-applications', 'admin/video-operations'].map(async path => {
+    ...['auth/mfa', 'admin/role-applications', 'admin/video-operations', 'admin/security/summary', 'admin/security/events'].map(async path => {
       const response = await request(fetchImpl, `${config.apiBaseUrl}/${path}`, { signal, headers }, 401, `Unauthenticated ${path}`);
       checkCors(response, config, path);
       requireCondition((await json(response, path))?.error?.code === 'AUTH_REQUIRED', `${path}: missing authentication guard.`);

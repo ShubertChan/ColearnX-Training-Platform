@@ -6,7 +6,10 @@
   "pagesBranch": "main",
   "paymentsEnabled": true,
   "paymentProvider": "stripe",
-  "hostedVideoEnabled": false,
-  "mediaOrigins": [],
-  "uploadOrigins": []
+  "hostedVideoEnabled": true,
+  "mediaOrigins": ["https://colearnx-media-gateway.a1719396704.workers.dev"],
+  "uploadOrigins": [
+    "https://f457ddb114ddef000e8d0c4cc4aa5a97.r2.cloudflarestorage.com",
+    "https://colearnx-staging-assets.f457ddb114ddef000e8d0c4cc4aa5a97.r2.cloudflarestorage.com"
+  ]
 }

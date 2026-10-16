@@ -8,7 +8,7 @@ const commit = 'a'.repeat(40);
 const config = await loadConfig();
 const files = { 'index.html': '<html><script src="/assets/index-test.js"></script></html>', 'assets/index-test.js': 'console.log("staging");', 'assets/index-test.css': 'body{margin:0}' };
 const manifest = { commit, appOrigin: config.appOrigin, apiBaseUrl: config.apiBaseUrl, paymentsEnabled: true, assets: Object.entries(files).map(([path, body]) => ({ path, sha256: createHash('sha256').update(body).digest('hex') })) };
-Object.assign(manifest, { schemaVersion: 1, hostedVideoEnabled: false, mediaOrigins: [], uploadOrigins: [], requiredMigrations: await migrationInventory(), files: manifest.assets });
+Object.assign(manifest, { schemaVersion: 1, hostedVideoEnabled: config.hostedVideoEnabled, mediaOrigins: config.mediaOrigins, uploadOrigins: config.uploadOrigins, requiredMigrations: await migrationInventory(), files: manifest.assets });
 const cors = { 'access-control-allow-origin': config.appOrigin, 'access-control-allow-credentials': 'true' };
 const options = { config, manifest, releaseSha: commit, maxAttempts: 1 };
 const responseJson = (body, status = 200, headers = cors) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -27,7 +27,7 @@ function fakeFetch(override = () => undefined) {
     if (url.pathname.endsWith('/wallet/top-up-packages')) return responseJson({ data: [{ id: 'package-one', amountMinor: 500, points: 500 }] });
     if (url.pathname.endsWith('/auth/refresh')) return new Response(null, { status: 204, headers: { ...cors, 'access-control-allow-methods': 'GET,POST', 'access-control-allow-headers': 'Content-Type,X-CSRF-Token' } });
     if (url.pathname.endsWith('/me')) return responseJson({ error: { code: 'AUTH_REQUIRED' } }, 401);
-    if (['/auth/mfa', '/admin/role-applications', '/admin/video-operations'].some(path => url.pathname.endsWith(path))) return responseJson({ error: { code: 'AUTH_REQUIRED' } }, 401);
+    if (['/auth/mfa', '/admin/role-applications', '/admin/video-operations', '/admin/security/summary', '/admin/security/events'].some(path => url.pathname.endsWith(path))) return responseJson({ error: { code: 'AUTH_REQUIRED' } }, 401);
     if (url.pathname === '/release.json') return responseJson(manifest);
     const path = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
     if (path in files) return new Response(files[path]);
@@ -42,7 +42,7 @@ test('full smoke verifies the expected release and every artifact with no mutati
   assert.equal(result.assetsChecked, 3);
   assert.equal(result.commit, commit);
   assert.equal(result.attempts, 1);
-  assert.equal(deps.requests.length, 14);
+  assert.equal(deps.requests.length, 16);
   for (const { url, init } of deps.requests) {
     assert.ok(['GET', 'OPTIONS'].includes(init.method ?? 'GET'));
     assert.equal(init.credentials, 'omit');
@@ -56,7 +56,7 @@ test('full smoke verifies the expected release and every artifact with no mutati
 test('API-only gate does not require a SHA, local artifact or Pages access', async () => {
   const deps = fakeFetch();
   assert.equal((await runSmoke({ config, apiOnly: true, maxAttempts: 1 }, deps)).mode, 'api-only');
-  assert.equal(deps.requests.length, 10);
+  assert.equal(deps.requests.length, 12);
   assert.ok(deps.requests.every(({ url }) => url.origin === config.apiOrigin));
 });
 
