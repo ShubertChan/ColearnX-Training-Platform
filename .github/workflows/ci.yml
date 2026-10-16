@@ -62,13 +62,13 @@ jobs:
           npm --prefix apps/video-worker ci --include=dev
           npm --prefix apps/media-gateway ci --include=dev
           npm --prefix deployment ci --ignore-scripts
-      - name: Audit frontend production dependencies (block high or critical)
-        run: npm audit --omit=dev --audit-level=high
-      - name: Audit API production dependencies (block high or critical)
-        run: npm --prefix apps/api audit --omit=dev --audit-level=high
-      - name: Audit video runtime and Cloudflare tooling dependencies (block high or critical)
+      - name: Audit frontend dependencies including build tools (block high or critical)
+        run: npm audit --audit-level=high
+      - name: Audit API dependencies including test tools (block high or critical)
+        run: npm --prefix apps/api audit --audit-level=high
+      - name: Audit video and Cloudflare tooling dependencies (block high or critical)
         run: |
-          npm --prefix apps/video-worker audit --omit=dev --audit-level=high
+          npm --prefix apps/video-worker audit --audit-level=high
           npm --prefix apps/media-gateway audit --audit-level=high
           npm --prefix deployment audit --audit-level=high
       - name: Deployment script tests (mock network only)
