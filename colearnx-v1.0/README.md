@@ -38,4 +38,4 @@ The repository also includes the backend delivery and refund workflows. Review a
 
 ## Controlled staging CI/CD
 
-See [the staging CI/CD guide](docs/STAGING_CICD.md) for automated tests, isolated PostgreSQL integration checks, pinned release artifacts, required migration acknowledgement, and manual publishing of the same commit to Render and Cloudflare Pages. Cloud migration and runtime secrets are deliberately kept outside this workflow. Hosted video remains disabled in `deployment/staging.json` until its separate worker, gateway and storage configuration are ready.
+See [the staging CI/CD guide](docs/STAGING_CICD.md) for automated tests, isolated PostgreSQL integration checks, pinned release artifacts, required migration acknowledgement, and manual publishing of the same commit to Render and Cloudflare Pages. Cloud migration and runtime secrets are deliberately kept outside this workflow. The canonical staging configuration preserves the existing hosted-video gateway and R2 origins; the separate transcoding process must still be running for new videos to be processed.
