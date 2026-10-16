@@ -116,8 +116,11 @@ try {
   assert.equal(existing.rows[0].count, 0, 'Target database must be empty; this script will not erase or restore it.');
   for (const role of ['colearnx_app', 'colearnx_migrator', 'colearnx_readonly']) {
     const result = await owner.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [role]);
-    if (!result.rowCount) await owner.query(`CREATE ROLE ${quoteIdentifier(role)} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE`);
+    if (!result.rowCount) await owner.query(`CREATE ROLE ${quoteIdentifier(role)} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`);
   }
+  const runtimeFlags = (await owner.query(`SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls, rolinherit
+    FROM pg_roles WHERE rolname = 'colearnx_app'`)).rows[0];
+  assert.ok(Object.values(runtimeFlags).every(flag => flag === false), 'Fixture runtime role must be unprivileged.');
   passed('isolated empty local PostgreSQL 16 database safety checks');
 
   await owner.query(`CREATE TABLE schema_migrations (filename text PRIMARY KEY, checksum text NOT NULL,
@@ -383,24 +386,38 @@ try {
     pricePoints: 350, capacity: 17, startsAt: '2030-01-01T08:00:00.000Z', endsAt: '2030-01-01T10:00:00.000Z',
     timezone: 'Asia/Singapore', deliveryModes: ['live', 'record'],
     fulfilmentInstructions: 'Private fixture instructions', trainerContact: 'trainer@example.test',
-    joinUrl: 'https://example.test/private-fixture', progressTrackingType: 'online_video', totalDurationSeconds: 300,
+    joinUrl: 'https://example.test/private-fixture', progressTrackingType: 'online_video',
   };
   const trainerToken = accessToken(sellerId);
-  const createdDraft = await request(app).post('/api/v1/courses').set('Authorization', `Bearer ${trainerToken}`).send(draftPayload).expect(201);
+  const createdDraft = await request(app).post('/api/v1/courses').set('Authorization', `Bearer ${trainerToken}`)
+    .send({ ...draftPayload, totalDurationSeconds: 300 }).expect(201);
   const firstListings = await request(app).get('/api/v1/my/listings').set('Authorization', `Bearer ${trainerToken}`).expect(200);
   const savedDraft = firstListings.body.data.find((item) => item.id === createdDraft.body.data.id);
+  // Only FFprobe may establish trusted duration; a newly saved draft has no
+  // verified source. Do not reintroduce trust in client duration to pass tests.
   for (const [key, value] of Object.entries(draftPayload)) assert.deepEqual(savedDraft[key], value, `Draft listings omitted ${key}`);
+  assert.equal(savedDraft.totalDurationSeconds, null, 'Client-supplied duration must remain unverified.');
   const editPayload = Object.fromEntries(Object.keys(draftPayload).map((key) => [key, savedDraft[key]]));
   editPayload.title = 'Edited fixture title';
-  await request(app).patch(`/api/v1/courses/${savedDraft.id}`).set('Authorization', `Bearer ${trainerToken}`).send(editPayload).expect(200);
+  await request(app).patch(`/api/v1/courses/${savedDraft.id}`).set('Authorization', `Bearer ${trainerToken}`)
+    .send({ ...editPayload, totalDurationSeconds: 999 }).expect(200);
+  const unverifiedEdit = await request(app).get('/api/v1/my/listings').set('Authorization', `Bearer ${trainerToken}`).expect(200);
+  assert.equal(unverifiedEdit.body.data.find((item) => item.id === savedDraft.id).totalDurationSeconds, null,
+    'Editing a draft cannot verify a client-supplied duration.');
+  // Fixture owner simulates a trusted processor result; the video-start suite
+  // separately verifies ready-video data. No production duration rule changes.
+  await owner.query('UPDATE course_runs SET total_duration_seconds=300 WHERE course_run_id=$1', [savedDraft.id]);
+  await request(app).patch(`/api/v1/courses/${savedDraft.id}`).set('Authorization', `Bearer ${trainerToken}`)
+    .send({ ...editPayload, totalDurationSeconds: 999 }).expect(200);
   const afterEditListings = await request(app).get('/api/v1/my/listings').set('Authorization', `Bearer ${trainerToken}`).expect(200);
   const afterEditDraft = afterEditListings.body.data.find((item) => item.id === savedDraft.id);
   for (const [key, value] of Object.entries(editPayload)) assert.deepEqual(afterEditDraft[key], value, `Draft edit lost ${key}`);
+  assert.equal(afterEditDraft.totalDurationSeconds, 300, 'Metadata edits must preserve the server-verified duration.');
   const publicCourse = await request(app).get(`/api/v1/courses/${courseRunId}`).expect(200);
   assert.equal('fulfilmentInstructions' in publicCourse.body.data, false);
   assert.equal('trainerContact' in publicCourse.body.data, false);
   assert.equal('joinUrl' in publicCourse.body.data, false);
-  passed('real draft create/list/edit preserves category/timezone/schedule/delivery/video metadata; public catalog omits private delivery fields');
+  passed('draft metadata is preserved, untrusted durations stay null, verified durations cannot be forged, and public delivery fields stay private');
 
   const assetId = randomUUID();
   await apiPool.query(`INSERT INTO course_delivery_assets (course_delivery_asset_id, course_run_id, owner_user_id, asset_purpose,
@@ -564,6 +581,8 @@ try {
   passed('real second-delete failure rolls back the first deletion; CLI rejects malformed days before deletion and succeeds with the corrected schema');
   const { runMfaSessionChecks } = await import('./mfa-session-checks.mjs');
   await runMfaSessionChecks({ owner, app, apiPool, environment, passed });
+  const { runVideoOrderIntegrityChecks } = await import('./video-order-integrity-checks.mjs');
+  await runVideoOrderIntegrityChecks({ owner, buyerId, sellerId, courseId, courseRunId, passed });
   assert.equal(blockedHttpCalls, 0, 'No email, HIBP, alert, payment, or storage HTTP request may be attempted.');
   process.stdout.write(`SUCCESS ${checks} integration check groups passed; test-only data retained in disposable local PostgreSQL cluster.\n`);
 } finally {
