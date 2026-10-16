@@ -66,6 +66,11 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Audit API production dependencies (block high or critical)
         run: npm --prefix apps/api audit --omit=dev --audit-level=high
+      - name: Audit video runtime and Cloudflare tooling dependencies (block high or critical)
+        run: |
+          npm --prefix apps/video-worker audit --omit=dev --audit-level=high
+          npm --prefix apps/media-gateway audit --audit-level=high
+          npm --prefix deployment audit --audit-level=high
       - name: Deployment script tests (mock network only)
         run: npm run release:test
       - name: Frontend tests
@@ -80,10 +85,25 @@ jobs:
         run: |
           npm --prefix apps/video-worker run typecheck
           npm --prefix apps/media-gateway run typecheck
+      - name: Video Worker and gateway unit tests (no cloud services)
+        run: |
+          npm --prefix apps/video-worker test
+          npm --prefix apps/media-gateway test
       - name: Isolated PostgreSQL 16 migrations, data preservation and permissions
         env:
           RELEASE_CHECK_DATABASE_URL: postgresql://release_owner:ci-local-fixture-only@127.0.0.1:5432/colearnx_release_check_ci
         run: npm run release:database-test
+      - name: Real restricted-login upload retry and scheduled-video integration checks
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          RELEASE_CHECK_DATABASE_URL: postgresql://release_owner:ci-local-fixture-only@127.0.0.1:5432/colearnx_release_check_upload_retry_ci
+          VIDEO_START_CHECK_DATABASE_URL: postgresql://release_owner:ci-local-fixture-only@127.0.0.1:5432/colearnx_release_check_video_ci
+        run: |
+          docker exec "$POSTGRES_CONTAINER" createdb -U release_owner colearnx_release_check_upload_retry_ci
+          docker exec "$POSTGRES_CONTAINER" createdb -U release_owner colearnx_release_check_video_ci
+          npm --prefix apps/api run test:integration:upload-retry
+          cd apps/api
+          node --import tsx scripts/video-start-integration-check.mjs
       - name: Browser regression checks against local fixtures only
         run: |
           npm exec -- playwright install --with-deps chromium

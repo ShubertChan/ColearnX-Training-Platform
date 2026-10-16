@@ -11,13 +11,20 @@ export function pagesArguments(config, commit) {
     '--branch', config.pagesBranch, '--commit-hash', commit, '--commit-message', `staging-${commit}`, '--commit-dirty=false'];
 }
 
+export function verifyCliVersion(installedVersion, pinnedVersion) {
+  if (!/^\d+\.\d+\.\d+$/.test(pinnedVersion || '') || installedVersion !== pinnedVersion) {
+    throw new Error('Install the exact lockfile-pinned deployment CLI before providing secrets.');
+  }
+}
+
 async function main() {
   const config = await loadConfig();
   const commit = requireCommit(process.env.RELEASE_SHA);
   if (!process.env.CLOUDFLARE_API_TOKEN || !/^[a-f0-9]{32}$/.test(process.env.CLOUDFLARE_ACCOUNT_ID || '')) throw new Error('Missing Cloudflare credentials.');
   if (process.env.GITHUB_ACTIONS !== 'true' || process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('Publish only through the approved main workflow.');
   const cli = JSON.parse(await readFile(resolve(appDirectory, 'deployment/node_modules/wrangler/package.json'), 'utf8'));
-  if (cli.version !== '4.129.1') throw new Error('Install the lockfile-pinned deployment CLI before providing secrets.');
+  const tooling = JSON.parse(await readFile(resolve(appDirectory, 'deployment/package.json'), 'utf8'));
+  verifyCliVersion(cli.version, tooling.dependencies?.wrangler);
   await verifyArtifact(resolve(appDirectory, 'dist'), config, commit);
   // GitHub's Linux runner avoids shell interpolation; no tokens appear in command arguments.
   if (process.platform === 'win32') throw new Error('Run publishing through the Linux GitHub Actions workflow.');
