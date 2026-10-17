@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { requestStepUp } from "../api/auth";
@@ -5,6 +6,7 @@ import { registerStepUpHandler } from "../api/stepUp.js";
 import { Button, FormField, Modal } from "./ui";
 
 export default function StepUpProvider({ children }) {
+  const { t } = useTranslation();
   const active = useRef(null);
   const [open, setOpen] = useState(false), [code, setCode] = useState("");
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -41,15 +43,15 @@ export default function StepUpProvider({ children }) {
     }
   };
 
-  return <>{children}{open && <Modal title="Confirm your identity" onClose={cancel}>
+  return <>{children}{open && <Modal title={t("Confirm your identity")} onClose={cancel}>
     <form onSubmit={submit} className="form-stack">
-      <p>This administrator action requires a recent second-factor check. No change is made until verification succeeds.</p>
-      <FormField label="Authenticator or recovery code" hint="Use a new authenticator code if you just signed in. A recovery code can only be used once.">
+      <p>{t("This administrator action requires a recent second-factor check. No change is made until verification succeeds.")}</p>
+      <FormField label={t("Authenticator or recovery code")} hint={t("Use a new authenticator code if you just signed in. A recovery code can only be used once.")}>
         <input autoComplete="one-time-code" value={code} onChange={event => setCode(event.target.value)} maxLength={32} required disabled={busy} />
       </FormField>
-      {error && <div className="form-error" role="alert">{error}</div>}
-      <div className="button-row"><Button type="button" variant="secondary" onClick={cancel}>Cancel</Button><Button type="submit" disabled={busy || code.trim().length < 6}>{busy ? "Verifying…" : "Verify and continue"}</Button></div>
-      <Link to="/security" onClick={cancel}>Manage two-factor authentication</Link>
+      {error && <div className="form-error" role="alert">{t(error)}</div>}
+      <div className="button-row"><Button type="button" variant="secondary" onClick={cancel}>{t("Cancel")}</Button><Button type="submit" disabled={busy || code.trim().length < 6}>{busy ? t("Verifying…") : t("Verify and continue")}</Button></div>
+      <Link to="/security" onClick={cancel}>{t("Manage two-factor authentication")}</Link>
     </form>
   </Modal>}</>;
 }

@@ -1,3 +1,4 @@
+import { getFormatLocale, useTranslation } from "../i18n/LanguageContext";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
@@ -34,14 +35,15 @@ const isIdentityInterruption = (error) =>
 
 function formatWhen(value) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(getFormatLocale());
 }
 
 const shortId = (value) => (value ? `${String(value).slice(0, 8)}…` : "—");
 
 function TrendChart({ daily }) {
+  const { t } = useTranslation();
   const { peak, bars } = useMemo(() => buildTrend(daily), [daily]);
-  if (!bars.length) return <p className="empty-copy">No activity in this window.</p>;
+  if (!bars.length) return <p className="empty-copy">{t("No activity in this window.")}</p>;
   const first = bars[0]?.date;
   const last = bars[bars.length - 1]?.date;
   const label = `Daily security events from ${first} to ${last}; busiest day ${peak} events.`;
@@ -52,7 +54,7 @@ function TrendChart({ daily }) {
           <div
             key={bar.date}
             className="sec-trend-col"
-            title={`${bar.date}: ${bar.total} event${bar.total === 1 ? "" : "s"}${bar.severe ? ` · ${bar.severe} high/critical` : ""}`}
+            title={t("{0}: {1} event{2}{3}", { 0: bar.date, 1: bar.total, 2: bar.total === 1 ? "" : "s", 3: bar.severe ? ` · ${bar.severe} high/critical` : "" })}
           >
             <div className="sec-trend-stack">
               {bar.routine > 0 && (
@@ -70,14 +72,15 @@ function TrendChart({ daily }) {
         <span>{last}</span>
       </div>
       <div className="sec-legend">
-        <span><i className="swatch routine" /> Routine</span>
-        <span><i className="swatch severe" /> High / critical</span>
+        <span><i className="swatch routine" />{t(" Routine")}</span>
+        <span><i className="swatch severe" />{t(" High / critical")}</span>
       </div>
     </div>
   );
 }
 
 export default function AdminSecurityDashboardPage() {
+  const { t } = useTranslation();
   const [summary, setSummary] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -173,9 +176,9 @@ export default function AdminSecurityDashboardPage() {
     return (
       <EmptyState
         icon={ShieldAlert}
-        title="Confirm your identity to view security telemetry"
-        description="The security monitor shows authentication and access-control events, so it asks for a recent second-factor check before loading."
-        action={<Button onClick={load}>Confirm and load monitor</Button>}
+        title={t("Confirm your identity to view security telemetry")}
+        description={t("The security monitor shows authentication and access-control events, so it asks for a recent second-factor check before loading.")}
+        action={<Button onClick={load}>{t("Confirm and load monitor")}</Button>}
       />
     );
   }
@@ -184,57 +187,52 @@ export default function AdminSecurityDashboardPage() {
     <>
       <section className="hero-banner">
         <div>
-          <span className="eyebrow light">Security monitoring</span>
-          <h2>Security event monitor</h2>
-          <p>
-            Failed sign-ins, lockouts, denied authorisations and rate-limit hits recorded across the
-            platform. Sources are shown as salted fingerprints, never raw addresses.
-          </p>
+          <span className="eyebrow light">{t("Security monitoring")}</span>
+          <h2>{t("Security event monitor")}</h2>
+          <p>{t("Failed sign-ins, lockouts, denied authorisations and rate-limit hits recorded across the platform. Sources are shown as salted fingerprints, never raw addresses.")}</p>
           <div className="button-row">
             <Button variant="glass" onClick={load} disabled={loading}>
-              <RefreshCw size={15} /> {loading ? "Refreshing…" : "Refresh"}
+              <RefreshCw size={15} /> {loading ? t("Refreshing…") : t("Refresh")}
             </Button>
           </div>
         </div>
         <ShieldAlert size={54} />
       </section>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <p className="form-error" role="alert">{t(error)}</p>}
 
       {summary && (
-        <p className="sec-range" role="note">
-          Window {summary.range.from} to {summary.range.to} · {summary.total} event{summary.total === 1 ? "" : "s"} ·{" "}
-          {summary.severe} high or critical
-        </p>
+        <p className="sec-range" role="note">{t("Window ")}{summary.range.from}{t(" to ")}{summary.range.to} · {summary.total}{t(" event")}{summary.total === 1 ? "" : t("s")} ·{" "}
+          {summary.severe}{t(" high or critical")}</p>
       )}
 
       <div className="metric-grid three">
-        <Metric label="Failed sign-ins" value={highlights.failedLogins ?? 0} detail="auth.login_failed" icon={KeyRound} />
-        <Metric label="Account lockouts" value={highlights.accountsLocked ?? 0} detail="Progressive, auto-releasing" icon={Lock} />
-        <Metric label="Rate-limit hits" value={highlights.rateLimited ?? 0} detail="Throttled requests" icon={Ban} />
-        <Metric label="High / critical events" value={summary?.severe ?? 0} detail="Severity 3 and above" icon={AlertTriangle} />
-        <Metric label="Breach-check outages" value={highlights.breachUnavailable ?? 0} detail="HIBP failed open" icon={ServerCrash} />
-        <Metric label="Accounts targeted" value={highlights.accountsTargeted ?? 0} detail="Distinct accounts, severity 2+" icon={Users} />
+        <Metric label={t("Failed sign-ins")} value={highlights.failedLogins ?? 0} detail={t("auth.login_failed")} icon={KeyRound} />
+        <Metric label={t("Account lockouts")} value={highlights.accountsLocked ?? 0} detail={t("Progressive, auto-releasing")} icon={Lock} />
+        <Metric label={t("Rate-limit hits")} value={highlights.rateLimited ?? 0} detail={t("Throttled requests")} icon={Ban} />
+        <Metric label={t("High / critical events")} value={summary?.severe ?? 0} detail={t("Severity 3 and above")} icon={AlertTriangle} />
+        <Metric label={t("Breach-check outages")} value={highlights.breachUnavailable ?? 0} detail={t("HIBP failed open")} icon={ServerCrash} />
+        <Metric label={t("Accounts targeted")} value={highlights.accountsTargeted ?? 0} detail={t("Distinct accounts, severity 2+")} icon={Users} />
       </div>
 
       <Card>
         <div className="card-heading">
           <div>
-            <span className="eyebrow">Activity trend</span>
-            <h3>Events per day</h3>
-            <p>Daily volume over the window, with the high and critical share called out.</p>
+            <span className="eyebrow">{t("Activity trend")}</span>
+            <h3>{t("Events per day")}</h3>
+            <p>{t("Daily volume over the window, with the high and critical share called out.")}</p>
           </div>
           <Activity size={22} />
         </div>
-        {summary ? <TrendChart daily={summary.daily} /> : <p role="status">Loading trend…</p>}
+        {summary ? <TrendChart daily={summary.daily} /> : <p role="status">{t("Loading trend…")}</p>}
       </Card>
 
       <Card>
         <div className="card-heading">
           <div>
-            <span className="eyebrow">Breakdown</span>
-            <h3>Most frequent event types</h3>
-            <p>The vocabulary firing most often in this window.</p>
+            <span className="eyebrow">{t("Breakdown")}</span>
+            <h3>{t("Most frequent event types")}</h3>
+            <p>{t("The vocabulary firing most often in this window.")}</p>
           </div>
         </div>
         {typeOptions.length ? (
@@ -250,41 +248,40 @@ export default function AdminSecurityDashboardPage() {
             ))}
           </ul>
         ) : (
-          <p className="empty-copy">No events recorded in this window.</p>
+          <p className="empty-copy">{t("No events recorded in this window.")}</p>
         )}
       </Card>
 
       <Card>
         <div className="card-heading">
           <div>
-            <span className="eyebrow">Event stream</span>
-            <h3>Recent events</h3>
-            <p>Newest first. Filter by severity, or select an event type above.</p>
+            <span className="eyebrow">{t("Event stream")}</span>
+            <h3>{t("Recent events")}</h3>
+            <p>{t("Newest first. Filter by severity, or select an event type above.")}</p>
           </div>
           <div className="sec-filters">
             <Segmented options={SEVERITY_FILTERS} value={minSeverity} onChange={applySeverity} />
             {typeFilter && (
-              <Button variant="secondary" className="sm" onClick={() => applyType("")}>
-                Clear “{formatEventType(typeFilter)}”
+              <Button variant="secondary" className="sm" onClick={() => applyType("")}>{t("Clear “")}{formatEventType(typeFilter)}”
               </Button>
             )}
           </div>
         </div>
         {loading ? (
-          <p role="status">Loading events…</p>
+          <p role="status">{t("Loading events…")}</p>
         ) : events.length ? (
           <>
             <div className="table-scroll">
               <table className="sec-table">
-                <caption className="sr-only">Recent security events, newest first</caption>
+                <caption className="sr-only">{t("Recent security events, newest first")}</caption>
                 <thead>
                   <tr>
-                    <th scope="col">When (UTC-local)</th>
-                    <th scope="col">Event</th>
-                    <th scope="col">Severity</th>
-                    <th scope="col">Decision</th>
-                    <th scope="col">Source</th>
-                    <th scope="col">Account</th>
+                    <th scope="col">{t("When (UTC-local)")}</th>
+                    <th scope="col">{t("Event")}</th>
+                    <th scope="col">{t("Severity")}</th>
+                    <th scope="col">{t("Decision")}</th>
+                    <th scope="col">{t("Source")}</th>
+                    <th scope="col">{t("Account")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -304,13 +301,13 @@ export default function AdminSecurityDashboardPage() {
             {nextCursor && (
               <div className="button-row center">
                 <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
-                  {loadingMore ? "Loading…" : "Load more"}
+                  {loadingMore ? t("Loading…") : t("Load more")}
                 </Button>
               </div>
             )}
           </>
         ) : (
-          <p className="empty-copy">No events match the current filters.</p>
+          <p className="empty-copy">{t("No events match the current filters.")}</p>
         )}
       </Card>
     </>

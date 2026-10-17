@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 import { recordCourseProgress } from "../api/courseDelivery";
 import { createPlaybackSession, createPreviewSession } from "../api/video";
@@ -13,6 +14,7 @@ const messages = {
   scheduled: "This course has not started yet. Refresh the course after its start time.", schedule_required: "The Trainer must set a start time before this video can be watched.",
 };
 export default function CourseVideoPlayer({ orderItemId, record, onRecorded, onReady, previewCourseId, previewVersionId, showHeading = true, showProgress = true }) {
+  const { t } = useTranslation();
   const videoRef = useRef(null), reporterRef = useRef(null), callbackRef = useRef(onRecorded);
   callbackRef.current = onRecorded;
   const readyRef = useRef(onReady); readyRef.current = onReady;
@@ -127,15 +129,15 @@ export default function CourseVideoPlayer({ orderItemId, record, onRecorded, onR
     else void open();
     return () => { disposed = true; abort.abort(); detach(); clearInterval(interval); events.forEach(([name, handler]) => media.removeEventListener(name, handler)); document.removeEventListener("visibilitychange", visibility); window.removeEventListener("pagehide", leaving); };
   }, [orderItemId, previewCourseId, previewVersionId, preview, expectedVersion, versionStatus, playbackState, attempt]);
-  return <section className="video-player" aria-label={preview ? "Video review preview" : "Online course video"}>
-    {showHeading && <b>{preview ? "Review preview" : "Online video"}</b>}
-    <video ref={videoRef} controls playsInline preload="metadata" controlsList="nodownload" disablePictureInPicture aria-label="Course video" hidden={state !== "ready" && state !== "loading"} />
-    {messages[state] && <p role={state === "loading" || state === "processing" ? "status" : "alert"}>{messages[state]}</p>}
+  return <section className="video-player" aria-label={preview ? t("Video review preview") : t("Online course video")}>
+    {showHeading && <b>{preview ? t("Review preview") : t("Online video")}</b>}
+    <video ref={videoRef} controls playsInline preload="metadata" controlsList="nodownload" disablePictureInPicture aria-label={t("Course video")} hidden={state !== "ready" && state !== "loading"} />
+    {messages[state] && <p role={state === "loading" || state === "processing" ? "status" : "alert"}>{t(messages[state])}</p>}
     {!preview && <>
-      {showProgress && (progress ? <><Progress value={videoProgressPercent(progress)} label="Server-confirmed unique viewing progress" /><small>{progress.uniqueContentWatchedSeconds.toFixed(3)} of {progress.durationSeconds.toFixed(3)} seconds confirmed. Seeking and repeat viewing do not add duplicate progress.</small></> : <p>Waiting for confirmed viewing progress.</p>)}
-      {progressError && <p role="alert" className="form-error">{progressError}</p>}
-      {state === "ready" && <Button type="button" variant="secondary" size="sm" onClick={() => { const v = videoRef.current; void reporterRef.current?.report(v.seeking ? "seeking" : v.paused ? "pause" : "playing", v); }}>Sync viewing progress</Button>}
+      {showProgress && (progress ? <><Progress value={videoProgressPercent(progress)} label={t("Server-confirmed unique viewing progress")} /><small>{progress.uniqueContentWatchedSeconds.toFixed(3)}{t(" of ")}{progress.durationSeconds.toFixed(3)}{t(" seconds confirmed. Seeking and repeat viewing do not add duplicate progress.")}</small></> : <p>{t("Waiting for confirmed viewing progress.")}</p>)}
+      {progressError && <p role="alert" className="form-error">{t(progressError)}</p>}
+      {state === "ready" && <Button type="button" variant="secondary" size="sm" onClick={() => { const v = videoRef.current; void reporterRef.current?.report(v.seeking ? "seeking" : v.paused ? "pause" : "playing", v); }}>{t("Sync viewing progress")}</Button>}
     </>}
-    {["expired", "network_error"].includes(state) && <Button type="button" variant="secondary" onClick={() => setAttempt(value => value + 1)}>Retry playback</Button>}
+    {["expired", "network_error"].includes(state) && <Button type="button" variant="secondary" onClick={() => setAttempt(value => value + 1)}>{t("Retry playback")}</Button>}
   </section>;
 }
