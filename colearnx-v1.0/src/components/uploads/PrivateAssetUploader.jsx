@@ -1,3 +1,4 @@
+import { useTranslation } from "../../i18n/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -82,6 +83,7 @@ export default function PrivateAssetUploader({
   label = "Content files",
   renderPicker,
 }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [listError, setListError] = useState("");
   const [listAttempt, setListAttempt] = useState(0);
@@ -277,14 +279,14 @@ export default function PrivateAssetUploader({
 
   return (
     <section className="private-uploader" aria-label={label}>
-      {listing && <p role="status">Loading private files…</p>}
-      {listError && <div className="form-error" role="alert">{listError} <button className="button secondary sm" type="button" onClick={() => setListAttempt((value) => value + 1)}>Retry file list</button></div>}
+      {listing && <p role="status">{t("Loading private files…")}</p>}
+      {listError && <div className="form-error" role="alert">{t(listError)} <button className="button secondary sm" type="button" onClick={() => setListAttempt((value) => value + 1)}>{t("Retry file list")}</button></div>}
       {renderPicker ? renderPicker({ addFiles, disabled }) : <UploadDropzone onFiles={addFiles}
         inputLabel={`Choose ${label.toLowerCase()}`} accept={PRIVATE_ASSET_ACCEPT} disabled={disabled}
-        hint="PDF, DOCX, ZIP and images up to 25 MiB · MP4 up to 100 MiB · 500 MiB total" />}
+        hint={t("PDF, DOCX, ZIP and images up to 25 MiB · MP4 up to 100 MiB · 500 MiB total")} />}
 
       {!contentVersionId && hasQueuedFiles && (
-        <small className="upload-gate-note">Files start uploading after the draft is created.</small>
+        <small className="upload-gate-note">{t("Files start uploading after the draft is created.")}</small>
       )}
 
       <div className="upload-file-list" aria-live="polite">
@@ -294,19 +296,19 @@ export default function PrivateAssetUploader({
             <div className="upload-file-main">
               <b>{item.filename}</b>
               <small>{formatBytes(item.sizeBytes)} · {item.mediaType}</small>
-              <span className="upload-file-message">{itemMessage(item, contentVersionId)}</span>
+              <span className="upload-file-message">{t(itemMessage(item, contentVersionId))}</span>
               {item.status === "uploading" && (
-                <div className="upload-progress" role="progressbar" aria-label={`${item.filename} upload progress`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={item.progress}>
+                <div className="upload-progress" role="progressbar" aria-label={t("{0} upload progress", { 0: item.filename })} aria-valuemin="0" aria-valuemax="100" aria-valuenow={item.progress}>
                   <span style={{ width: `${item.progress}%` }} />
                 </div>
               )}
             </div>
             {item.status === "error" && item.file && contentVersionId && (
-              <button className="asset-icon-action retry" type="button" onClick={() => retryItem(item.id)} aria-label={`Retry ${item.filename}`} title="Retry upload">
+              <button className="asset-icon-action retry" type="button" onClick={() => retryItem(item.id)} aria-label={t("Retry {0}", { 0: item.filename })} title={t("Retry upload")}>
                 <RefreshCw size={17} />
               </button>
             )}
-            <button className="asset-icon-action remove" type="button" disabled={item.status === "deleting"} onClick={() => void removeItem(item.id)} aria-label={`Remove ${item.filename}`} title="Remove file">
+            <button className="asset-icon-action remove" type="button" disabled={item.status === "deleting"} onClick={() => void removeItem(item.id)} aria-label={t("Remove {0}", { 0: item.filename })} title={t("Remove file")}>
               <X size={18} />
             </button>
           </article>
