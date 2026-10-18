@@ -91,12 +91,11 @@ function MarketplaceShell({ children }) {
 }
 
 function AnonymousOnly({ children }) {
-  const { t } = useTranslation();
-  const { authenticated, accountLoading, accountError, retrySession, role } = usePlatform();
+  const { authenticated, accountLoading, accountError, role } = usePlatform();
   const location = useLocation();
-  if (accountLoading) return <div className="session-loading" role="status"><span className="session-spinner" /><b>{t("Checking your session…")}</b></div>;
-  if (accountError) return <EmptyState title={t("Session temporarily unavailable")} description={t(accountError)} action={<button className="button primary" onClick={() => void retrySession()}>{t("Retry session")}</button>} />;
-  if (!authenticated) return children;
+  // Public entry must not disappear because an optional session check is slow.
+  // Workspace still requires a server-confirmed session above.
+  if (accountLoading || accountError || !authenticated) return children;
   return <Navigate to={intendedPath(location.state?.from, role === "Admin" ? "/admin" : "/home")} replace />;
 }
 

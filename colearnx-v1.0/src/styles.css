@@ -3628,6 +3628,9 @@ tbody tr[role="button"]:focus-visible {
 .sec-type-count { color: var(--brand-dark); font-variant-numeric: tabular-nums; }
 
 /* Event stream table */
+.session-connection-notice { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); color: var(--muted); font-size: 0.9rem; }
+.session-connection-notice .session-spinner { flex: 0 0 auto; width: 18px; height: 18px; }
+.session-connection-notice > span:not(.session-spinner) { flex: 1 1 220px; }
 .sec-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .table-scroll { overflow-x: auto; }
 .sec-table {

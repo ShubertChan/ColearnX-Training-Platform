@@ -4,14 +4,14 @@ import {
   getCsrfToken,
   loginAccount,
   logoutAccount,
-  refreshAccount,
   registerAccount,
   resendVerificationEmail,
   updateCurrentUser,
   verifyEmailAddress,
   completeMfaLogin,
 } from "../api/auth";
-import { hasAccessToken, hasCsrfToken, setAccessToken, setCsrfToken } from "../api/client";
+import { hasAccessToken, hasCsrfToken, restoreClientSession, setAccessToken, setCsrfToken } from "../api/client";
+import { readSessionResource } from "../api/sessionRecovery.js";
 import {
   createContent,
   createCourse,
@@ -54,6 +54,12 @@ import { cartStorageKey, readAccountCart, mergeConfirmedOrders } from "../utils/
 import { getCourseTypeLabel } from "../utils/coursePresentation";
 
 const PlatformContext = createContext(null);
+
+const readSessionIdentity = () => readSessionResource(async (options) => {
+  const user = await getCurrentUser({ ...options, _skipAuthRefresh: true });
+  if (!user?.id) throw Object.assign(new Error("The account service is still connecting. Please try again."), { code: "AUTH_IDENTITY_INVALID", status: 502 });
+  return user;
+});
 
 const roleLabels = {
   member: "Member",
@@ -250,7 +256,11 @@ const mapPublishedItem = (listing) => ({
 });
 
 export function PlatformProvider({ children }) {
-  const [authenticated, setAuthenticated] = useState(hasAccessToken());
+  // A stored bearer token is only a hint until the server confirms identity.
+  const [authenticated, setAuthenticated] = useState(false);
+  const sessionRestore = useRef(null);
+  const authRequestRevision = useRef(0);
+  const mounted = useRef(true);
   const [role, setRoleState] = useState("Member");
   const [approvedRoles, setApprovedRoles] = useState(["Member"]);
   const [profile, setProfile] = useState({ name: "", email: "", phone: "", location: "", bio: "" });
@@ -489,47 +499,66 @@ export function PlatformProvider({ children }) {
     return { ok: !Object.keys(failures).length, failures };
   }, [refreshAdminQueues, refreshCatalog, refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet, trackDataset]);
 
-  const restoreSession = useCallback(async () => {
+  const restoreSession = useCallback(() => {
+    if (sessionRestore.current) return sessionRestore.current;
+    const revision = authRequestRevision.current;
+    const current = () => mounted.current && revision === authRequestRevision.current;
     setAccountLoading(true); setAccountError("");
-    try {
-      if (hasAccessToken()) {
-        try {
-          const user = await getCurrentUser();
-          const roles = applyServerIdentity(user);
-          void refreshAccountData(roles);
-          return true;
-        } catch (error) {
-          if (![401, 403].includes(error.status)) {
-            setAccountError(error.message);
-            return false;
+    const request = (async () => {
+      try {
+        let user;
+        if (hasAccessToken()) {
+          try {
+            user = await readSessionIdentity();
+          } catch (error) {
+            if (![401, 403].includes(error.status)) throw error;
           }
-          setAccessToken("");
         }
+        if (!current()) return false;
+        if (!user) {
+          const refreshed = await restoreClientSession();
+          if (!current()) return false;
+          user = refreshed.user || await readSessionIdentity();
+        }
+        if (!current()) return false;
+        const roles = applyServerIdentity(user);
+        void refreshAccountData(roles);
+        return true;
+      } catch (error) {
+        if (!current()) return false;
+        if ([401, 403].includes(error.status)) {
+          setAccessToken(""); setCsrfToken(""); setAuthenticated(false);
+        } else {
+          // A timeout is not proof that the user's credentials have expired.
+          setAccountError(error.message);
+        }
+        return false;
+      } finally {
+        if (current()) {
+          setAccountLoading(false);
+          // Do not race public catalog requests against initial cookie rotation.
+          void refreshCatalog();
+        }
+        if (sessionRestore.current === request) sessionRestore.current = null;
       }
-      const csrf = await getCsrfToken();
-      if (!csrf.csrfToken) return false;
-      setCsrfToken(csrf.csrfToken);
-      const refreshed = await refreshAccount();
-      setAccessToken(refreshed.accessToken);
-      setCsrfToken(refreshed.csrfToken);
-      const roles = applyServerIdentity(refreshed.user);
-      void refreshAccountData(roles);
-      return true;
-    } catch (error) {
-      setAccessToken("");
-      setCsrfToken("");
-      setAuthenticated(false);
-      if (![401, 403].includes(error.status)) setAccountError(error.message);
-      return false;
-    } finally {
-      setAccountLoading(false);
-    }
-  }, [applyServerIdentity, refreshAccountData]);
+    })();
+    sessionRestore.current = request;
+    return request;
+  }, [applyServerIdentity, refreshAccountData, refreshCatalog]);
 
   useEffect(() => {
-    void refreshCatalog();
-    restoreSession();
-  }, [refreshCatalog, restoreSession]);
+    mounted.current = true;
+    void restoreSession();
+    return () => { mounted.current = false; };
+  }, [restoreSession]);
+
+  const beginAuthentication = async () => {
+    // The public form stays mounted while bootstrap runs. Serialize submission
+    // with it so a late recovery cannot overwrite a newly signed-in identity.
+    authRequestRevision.current += 1;
+    await sessionRestore.current;
+    setAccountLoading(false); setAccountError("");
+  };
 
   // Shared tail of both sign-in paths. Kept in one place so the second-factor
   // route cannot drift from the single-factor one -- a session established by
@@ -546,6 +575,7 @@ export function PlatformProvider({ children }) {
   };
 
   const signIn = async ({ email, password }) => {
+    await beginAuthentication();
     const result = await loginAccount({ email, password });
     // No session is issued yet when a second factor is enrolled. The caller
     // must collect a code and call completeSignIn; nothing here is stored in
@@ -557,17 +587,20 @@ export function PlatformProvider({ children }) {
   };
 
   const completeSignIn = async ({ mfaToken, code }) => {
+    await beginAuthentication();
     const result = await completeMfaLogin({ mfaToken, code });
     const session = await establishSession(result);
     return { ...session, usedRecoveryCode: result.usedRecoveryCode, recoveryCodesRemaining: result.recoveryCodesRemaining };
   };
 
   const registerMember = async ({ name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged }) => {
+    await beginAuthentication();
     const result = await registerAccount({ displayName: name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged });
     return result;
   };
 
   const verifyRegistrationEmail = async (input) => {
+    await beginAuthentication();
     const result = await verifyEmailAddress(input);
     if (!result.authenticated || !result.user || !result.accessToken || !result.csrfToken) {
       return result;
@@ -597,6 +630,9 @@ export function PlatformProvider({ children }) {
   const resendRegistrationEmail = async (input) => resendVerificationEmail(input);
 
   const signOut = async () => {
+    authRequestRevision.current += 1;
+    await sessionRestore.current;
+    setAccountLoading(false);
     sessionRevision.current += 1;
     adminRoleRequestRevision.current += 1;
     try {
