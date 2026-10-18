@@ -1,5 +1,10 @@
 {
   "Language": "语言",
+  "Connecting securely. You can enter your details while we check your session.": "正在建立安全连接，检查登录状态期间您可以先填写信息。",
+  "The connection is taking longer than expected. Your details stay on this page; you do not need to refresh it.": "连接所需时间较长，已填写的信息会保留在此页面，无需刷新。",
+  "Retry connection": "重新连接",
+  "The session service is still connecting. Please try again.": "会话服务仍在连接中，请稍后重试。",
+  "The account service is still connecting. Please try again.": "账户服务仍在连接中，请稍后重试。",
   "Restoring your secure session…": "正在恢复您的安全会话…",
   "Session temporarily unavailable": "会话暂时不可用",
   "Retry session": "重试恢复会话",

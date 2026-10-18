@@ -1,7 +1,7 @@
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import axios from "axios";
-import { apiClient, setAccessToken, setCsrfToken, hasAccessToken, mutateApi } from "./client.js";
+import { apiClient, setAccessToken, setCsrfToken, hasAccessToken, mutateApi, restoreClientSession } from "./client.js";
 import { registerStepUpHandler } from "./stepUp.js";
 
 const originalAdapter = apiClient.defaults.adapter;
@@ -171,4 +171,36 @@ test("step-up rejection never triggers refresh and preserves the mutation key on
     await mutateApi("post", "/courses", {title:"ordinary"});
     assert.equal(calls[2].token, undefined);
   } finally { cleanup(); }
+});
+
+test("bootstrap and expired bearer requests share one refresh-token rotation", async () => {
+  const gate = deferred(), started = deferred(); let refreshes = 0, reads = 0;
+  apiClient.defaults.adapter = async config => {
+    if (config.url === "/auth/csrf") { reads++; started.resolve(); await gate.promise; return response(config, { csrfToken: "csrf" }); }
+    if (config.url === "/auth/refresh") { refreshes++; return response(config, { accessToken: "fresh", csrfToken: "csrf", user: { id: "member" } }); }
+    if (config.headers.Authorization === "Bearer old") reject(config, 401);
+    return response(config);
+  };
+  const bootstrap = restoreClientSession(); await started.promise;
+  const other = apiClient.get("/wallet");
+  await new Promise(resolve => setImmediate(resolve)); gate.resolve();
+  const [identity] = await Promise.all([bootstrap, other]);
+  assert.equal(identity.user.id, "member"); assert.equal(refreshes, 1); assert.equal(reads, 1);
+});
+
+test("an uncertain refresh POST is not automatically replayed", async () => {
+  let posts = 0;
+  apiClient.defaults.adapter = async config => {
+    if (config.url === "/auth/csrf") return response(config, { csrfToken: "csrf" });
+    posts++; throw new axios.AxiosError("Timed out", "ECONNABORTED", config);
+  };
+  await assert.rejects(restoreClientSession(), error => error.status === 0);
+  assert.equal(posts, 1); assert.equal(hasAccessToken(), true);
+});
+
+test("an anonymous startup does not send a refresh POST", async () => {
+  setAccessToken(""); const calls = [];
+  apiClient.defaults.adapter = async config => { calls.push(config.url); return response(config, { csrfToken: null }); };
+  await assert.rejects(restoreClientSession(), error => error.status === 401);
+  assert.deepEqual(calls, ["/auth/csrf"]); assert.equal(hasAccessToken(), false);
 });
