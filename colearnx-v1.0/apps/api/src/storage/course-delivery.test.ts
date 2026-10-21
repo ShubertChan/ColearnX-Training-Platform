@@ -127,6 +127,8 @@ test('W8: a row that changed while its bytes were inspected is not marked ready'
   const f = fixture({ swapKeyDuringVerify: true });
   await assert.rejects(f.handler(10)(f.request, f.response), { status: 409, code: 'UPLOAD_NOT_PENDING' });
   assert.equal(f.state().committedStatus, 'pending');
+  // The promoted copy made for this attempt is referenced by nothing: removed.
+  assert.ok(f.state().deleted.includes('course/test-file.pdf'));
 });
 
 test('unauthorised, uncertified, expired and deleted uploads never reach R2 verification', async () => {

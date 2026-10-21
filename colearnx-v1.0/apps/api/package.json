@@ -21,6 +21,7 @@
     "security:ledger-audit": "tsx src/security/ledger-audit-run.ts",
     "security:risk-sweep": "tsx src/security/risk-sweep-run.ts",
     "security:download-audit": "tsx src/security/download-audit-run.ts",
+    "security:upload-backfill": "tsx src/security/upload-backfill-run.ts",
     "video:queue:prepare": "tsx src/video/prepare-queue.ts"
   },
   "dependencies": {

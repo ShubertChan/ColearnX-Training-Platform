@@ -23,6 +23,7 @@ import { canFinalizeStorageAssetDeletion, remainingSignedUploadTtlSeconds } from
 import { env } from '../config/env.js';
 import { recordDownloadIssued } from '../security/download-audit.js';
 import {
+  discardUncommittedPromotion,
   recordScanUnavailable,
   recordUploadRejection,
   uploadRejectedError,
@@ -337,40 +338,48 @@ export function createContentUploadCompletionHandler(dependencies: CompletionDep
       throw error;
     }
 
-    const finished = await dependencies.withTransaction(async (client) => {
-      await lockOwnedDraftVersion(client, actor.id, contentVersionId);
-      const asset = await pendingAsset(client, assetId, contentVersionId, actor.id);
-      // A concurrent completion of the same upload already committed.
-      if (asset.asset_status === 'ready') return { kind: 'ready' as const, asset };
-      if (asset.asset_status !== 'pending' || asset.object_key !== inspected.object_key) {
-        throw new ApiError(409, 'UPLOAD_NOT_PENDING', 'This upload intent cannot be completed.');
-      }
-      if (outcome.kind === 'rejected') {
+    let finished;
+    try {
+      finished = await dependencies.withTransaction(async (client) => {
+        await lockOwnedDraftVersion(client, actor.id, contentVersionId);
+        const asset = await pendingAsset(client, assetId, contentVersionId, actor.id);
+        // A concurrent completion of the same upload already committed.
+        if (asset.asset_status === 'ready') return { kind: 'ready' as const, asset };
+        if (asset.asset_status !== 'pending' || asset.object_key !== inspected.object_key) {
+          throw new ApiError(409, 'UPLOAD_NOT_PENDING', 'This upload intent cannot be completed.');
+        }
+        if (outcome.kind === 'rejected') {
+          await client.query(`UPDATE storage_assets
+            SET asset_status = 'quarantined', verified_byte_size = $2, etag = $3, uploaded_at = now(), updated_at = now()
+            WHERE storage_asset_id = $1`, [asset.storage_asset_id, Number(asset.declared_byte_size), checked.etag ?? null]);
+          await audit(client, actor.id, 'content.upload.rejected', asset.storage_asset_id, res.locals.requestId, {
+            contentVersionId, reason: outcome.verdict.reason, outcome: 'quarantined',
+          });
+          return { kind: 'rejected' as const, asset, verdict: outcome.verdict };
+        }
         await client.query(`UPDATE storage_assets
-          SET asset_status = 'quarantined', verified_byte_size = $2, etag = $3, uploaded_at = now(), updated_at = now()
-          WHERE storage_asset_id = $1`, [asset.storage_asset_id, Number(asset.declared_byte_size), checked.etag ?? null]);
-        await audit(client, actor.id, 'content.upload.rejected', asset.storage_asset_id, res.locals.requestId, {
-          contentVersionId, reason: outcome.verdict.reason, outcome: 'quarantined',
+          SET asset_status = 'ready', object_key = $5, verified_content_type = $2, verified_byte_size = $3, etag = $4,
+            uploaded_at = now(), verified_at = now(), updated_at = now()
+          WHERE storage_asset_id = $1`,
+        [asset.storage_asset_id, outcome.mediaType, Number(asset.declared_byte_size), checked.etag ?? null, outcome.objectKey]);
+        // Keep the first verified asset as the backwards-compatible primary file.
+        // Other verified assets remain attached to the same content version.
+        await client.query(`UPDATE content_versions
+          SET storage_asset_id = COALESCE(storage_asset_id, $2)
+          WHERE content_version_id = $1`, [contentVersionId, asset.storage_asset_id]);
+        await audit(client, actor.id, 'content.upload.completed', asset.storage_asset_id, res.locals.requestId, {
+          contentVersionId, sizeBytes: Number(asset.declared_byte_size), mediaType: outcome.mediaType,
+          malwareScanned: outcome.scanned, outcome: 'success',
         });
-        return { kind: 'rejected' as const, asset, verdict: outcome.verdict };
-      }
-      await client.query(`UPDATE storage_assets
-        SET asset_status = 'ready', object_key = $5, verified_content_type = $2, verified_byte_size = $3, etag = $4,
-          uploaded_at = now(), verified_at = now(), updated_at = now()
-        WHERE storage_asset_id = $1`,
-      [asset.storage_asset_id, outcome.mediaType, Number(asset.declared_byte_size), checked.etag ?? null, outcome.objectKey]);
-      // Keep the first verified asset as the backwards-compatible primary file.
-      // Other verified assets remain attached to the same content version.
-      await client.query(`UPDATE content_versions
-        SET storage_asset_id = COALESCE(storage_asset_id, $2)
-        WHERE content_version_id = $1`, [contentVersionId, asset.storage_asset_id]);
-      await audit(client, actor.id, 'content.upload.completed', asset.storage_asset_id, res.locals.requestId, {
-        contentVersionId, sizeBytes: Number(asset.declared_byte_size), mediaType: outcome.mediaType,
-        malwareScanned: outcome.scanned, outcome: 'success',
+        return { kind: 'ready' as const, asset: { ...asset, asset_status: 'ready', object_key: outcome.objectKey,
+          verified_content_type: outcome.mediaType, verified_byte_size: asset.declared_byte_size } };
       });
-      return { kind: 'ready' as const, asset: { ...asset, asset_status: 'ready', object_key: outcome.objectKey,
-        verified_content_type: outcome.mediaType, verified_byte_size: asset.declared_byte_size } };
-    });
+    } catch (error) {
+      await discardUncommittedPromotion(outcome, inspected.bucket_name, null, dependencies.deleteObject);
+      throw error;
+    }
+    await discardUncommittedPromotion(outcome, inspected.bucket_name,
+      finished.kind === 'ready' ? finished.asset.object_key : null, dependencies.deleteObject);
 
     // The incoming object is never served: after promotion it is a stale copy,
     // after a rejection it is the blocked file. Either way it goes; a failure

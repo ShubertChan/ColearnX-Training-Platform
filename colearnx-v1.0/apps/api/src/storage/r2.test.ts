@@ -43,9 +43,12 @@ test('uses server-generated keys and safe signed-response metadata', () => {
   // W8: browsers upload under incoming/; only inspected files are promoted to
   // the served key, which the still-valid PUT URL can no longer overwrite.
   assert.match(key, /^incoming\/content\/11111111-1111-4111-8111-111111111111\/22222222-2222-4222-8222-222222222222\/[0-9a-f-]+\.pdf$/);
-  assert.equal(promotedObjectKey(key), key.slice('incoming/'.length));
-  assert.equal(promotedObjectKey('content/a/b/legacy.pdf'), 'content/a/b/legacy.verified.pdf');
-  assert.notEqual(promotedObjectKey('content/a/b/legacy.pdf'), 'content/a/b/legacy.pdf');
+  const promoted = promotedObjectKey(key, 'n1');
+  assert.equal(promoted, key.slice('incoming/'.length).replace(/\.pdf$/, '.v-n1.pdf'));
+  assert.ok(!promoted.startsWith('incoming/'));
+  assert.equal(promotedObjectKey('content/a/b/legacy.pdf', 'n2'), 'content/a/b/legacy.v-n2.pdf');
+  // Every attempt gets its own key, so a losing attempt can delete its copy safely.
+  assert.notEqual(promotedObjectKey(key), promotedObjectKey(key));
   assert.equal(contentTypeMatches('application/zip', 'application/x-zip-compressed; charset=binary'), true);
   assert.equal(safeContentDisposition('notes.pdf', 'attachment'), "attachment; filename=\"download\"; filename*=UTF-8''notes.pdf");
 });

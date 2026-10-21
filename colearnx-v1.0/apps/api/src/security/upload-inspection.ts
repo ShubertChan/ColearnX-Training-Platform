@@ -34,6 +34,7 @@ export type InspectionRejection =
   | 'type_mismatch'
   | 'executable_disguised'
   | 'archive_rejected'
+  | 'scan_inconclusive'
   | 'malware_detected';
 
 export type InspectionVerdict =
@@ -50,6 +51,8 @@ export type InspectionVerdict =
   };
 
 export { ScannerUnavailableError };
+
+const DISGUISED_EXECUTABLE_FORMATS = new Set(['pe', 'elf', 'mach-o', 'script']);
 
 type Rejection = Extract<InspectionVerdict, { accepted: false }>;
 const reject = (verdict: Omit<Rejection, 'accepted'>): Rejection => ({ accepted: false, ...verdict });
@@ -77,12 +80,16 @@ export async function inspectUpload(
   const head = body ? body.subarray(0, SNIFF_BYTES) : await reader.readHead(SNIFF_BYTES);
 
   const sniffed = sniffFileType(head);
-  if (sniffed.kind === 'executable') {
+  // Native code and interpreter scripts are an attack signal whatever they
+  // were declared as. An OLE compound file (.doc/.xls/.msi) or a Java class
+  // posing as an allowed type is reported as a mismatch instead: usually a
+  // wrongly-saved document, and paging an operator for it would be noise.
+  if (sniffed.kind === 'executable' && DISGUISED_EXECUTABLE_FORMATS.has(sniffed.format)) {
     return reject({ reason: 'executable_disguised', eventType: 'upload.executable_blocked', detected: sniffed.format,
       detail: `declared ${declared}, content is a ${sniffed.format} executable` });
   }
   if (sniffed.kind !== 'known' || sniffed.mediaType !== container) {
-    const detected = sniffed.kind === 'known' ? sniffed.mediaType : 'unrecognised';
+    const detected = sniffed.kind === 'known' ? sniffed.mediaType : sniffed.kind === 'executable' ? sniffed.format : 'unrecognised';
     return reject({ reason: 'type_mismatch', eventType: 'upload.type_mismatch', detected,
       detail: `declared ${declared}, content is ${detected}` });
   }
@@ -102,6 +109,15 @@ export async function inspectUpload(
   if (!scanner) return { accepted: true, mediaType: declared, scanned: false };
   const result = await scanner.scan(body ? [body] : await reader.stream());
   if (!result.clean) {
+    // clamd reports policy findings under Heuristics.* -- e.g.
+    // Heuristics.Limits.Exceeded (too large or deep to scan, raised because
+    // clamd.conf sets AlertExceedsMax) or OLE2 macro heuristics. The file is
+    // still refused (it could not be cleared), but it is not a malware
+    // signature, so it is not recorded as a critical malware event.
+    if (result.signature.startsWith('Heuristics.')) {
+      return reject({ reason: 'scan_inconclusive', eventType: 'upload.archive_rejected', signature: result.signature,
+        detail: `${scanner.name} could not clear the file: ${result.signature}` });
+    }
     return reject({ reason: 'malware_detected', eventType: 'upload.malware_detected', signature: result.signature,
       detail: `${scanner.name} detected ${result.signature}` });
   }

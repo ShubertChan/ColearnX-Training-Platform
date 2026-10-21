@@ -45,20 +45,29 @@ function configuredScanner(): MalwareScanner | null {
   return scanner;
 }
 
-// A small in-process semaphore: each inspection may buffer a whole upload, so
-// the number running at once is what bounds memory.
-let running = 0;
-const waiting: Array<() => void> = [];
-async function withInspectionSlot<T>(work: () => Promise<T>): Promise<T> {
-  if (running >= env.UPLOAD_INSPECTION_CONCURRENCY) await new Promise<void>((resolve) => waiting.push(resolve));
-  running += 1;
-  try {
-    return await work();
-  } finally {
-    running -= 1;
-    waiting.shift()?.();
-  }
+/**
+ * A small in-process semaphore: each inspection may buffer a whole upload, so
+ * the number running at once is what bounds memory. A released slot is handed
+ * DIRECTLY to the next waiter (the count is not decremented in between), so a
+ * newcomer can never slip in ahead of the woken waiter and exceed the limit.
+ */
+export function createInspectionLimiter(limit: () => number) {
+  let running = 0;
+  const waiting: Array<() => void> = [];
+  return async function withSlot<T>(work: () => Promise<T>): Promise<T> {
+    if (running >= limit()) await new Promise<void>((resolve) => waiting.push(resolve));
+    else running += 1;
+    try {
+      return await work();
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else running -= 1;
+    }
+  };
 }
+
+const withInspectionSlot = createInspectionLimiter(() => env.UPLOAD_INSPECTION_CONCURRENCY);
 
 export const verifyUploadedObject: UploadVerifier = async (object) => {
   if (!object.etag) {
@@ -90,6 +99,18 @@ export const verifyUploadedObject: UploadVerifier = async (object) => {
   await copyStoredObject(locator, servedKey, etag);
   return { kind: 'accepted', objectKey: servedKey, mediaType: verdict.mediaType, scanned: verdict.scanned };
 };
+
+/**
+ * After step 3: removes the promoted copy unless the row now serves exactly
+ * that key. Promoted keys are unique per attempt (promotedObjectKey), so this
+ * never touches an object some other row points to. Best-effort: a failure
+ * leaves an unreferenced object, never a broken row.
+ */
+export async function discardUncommittedPromotion(outcome: VerificationOutcome, bucketName: string,
+  committedKey: string | null, deleteObject: (locator: { bucketName: string; objectKey: string }) => Promise<unknown>) {
+  if (outcome.kind !== 'accepted' || committedKey === outcome.objectKey) return;
+  await deleteObject({ bucketName, objectKey: outcome.objectKey }).catch(() => undefined);
+}
 
 /**
  * Request-path telemetry for a verification outcome. Never throws (it uses the

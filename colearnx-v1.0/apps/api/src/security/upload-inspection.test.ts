@@ -144,11 +144,89 @@ test('F-09b: an overlapping-entries bomb is stopped by the declared total and by
   const declared = await inspectZipArchive(overlapping);
   assert.ok(!declared.ok);
   assert.equal(declared.reason, 'too_large_uncompressed');
-  // With honest-looking (tiny) declared sizes, the real inflation catches it.
+  // With honest-looking (tiny) declared sizes, the entries still share one
+  // local record, which the tiling rule refuses before anything is inflated.
   const lying = buildZip([{ name: 'a.bin', data: payload, declaredUncompressedSize: 10 }], { overlapCopies: 199 });
-  const inflated = await inspectZipArchive(lying);
-  assert.ok(!inflated.ok);
-  assert.equal(inflated.reason, 'size_mismatch');
+  const tiled = await inspectZipArchive(lying);
+  assert.ok(!tiled.ok);
+  assert.equal(tiled.reason, 'ambiguous_structure');
+  // And a single entry whose header lies about its size is caught by inflating it.
+  const single = await inspectZipArchive(buildZip([{ name: 'a.bin', data: payload, declaredUncompressedSize: 10 }]));
+  assert.ok(!single.ok);
+  assert.equal(single.reason, 'size_mismatch');
+});
+
+test('W8 review: one entry may not inflate beyond what clamd will actually scan', async () => {
+  // ~78:1, under the ratio limit and the archive budget, but one entry is
+  // larger than clamd's MaxFileSize -- clamd would skip it and answer OK.
+  const limits = { ...DEFAULT_ZIP_LIMITS, maxEntryUncompressedBytes: 1024 * 1024 };
+  const verdict = await inspectZipArchive(buildZip([{ name: 'install.bat', data: Buffer.alloc(2 * 1024 * 1024, 1) }]), { limits });
+  assert.ok(!verdict.ok);
+  assert.equal(verdict.reason, 'entry_too_large');
+  const lying = await inspectZipArchive(buildZip([{ name: 'install.bat', data: Buffer.alloc(2 * 1024 * 1024, 1), declaredUncompressedSize: 100 }]), { limits });
+  assert.ok(!lying.ok);
+  assert.equal(lying.reason, 'size_mismatch');
+});
+
+test('W8 review: an archive must mean the same thing to every extractor', async () => {
+  const text = Buffer.from('hello');
+  const cases: Array<[string, Buffer, string]> = [
+    ['local name differs from central name (streaming extractors write the local one)',
+      buildZip([{ name: 'readme.txt', localName: 'aaaaaa.vbs', data: text }]), 'ambiguous_structure'],
+    ['hidden local entry missing from the central directory',
+      buildZip([{ name: 'readme.txt', data: text }], { hidden: [{ name: 'setup.exe', data: fakeWindowsExecutable() }] }), 'ambiguous_structure'],
+    ['central says stored, local says deflated',
+      buildZip([{ name: 'readme.txt', data: fakeWindowsExecutable(), method: 0, localMethod: 8 }]), 'ambiguous_structure'],
+    ['Info-ZIP Unicode Path extra field naming a different file',
+      buildZip([{ name: 'readme.txt', data: text, extraField: { id: 0x7075, data: Buffer.concat([Buffer.from([1, 0, 0, 0, 0]), Buffer.from('../../evil.vbs')]) } }]), 'ambiguous_structure'],
+    ['CRC-32 that does not match the content', buildZip([{ name: 'readme.txt', data: text, crc: 0xdeadbeef }]), 'checksum_mismatch'],
+    ['trailing dot Windows strips on extraction', buildZip([{ name: 'evil.vbs.', data: text }]), 'unsafe_name'],
+    ['trailing space Windows strips on extraction', buildZip([{ name: 'evil.hta ', data: text }]), 'unsafe_name'],
+    ['NTFS alternate data stream', buildZip([{ name: 'notes.txt:evil.exe', data: text }]), 'unsafe_name'],
+  ];
+  for (const [label, archive, reason] of cases) {
+    const verdict = await inspectZipArchive(archive);
+    assert.ok(!verdict.ok, label);
+    assert.equal(verdict.reason, reason, label);
+  }
+  // Directory entries ("week1/") and dotted names are fine.
+  const ok = await inspectZipArchive(buildZip([{ name: 'week1/', method: 0 }, { name: 'week1/v1.2.notes.txt', data: text }]));
+  assert.equal(ok.ok, true);
+});
+
+test('W8 review: a .docx macro is found by its declared content type, whatever its part is called', async () => {
+  const macroTypes = Buffer.from('<Types><Override PartName="/word/macros.bin" ContentType="application/vnd.ms-office.vbaProject"/></Types>');
+  const renamed = buildZip([
+    { name: '[Content_Types].xml', data: macroTypes },
+    { name: 'word/document.xml', data: Buffer.from('<w:document/>') },
+    { name: 'word/macros.bin', data: Buffer.from('macro') },
+  ]);
+  const verdict = await inspectZipArchive(renamed, { requireDocx: true });
+  assert.ok(!verdict.ok);
+  assert.equal(verdict.reason, 'docx_macro');
+});
+
+test('W8 review: Office documents and Java classes inside a zip are not "executables"', async () => {
+  const ole = Buffer.concat([Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), Buffer.alloc(64)]);
+  const javaClass = Buffer.concat([Buffer.from([0xca, 0xfe, 0xba, 0xbe]), Buffer.alloc(64)]);
+  const zip = buildZip([{ name: 'word/embeddings/oleObject1.bin', data: ole }, { name: 'lab/Main.class', data: javaClass }]);
+  assert.equal((await inspectZipArchive(zip)).ok, true);
+  // At the top level, an OLE file posing as a PDF is a mismatch, not a disguised executable.
+  const top = await inspect('application/pdf', ole);
+  assert.ok(!top.accepted);
+  assert.equal(top.reason, 'type_mismatch');
+  assert.equal(top.eventType, 'upload.type_mismatch');
+  assert.equal(top.detected, 'ole-compound');
+});
+
+test('W8 review: clamd heuristics refuse the file without being recorded as malware', async () => {
+  for (const signature of ['Heuristics.Limits.Exceeded.MaxFileSize', 'Heuristics.OLE2.ContainsMacros']) {
+    const heuristic: MalwareScanner = { name: 'clamav', scan: async () => ({ clean: false, signature }) };
+    const verdict = await inspect('application/pdf', minimalPdf(), heuristic);
+    assert.ok(!verdict.accepted, signature);
+    assert.equal(verdict.reason, 'scan_inconclusive', signature);
+    assert.equal(verdict.eventType, 'upload.archive_rejected', signature);
+  }
 });
 
 test('F-09b: the inflate budget bounds work even when every header is consistent', async () => {

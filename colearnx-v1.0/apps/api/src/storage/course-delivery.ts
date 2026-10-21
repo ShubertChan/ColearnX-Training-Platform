@@ -23,6 +23,7 @@ import { assertAccountStorageQuota, lockStorageAccount } from './storage-quota.j
 import { assertVideoStarted, videoAvailability } from '../video/availability.js';
 import { recordDownloadIssued } from '../security/download-audit.js';
 import {
+  discardUncommittedPromotion,
   recordScanUnavailable,
   recordUploadRejection,
   uploadRejectedError,
@@ -397,8 +398,18 @@ export function createCourseUploadCompletionHandler(dependencies: CourseCompleti
       }
       throw error;
     }
-    const finished = await dependencies.withTransaction((client) => commitCourseUploadVerdict(client,
-      { ...input, inspectedKey: inspected.object_key, etag: checked.etag }, outcome));
+    let finished;
+    try {
+      finished = await dependencies.withTransaction((client) => commitCourseUploadVerdict(client,
+        { ...input, inspectedKey: inspected.object_key, etag: checked.etag }, outcome));
+    } catch (error) {
+      await discardUncommittedPromotion(outcome, inspected.bucket_name, null, deleteObject);
+      throw error;
+    }
+    // A losing concurrent attempt (the row is already ready on another key)
+    // or a rejection leaves its promoted copy unreferenced: remove it.
+    await discardUncommittedPromotion(outcome, inspected.bucket_name,
+      finished.kind === 'ready' ? finished.asset.object_key : null, deleteObject);
     // The incoming object is never served (stale copy or blocked file).
     await deleteObject({ bucketName: inspected.bucket_name, objectKey: inspected.object_key }).catch(() => undefined);
     if (finished.kind === 'rejected') {

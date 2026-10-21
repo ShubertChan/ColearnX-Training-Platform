@@ -93,15 +93,18 @@ export function createCourseObjectKey(ownerUserId: string, courseRunId: string, 
 }
 
 /**
- * The served key for a verified upload. Deterministic, so two concurrent
- * completions of one upload copy to the same place. Keys issued before W8 have
- * no `incoming/` prefix; they get a `.verified` marker instead, which still
- * moves the served object away from the key the old PUT URL can write to.
+ * The served key for one verification attempt. Unique per attempt (the nonce)
+ * so that an attempt which does not end up committed -- it lost a race with a
+ * concurrent completion, or the draft changed meanwhile -- can always delete
+ * its own copy without any risk of removing an object another row serves.
+ * Keys issued before W8 have no `incoming/` prefix; they are promoted the same
+ * way, which still moves the served object off the key the old PUT URL can
+ * write to.
  */
-export function promotedObjectKey(objectKey: string) {
-  if (objectKey.startsWith(INCOMING_PREFIX)) return objectKey.slice(INCOMING_PREFIX.length);
-  const dot = objectKey.lastIndexOf('.');
-  return dot > objectKey.lastIndexOf('/') ? `${objectKey.slice(0, dot)}.verified${objectKey.slice(dot)}` : `${objectKey}.verified`;
+export function promotedObjectKey(objectKey: string, nonce: string = randomUUID()) {
+  const base = objectKey.startsWith(INCOMING_PREFIX) ? objectKey.slice(INCOMING_PREFIX.length) : objectKey;
+  const dot = base.lastIndexOf('.');
+  return dot > base.lastIndexOf('/') ? `${base.slice(0, dot)}.v-${nonce}${base.slice(dot)}` : `${base}.v-${nonce}`;
 }
 
 export function contentTypeMatches(expected: string, actual: string | undefined) {
