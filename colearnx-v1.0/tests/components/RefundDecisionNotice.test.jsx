@@ -107,5 +107,5 @@ test("closing by Escape acknowledges once while an acknowledgement is in flight"
   fireEvent.keyDown(document, { key: "Escape" });
   expect(mocks.read).toHaveBeenCalledTimes(1);
   await act(async () => pending.resolve());
-  expect(screen.queryByRole("dialog")).toBeNull();
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 });
