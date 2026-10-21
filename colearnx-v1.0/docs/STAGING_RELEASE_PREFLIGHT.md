@@ -15,7 +15,7 @@
 发布前、发布后各建立一次独立的 PostgreSQL 只读连接：
 
 1. 连接目标必须是受保护变量 `STAGING_DATABASE_HOST` 指定的 Neon direct 主机，数据库固定 `colearnx`，账号固定 `colearnx_release_reader`。
-2. 强制 TLS 证书验证、连接/查询/锁等待超时。单独解析连接串，拒绝覆盖 SSL、角色或会话参数的 URL 选项。
+2. 强制 TLS 证书与主机名验证、连接/查询/锁等待超时。单独解析连接串，拒绝覆盖 SSL、角色或会话参数的 URL 选项。连接成功后、第一条 SQL 之前核对 node-postgres 实际客户端 socket 的 `encrypted`、`authorized` 与授权错误状态，并要求 `rejectUnauthorized=true`、SNI 与核准主机一致。代理后的 `pg_stat_ssl` 仅记录为诊断信息，不能代替客户端 TLS 核验；内部统计为 false 不代表客户端未加密。
 3. 使用 `REPEATABLE READ READ ONLY` 事务和 `pg_catalog` search_path；核对实际数据库、session/current user、默认只读模式、角色属性及权限。
 4. 拒绝 Owner/超级用户、角色成员关系、DDL、对象所有权、表/字段写权限和序列写权限；应用账号无需获得迁移记录读取权限。
 5. 只读取 `public.schema_migrations` 的 `filename, checksum, applied_at`。必须与仓库完整清单一一匹配，不只看最后一个编号。
@@ -82,11 +82,12 @@ API 发布前必须与计划中的旧部署 ID/SHA 相同；被外部替换就�
 
 ## 6. 测试与范围
 
-- 模拟网络/数据库测试：正常与不完整 ledger、历史 checksum/CRLF、审批缺失、Owner/权限过大、TLS/连接目标错误、异常脱敏和关闭连接。
+- 模拟网络/数据库测试：正常与不完整 ledger、历史 checksum/CRLF、审批缺失、Owner/权限过大、TLS/连接目标错误、异常脱敏和关闭连接；覆盖“客户端证书验证成功、代理后端 SSL 为 false”成功路径，以及明文/未验证/缺失 socket、证书校验关闭、SNI 不匹配均在第一条 SQL 前阻断的反例。本地明文例外仅适用于回环地址、真实客户端主机一致且库名为 `colearnx_release_check_*` 的隔离夹具，不能用于云端库。
 - 组件测试：前端单独发布、API 单独发布、不同组件的不同基线、多次合并区间、删除/改名、共享变更、文档-only、未知组件、基线缺失、产物漂移、竞争部署和手动强制发布。
 - CI 工作流契约与 actionlint：保留手动触发、完整 CI、Environment、Secrets 隔离及发布阶段顺序。
 - 隔离本地 PostgreSQL 16：建立合成 reader 登录，实际验证读 ledger、不能读用户/写 ledger/建表，迁移缺失、checksum 改动、字段级权限越权及 SELECT 权限丢失都会阻断；测试修改仅发生在受保护测试库并还原测试记录。
+- 同一隔离测试还建立临时回环 TLS 终结代理，真实 node-postgres 连接必须通过临时 CA 与主机名验证，同时数据库后端的 SSL 统计为 false；不受信 CA、主机名不匹配和明文连接都会失败。夹具只调用本机 OpenSSL 生成一天有效的临时证书，不安装全局信任，退出时关闭代理并删除临时证书。Ubuntu CI 已有 OpenSSL；Windows 可用 `RELEASE_CHECK_OPENSSL_BIN` 指定已安装的 OpenSSL，并将测试 `TMP/TEMP` 指向 D 盘。
 
 上述测试不等于已经创建 Neon reader、配置 GitHub Secret、完成一次真实 CD 或通过真实双账号退款/支付验收。合并与一次性配置后，仍需从 main 手动运行并审阅 Actions 报告。
 
-参考：[PostgreSQL 只读事务](https://www.postgresql.org/docs/16/sql-set-transaction.html)、[node-postgres SSL 与连接串选项](https://node-postgres.com/features/ssl)、[GitHub 条件执行](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions)。
+参考：[PostgreSQL 只读事务](https://www.postgresql.org/docs/16/sql-set-transaction.html)、[PostgreSQL 后端 SSL 统计](https://www.postgresql.org/docs/16/monitoring-stats.html#MONITORING-PG-STAT-SSL-VIEW)、[Node.js 客户端 TLS 状态](https://nodejs.org/docs/latest-v22.x/api/tls.html#tlssocketauthorized)、[node-postgres SSL 与连接串选项](https://node-postgres.com/features/ssl)、[GitHub 条件执行](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions)。

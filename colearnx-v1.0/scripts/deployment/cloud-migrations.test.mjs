@@ -16,7 +16,9 @@ const identity = { database: 'colearnx', role: 'colearnx_release_reader', sessio
 function fixture(overrides = {}) {
   const queries = [];
   let ended = false;
-  const client = { connect: async () => {}, end: async () => { ended = true; }, query: async (sql) => {
+  const client = { connection: { stream: { encrypted: true, authorized: true } },
+    connectionParameters: { host: config.host },
+    connect: async () => {}, end: async () => { ended = true; }, query: async (sql) => {
     queries.push(sql);
     if (sql.startsWith('SELECT current_database')) return { rows: [overrides.identity ?? identity] };
     if (sql.startsWith('SELECT filename')) return { rows: overrides.ledger ?? ledger };
@@ -74,6 +76,7 @@ test('preflight uses a read-only snapshot, checks identity first and always roll
   assert.equal(report.result, 'verified');
   assert.equal(report.migrationCount, 2);
   assert.equal(report.commit, commit);
+  assert.deepEqual(report.transport, { mode: 'verified-tls', encrypted: true, certificateAuthorized: true, backendPgStatSsl: true });
   assert.equal(f.queries[0], 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
   assert.equal(f.queries.at(-1), 'ROLLBACK');
   assert.ok(f.queries.includes('SET LOCAL search_path = pg_catalog'));
@@ -91,7 +94,66 @@ test('manual approval and repository checksum validation cannot be bypassed by a
   }
 });
 
-for (const [key, value] of [['database', 'other'], ['role', 'neondb_owner'], ['session_role', 'owner'], ['tls', false], ['read_only', 'off'],
+test('verified client TLS succeeds through a proxy whose PostgreSQL backend reports no SSL', async () => {
+  const f = fixture({ identity: { ...identity, tls: false } });
+  const report = await f.run();
+  assert.equal(report.result, 'verified');
+  assert.deepEqual(report.transport, { mode: 'verified-tls', encrypted: true, certificateAuthorized: true, backendPgStatSsl: false });
+  assert.equal(f.queries.at(-1), 'ROLLBACK');
+  assert.equal(f.ended, true);
+});
+
+for (const [label, connection] of [
+  ['missing connection', undefined], ['missing socket', {}],
+  ['plaintext socket', { stream: { encrypted: false, authorized: true } }],
+  ['unverified certificate', { stream: { encrypted: true, authorized: false } }],
+  ['missing certificate verdict', { stream: { encrypted: true } }],
+  ['authorization error', { stream: { encrypted: true, authorized: true, authorizationError: 'sensitive certificate error' } }],
+]) {
+  test(`backend SSL cannot substitute for verified client transport: ${label}`, async () => {
+    const f = fixture({ client: { connection } });
+    await assert.rejects(f.run(), error => /must use verified TLS/.test(error.message)
+      && !error.message.includes('sensitive certificate error'));
+    assert.deepEqual(f.queries, []);
+    assert.equal(f.ended, true);
+  });
+}
+
+test('disabled certificate validation and mismatched SNI fail before the first SQL query', async () => {
+  for (const ssl of [undefined, { ...config.ssl, rejectUnauthorized: false }, { ...config.ssl, servername: 'wrong.example' }]) {
+    const f = fixture();
+    await assert.rejects(f.run({ config: { ...config, ssl } }), /must use verified TLS/);
+    assert.deepEqual(f.queries, []);
+    assert.equal(f.ended, true);
+  }
+});
+
+test('plaintext fixture exception is restricted to an isolated database and an actual loopback client', async () => {
+  const database = 'colearnx_release_check_transport';
+  const localConfig = { database, host: '127.0.0.1', testOnlyLocalTransport: true };
+  const localIdentity = { ...identity, database, tls: false };
+  const make = (host = '127.0.0.1') => fixture({ identity: localIdentity,
+    client: { connection: { stream: {} }, connectionParameters: { host } } });
+  const f = make();
+  assert.deepEqual((await f.run({ config: localConfig })).transport, { mode: 'local-fixture', backendPgStatSsl: false });
+  assert.equal(f.ended, true);
+  assert.equal((await make('::1').run({ config: { ...localConfig, host: '[::1]' } })).transport.mode, 'local-fixture');
+  assert.equal((await make('[::1]').run({ config: { ...localConfig, host: '::1' } })).transport.mode, 'local-fixture');
+  for (const [settings, clientHost] of [
+    [{ ...localConfig, database: 'colearnx' }, '127.0.0.1'],
+    [{ ...localConfig, host: config.host }, config.host],
+    [{ ...localConfig, host: undefined }, '127.0.0.1'],
+    [{ ...localConfig, testOnlyLocalTransport: false }, '127.0.0.1'],
+    [localConfig, config.host],
+  ]) {
+    const unsafe = make(clientHost);
+    await assert.rejects(unsafe.run({ config: settings }), /must use verified TLS/);
+    assert.deepEqual(unsafe.queries, []);
+    assert.equal(unsafe.ended, true);
+  }
+});
+
+for (const [key, value] of [['database', 'other'], ['role', 'neondb_owner'], ['session_role', 'owner'], ['read_only', 'off'],
   ['default_read_only', 'off'], ...['rolsuper', 'rolcreatedb', 'rolcreaterole', 'rolinherit', 'rolreplication', 'rolbypassrls', 'memberships',
     'database_create', 'schema_create', 'table_write', 'sequence_write'].map(key => [key, true])]) {
   test(`cloud preflight rejects unsafe identity/privileges before ledger read: ${key}`, async () => {
