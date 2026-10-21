@@ -248,7 +248,9 @@ try {
 
   const promotionGrantsBefore = await updateGrants();
   const promotionLedgerBefore = (await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows;
-  assert.deepEqual(await migrate(), [`Applied ${promotionMigration}`]);
+  // Isolate 019 so its exact grant/data delta is not attributed to later
+  // migrations. The production runner validates/applies those below.
+  await applyFixtureMigration(promotionMigration);
   assert.deepEqual(await snapshot(), beforePromotion, '019 must not rewrite any existing file records.');
   const promotionGrantsAfter = await updateGrants();
   assert.deepEqual(promotionGrantsAfter.filter(row => !promotionGrantsBefore.some(before => JSON.stringify(before) === JSON.stringify(row))), [
@@ -279,12 +281,18 @@ try {
     passed(`${f.kind}: real restricted-role W8 completion promotes once, preserves the delivered copy and retains all unrelated permission restrictions`);
   }
 
+  const ledgerBeforeRemaining = (await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows;
+  const remainingMigrations = files.filter(filename => filename > promotionMigration);
+  assert.deepEqual(await migrate(), remainingMigrations.map(filename => `Applied ${filename}`));
+  const ledgerAfter = (await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows;
+  assert.deepEqual(ledgerAfter.map(row => row.filename), files, 'The real runner must ledger the complete current inventory.');
+  assert.deepEqual(ledgerAfter.slice(0, ledgerBeforeRemaining.length), ledgerBeforeRemaining,
+    'Later migrations must preserve previously applied migration records.');
   await assert.rejects(runtime.query('CREATE TABLE prohibited_runtime_ddl (id int)'), permissionDenied);
   await assert.rejects(runtime.query('SELECT * FROM schema_migrations'), permissionDenied);
-  const ledgerAfter = (await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows;
   assert.deepEqual(await migrate(), []);
   assert.deepEqual((await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows, ledgerAfter);
-  passed('forward migrations are ledgered once; rerunning is a no-op without broadening runtime privileges');
+  passed('the real runner applies all later migrations once, preserves prior history and remains a no-op on rerun with restricted runtime access');
 
   for (const f of fixtures) {
     await owner.query(`UPDATE ${f.table} SET asset_status = 'ready', verified_content_type = declared_content_type,
