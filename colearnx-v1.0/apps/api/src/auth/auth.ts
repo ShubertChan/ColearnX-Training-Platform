@@ -687,13 +687,22 @@ export async function login(req: Request, res: Response) {
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
   }
 
-  const actor = await loadActor(record.id);
+  return completePrimarySignIn(record.id, req, res, 'password');
+}
+
+// Both verified first factors pass through the same status, lockout, MFA and
+// session gates. Google never grants a session ahead of an enrolled factor.
+export async function completePrimarySignIn(userId: string, req: Request, res: Response, method: 'password' | 'google') {
+  const fingerprint = securityContext(req, res);
+  const lock = await readLockState(userId);
+  if (lock.locked) throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
+  const actor = await loadActor(userId);
   if (!actor || actor.status !== 'active') {
     // Correct credentials against a suspended or deleted account. Not a
     // guessing failure, so it must not advance the ladder, but worth recording:
     // it usually means a credential dump is being replayed.
     await recordSecurityEvent(fingerprint, {
-      type: 'auth.login_denied_status', actorUserId: record.id, decision: 'deny',
+      type: 'auth.login_denied_status', actorUserId: userId, decision: 'deny',
       context: { status: actor?.status ?? 'unknown' },
     }, res);
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
@@ -727,7 +736,7 @@ export async function login(req: Request, res: Response) {
   const session = await createRefreshSession(actor, req, res);
   await recordSecurityEvent(fingerprint, {
     type: 'auth.login_succeeded', actorUserId: actor.id,
-    context: { clearedFailures: lock?.consecutiveFailures ?? 0, mfa: false },
+    context: { clearedFailures: lock?.consecutiveFailures ?? 0, mfa: false, method },
   }, res);
   return ok(res, { user: actor, accessToken: signAccessToken(actor, session.sessionId), csrfToken: createCsrfToken(session.token) });
 }
