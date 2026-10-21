@@ -32,6 +32,7 @@ function exactOrigins(value) {
 }
 
 export function securityHeaders(env) {
+  const paymentsOn = String(env.VITE_PAYMENTS_API_ENABLED).toLowerCase() === "true";
   const videoOn = String(env.VITE_ENABLE_HOSTED_VIDEO).toLowerCase() === "true";
   const media = videoOn ? exactOrigins(env.VITE_MEDIA_ORIGINS) : [];
   const upload = exactOrigins(env.VITE_UPLOAD_ORIGINS);
@@ -43,13 +44,18 @@ export function securityHeaders(env) {
   }
   const api = env.VITE_API_BASE_URL?.startsWith("http") ? [new URL(env.VITE_API_BASE_URL).origin] : [];
 
-  const connect = [...new Set(["'self'", ...api, ...media, ...upload])].join(" ");
-  const img = ["'self'", "data:", ...media].join(" ");
+  // Stripe's documented origins support Elements, 3DS and Link authentication.
+  const stripeScripts = paymentsOn ? ["https://js.stripe.com", "https://*.js.stripe.com", "https://checkout.stripe.com"] : [];
+  const stripeFrames = paymentsOn ? [...stripeScripts, "https://hooks.stripe.com", "https://link.com", "https://*.link.com"] : [];
+  const stripeConnect = paymentsOn ? ["https://api.stripe.com", "https://checkout.stripe.com", "https://link.com", "https://*.link.com"] : [];
+  const connect = [...new Set(["'self'", ...api, ...media, ...upload, ...stripeConnect])].join(" ");
+  const img = ["'self'", "data:", ...media, ...(paymentsOn ? ["https://*.stripe.com", "https://*.link.com"] : [])].join(" ");
   const mediaSrc = ["'self'", "blob:", ...media].join(" ");
 
   const csp = [
     "default-src 'self'",
-    "script-src 'self'",
+    ["script-src 'self'", ...stripeScripts].join(" "),
+    ["frame-src 'self'", ...stripeFrames].join(" "),
     "style-src 'self' 'unsafe-inline'",
     "img-src " + img,
     "font-src 'self'",
@@ -69,8 +75,8 @@ export function securityHeaders(env) {
     "  X-Content-Type-Options: nosniff",
     "  X-Frame-Options: DENY",
     "  Referrer-Policy: no-referrer",
-    "  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
-    "  Cross-Origin-Opener-Policy: same-origin",
+    `  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=${paymentsOn ? '(self "https://js.stripe.com" "https://*.js.stripe.com")' : '()'}, usb=(), interest-cohort=()`,
+    `  Cross-Origin-Opener-Policy: ${paymentsOn ? "same-origin-allow-popups" : "same-origin"}`,
     "",
   ].join("\n");
 }
