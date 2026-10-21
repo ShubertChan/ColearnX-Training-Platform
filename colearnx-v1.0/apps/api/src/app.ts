@@ -15,6 +15,7 @@ import { confirmMfaEnrolment, disableMfaForSelf, getMfaStatus, requestStepUp, ro
 import { requireAdminMfa, requireStepUp } from './auth/mfa/guards.js';
 import { listSessions, revokeOtherSessions, revokeSession } from './auth/sessions.js';
 import { authenticate, csrf, forgotPassword, login, logout, me, refresh, register, resendEmailVerification, requireRole, resetPassword, updateMe, verifyEmail, verifyMfaLogin } from './auth/auth.js';
+import { googleChallenge, googleConfig, googleLogin } from './auth/google.js';
 import { createCheckoutSession, getCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
 import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, deleteContentDraft, deleteCourseDraft, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse, updateCourse } from './catalog/catalog.js';
@@ -37,7 +38,7 @@ import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUpload
 import { abortVideoMultipart, completeVideoMultipart, completeVideoUpload, createPlaybackSession, createPreviewPlaybackSession, createVideoUploadIntent, deleteVideoVersion, getCourseVideo, listVideoMultipartParts, listVideoOperations, recordVideoProgress, retryVideo, retryVideoForAdmin, signVideoMultipartPart } from './video/service.js';
 
 
-const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-step-up-token"]', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'req.body.token', 'req.body.mfaToken', 'res.headers.set-cookie'] });
+const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-step-up-token"]', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'req.body.token', 'req.body.mfaToken', 'req.body.credential', 'res.headers.set-cookie'] });
 // W5 (finding F-06): each limiter uses a Redis-backed store when REDIS_URL is
 // set, so the budget is shared across every API instance instead of living in
 // one process's memory. With no Redis configured, rateLimitStore returns
@@ -112,6 +113,9 @@ export function createApp() {
   api.post('/auth/verify-email', verificationLimiter, verifyEmail);
   api.post('/auth/resend-verification', verificationLimiter, resendEmailVerification);
   api.post('/auth/login', authLimiter, login);
+  api.get('/auth/google/config', noStore, googleConfig);
+  api.post('/auth/google/challenge', authLimiter, noStore, googleChallenge);
+  api.post('/auth/google', authLimiter, noStore, googleLogin);
   api.post('/auth/refresh', authLimiter, refresh);
   api.get('/profiles/:id', getPublicProfile);
   api.post('/me/data-export', authenticate, mutationLimiter, requestDataExport);

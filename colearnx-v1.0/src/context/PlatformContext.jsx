@@ -11,6 +11,7 @@ import {
   completeMfaLogin,
 } from "../api/auth";
 import { hasAccessToken, hasCsrfToken, restoreClientSession, setAccessToken, setCsrfToken } from "../api/client";
+import { loginWithGoogle } from "../api/googleIdentity";
 import { readSessionResource } from "../api/sessionRecovery.js";
 import {
   createContent,
@@ -593,6 +594,13 @@ export function PlatformProvider({ children }) {
     return { ...session, usedRecoveryCode: result.usedRecoveryCode, recoveryCodesRemaining: result.recoveryCodesRemaining };
   };
 
+  const signInWithGoogle = async (input) => {
+    await beginAuthentication();
+    const result = await loginWithGoogle(input);
+    if (result.mfaRequired || result.registrationRequired) return result;
+    return establishSession(result);
+  };
+
   const registerMember = async ({ name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged }) => {
     await beginAuthentication();
     const result = await registerAccount({ displayName: name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged });
@@ -907,6 +915,7 @@ export function PlatformProvider({ children }) {
     toast,
     notify,
     signIn,
+    signInWithGoogle,
     completeSignIn,
     registerMember,
     verifyRegistrationEmail,

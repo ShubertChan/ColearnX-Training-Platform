@@ -7,6 +7,7 @@ import { usePlatform } from "../context/PlatformContext";
 import { requestPasswordReset, resetPassword } from "../api/auth";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import SessionConnectionNotice from "../components/SessionConnectionNotice";
+import GoogleSignIn from "../components/GoogleSignIn";
 import nextLogo from "../../assets/next-logo.jpg";
 import { intendedPath } from "../utils/frontendState";
 import { PASSWORD_MIN_LENGTH, passwordChecklist, passwordChecklistPasses, passwordStrength } from "../utils/passwordPolicy";
@@ -50,6 +51,14 @@ export function AuthPage({ mode = "login" }) {
   // they would otherwise never get.
   const [failures, setFailures] = useState({ email: "", count: 0 });
   const [mfa, setMfa] = useState(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const signedInWithGoogle = (identity) => {
+    if (identity.mfaRequired) {
+      setMfa({ token: identity.mfaToken, code: "", error: "", busy: false });
+      return;
+    }
+    navigate(intendedPath(location.state?.from, identity.roles.includes("Admin") ? "/admin" : "/home"), { replace: true });
+  };
   const attemptedEmail = email.trim().toLowerCase();
   const repeatedFailures = failures.email === attemptedEmail ? failures.count : 0;
 
@@ -58,7 +67,7 @@ export function AuthPage({ mode = "login" }) {
     setMfa((previous) => ({ ...previous, busy: true, error: "" }));
     try {
       const identity = await completeSignIn({ mfaToken: mfa.token, code: mfa.code });
-      const target = intendedPath() || defaultRouteForRoles(identity.roles);
+      const target = intendedPath(location.state?.from, identity.roles.includes("Admin") ? "/admin" : "/home");
       navigate(target, { replace: true });
     } catch (mfaError) {
       setMfa((previous) => ({ ...previous, busy: false, error: mfaError.message }));
@@ -67,6 +76,7 @@ export function AuthPage({ mode = "login" }) {
 
   const submit = async (event) => {
     event.preventDefault();
+    if (googleBusy || submitting) return;
     if (register && password !== confirmation) return setError("Passwords do not match.");
     if (register && !passwordChecklistPasses(password, { email, displayName: name })) return setError(`Choose a password of at least ${PASSWORD_MIN_LENGTH} characters that meets the requirements listed below.`);
     if (register && (!acceptedTerms || !ageAcknowledged)) return setError("Accept the terms/privacy notice and confirm the age policy.");
@@ -119,8 +129,9 @@ export function AuthPage({ mode = "login" }) {
       {error && <div className="form-error" role="alert">{t(error)}</div>}
       {!register && repeatedFailures >= 5 && <div className="form-notice" role="status">{t("Several sign-in attempts for this address have failed. For security, repeated failures pause sign-in for a short time, so a correct password may still be refused until the pause ends. Wait a minute and try again, or ")}<Link to="/forgot-password">{t("reset your password")}</Link>{t(" — completing a reset lifts the pause immediately.")}</div>}
       {register && <div className="auth-consents"><label className="check-label"><input required type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} /><span>{t("I accept the ")}<Link to="/terms" target="_blank">{t("Terms")}</Link>{t(" and ")}<Link to="/privacy" target="_blank">{t("Privacy Notice")}</Link>.</span></label><label className="check-label"><input required type="checkbox" checked={ageAcknowledged} onChange={(event) => setAgeAcknowledged(event.target.checked)} /><span>{t("I meet the configured minimum-age policy.")}</span></label></div>}
-      <Button className="wide" type="submit" disabled={submitting}>{submitting ? t("Connecting…") : register ? t("Create Member account") : t("Sign in")}<ArrowRight size={17} /></Button>
+      <Button className="wide" type="submit" disabled={submitting || googleBusy}>{submitting ? t("Connecting…") : register ? t("Create Member account") : t("Sign in")}<ArrowRight size={17} /></Button>
       {!register && <p className="auth-recovery"><Link to="/forgot-password">{t("Forgot your password?")}</Link></p>}
+      {!register && <GoogleSignIn disabled={submitting} onBusyChange={setGoogleBusy} onSignedIn={signedInWithGoogle} />}
       <p className="auth-switch">{register ? t("Already have an account?") : t("New to CoLearnX?")} <Link to={register ? "/login" : "/register"}>{register ? t("Sign in") : t("Create account")}</Link></p>
     </form>
   </section></div>;

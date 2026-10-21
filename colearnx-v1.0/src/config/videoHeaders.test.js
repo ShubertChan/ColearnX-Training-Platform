@@ -2,6 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { securityHeaders } from "../../build/videoHeaders.js";
 
+test("runtime Google sign-in permits only its SDK paths and popup communication", () => {
+  const headers = securityHeaders({});
+  assert.match(headers, /script-src[^;]*https:\/\/accounts.google.com\/gsi\/client/);
+  assert.match(headers, /frame-src[^;]*https:\/\/accounts.google.com\/gsi\//);
+  assert.match(headers, /connect-src[^;]*https:\/\/accounts.google.com\/gsi\//);
+  assert.match(headers, /style-src[^;]*https:\/\/accounts.google.com\/gsi\/style/);
+  assert.match(headers, /Cross-Origin-Opener-Policy: same-origin-allow-popups/);
+  assert.doesNotMatch(headers, /script-src[^;]*(?:unsafe-inline|unsafe-eval|\*)/);
+});
+
 test("onsite payments permit Stripe Elements, wallet permissions and Link popups only when enabled", () => {
   const headers = securityHeaders({ VITE_PAYMENTS_API_ENABLED: "true" });
   assert.match(headers, /script-src 'self' https:\/\/js.stripe.com/);
@@ -12,7 +22,8 @@ test("onsite payments permit Stripe Elements, wallet permissions and Link popups
   assert.match(headers, /Cross-Origin-Opener-Policy: same-origin-allow-popups/);
   assert.doesNotMatch(headers, /script-src[^;]*unsafe-inline/);
   const disabled = securityHeaders({ VITE_PAYMENTS_API_ENABLED: "false" });
-  assert.doesNotMatch(disabled, /stripe.com|link.com|same-origin-allow-popups/);
+  assert.doesNotMatch(disabled, /stripe.com|link.com/);
+  assert.match(disabled, /Cross-Origin-Opener-Policy: same-origin-allow-popups/);
   assert.match(disabled, /payment=\(\)/);
 });
 

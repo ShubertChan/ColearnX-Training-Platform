@@ -34,6 +34,8 @@ The frontend/backend boundary and the server work still required for the reporte
 
 ## Backend integration
 
+Google sign-in is optional and configured on the API with `GOOGLE_CLIENT_ID`. See the [step-by-step OAuth configuration and deployment handoff (中文)](docs/GOOGLE_LOGIN_SETUP_ZH.md) for account linking, migration 021, Google Console settings, and the existing manual staging release process.
+
 The repository also includes the backend delivery and refund workflows. Review and apply all pending migrations from the target commit (not only the original delivery migration 008), and configure deployment secrets before enabling protected features. See [API contract](docs/API.md), [local runbook](docs/LOCAL_RUNBOOK.md), and [staging runbook](docs/STAGING_RENDER_NEON.md). The frontend treats server-recorded refund eligibility as authoritative.
 
 ## Controlled staging CI/CD
