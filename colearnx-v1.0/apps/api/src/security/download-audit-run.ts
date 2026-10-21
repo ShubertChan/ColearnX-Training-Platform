@@ -1,8 +1,9 @@
 import { Pool } from 'pg';
 import { env } from '../config/env.js';
 import { closeDatabase } from '../db/database.js';
+import { closeRedis } from '../lib/redis.js';
 import { runDownloadAudit } from './download-audit.js';
-import { persistSecurityEvent, systemFingerprint } from './events.js';
+import { drainSecurityAlerts, persistSecurityEvent, systemFingerprint } from './events.js';
 
 /**
  * F-20 download-link audit.
@@ -61,6 +62,10 @@ async function main() {
     );
     if (summary.recordFailures > 0) process.exitCode = 1;
   } finally {
+    // A high-severity finding dispatches an alert; let it finish, then close
+    // Redis so the process can exit and the scheduler sees the exit code.
+    await drainSecurityAlerts();
+    await closeRedis();
     await pool.end();
     await closeDatabase();
   }

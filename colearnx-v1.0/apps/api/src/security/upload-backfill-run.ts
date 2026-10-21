@@ -1,8 +1,9 @@
 import { Pool } from 'pg';
 import { env } from '../config/env.js';
 import { closeDatabase } from '../db/database.js';
+import { closeRedis } from '../lib/redis.js';
 import { findStoredObject, readStoredObject, streamStoredObject } from '../storage/r2.js';
-import { persistSecurityEvent, systemFingerprint } from './events.js';
+import { drainSecurityAlerts, persistSecurityEvent, systemFingerprint } from './events.js';
 import { createClamdScanner } from './malware-scan.js';
 import { runUploadBackfill, type BackfillAsset } from './upload-backfill.js';
 import { inspectUpload } from './upload-inspection.js';
@@ -101,6 +102,10 @@ async function main() {
     );
     if (summary.inspectionErrors > 0 || summary.recordFailures > 0) process.exitCode = 1;
   } finally {
+    // A high-severity finding dispatches an alert; let it finish, then close
+    // Redis so the process can exit and the scheduler sees the exit code.
+    await drainSecurityAlerts();
+    await closeRedis();
     await pool.end();
     await closeDatabase();
   }

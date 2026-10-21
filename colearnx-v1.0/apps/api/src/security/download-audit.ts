@@ -72,8 +72,8 @@ export function assessDownloadPattern(pattern: DownloadPattern): DownloadVerdict
     riskScore += 30;
   }
   if (!ruleHits.length) return null;
-  // Medium, never paging: this is a lead for an operator to look at, and an
-  // unattended job must not depend on the alert channel to exit cleanly.
+  // Medium, never paging: this is a lead for an operator to look at, not an
+  // incident.
   return { actorUserId: pattern.actorUserId, assetId: pattern.assetId, riskScore, severity: 2, ruleHits, reasons };
 }
 
