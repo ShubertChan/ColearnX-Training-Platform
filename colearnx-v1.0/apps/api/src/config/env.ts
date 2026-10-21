@@ -68,6 +68,18 @@ const schema = z.object({
   // --- W3 credential protection -------------------------------------------
   PASSWORD_MIN_LENGTH: z.coerce.number().int().min(12).max(64).default(12),
   PWNED_PASSWORDS_ENABLED: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
+
+  // --- W8 file and content security ---------------------------------------
+  // Real-type checks (file signatures, archive inspection) need no
+  // infrastructure and always run. Malware scanning needs a clamd daemon, so it
+  // is opt-in outside production; production refuses to start without it.
+  UPLOAD_MALWARE_SCANNER: z.enum(['disabled', 'clamav']).default('disabled'),
+  CLAMAV_HOST: z.string().trim().min(1).max(255).default('127.0.0.1'),
+  CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
+  CLAMAV_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
+  // Inspections buffer up to CONTENT_UPLOAD_MAX_BYTES each; this bounds how
+  // many run at once in one process so concurrent uploads cannot exhaust memory.
+  UPLOAD_INSPECTION_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
   // Overridable so tests can point at a local stub; never derived from a request.
   PWNED_PASSWORDS_API_BASE: z.string().url().default('https://api.pwnedpasswords.com'),
   PWNED_PASSWORDS_TIMEOUT_MS: z.coerce.number().int().min(500).max(10000).default(2500),
@@ -210,6 +222,13 @@ if (parsed.data.NODE_ENV === 'production' && !parsed.data.SECURITY_ALERT_WEBHOOK
 // ledger's source attribution onto one address. Fail closed on that misconfig.
 if (deployedEnvironment && parsed.data.TRUST_PROXY === 0) {
   throw new Error('TRUST_PROXY must be the real proxy hop count (>= 1) in staging and production.');
+}
+
+// W8 (F-09): in production an upload must not become downloadable without a
+// malware verdict. Staging may run without clamd (signature and archive checks
+// still apply); the choice is logged by the server at start-up.
+if (parsed.data.NODE_ENV === 'production' && parsed.data.UPLOAD_MALWARE_SCANNER !== 'clamav') {
+  throw new Error('UPLOAD_MALWARE_SCANNER=clamav is required in production: uploads must be malware-scanned before other learners can download them.');
 }
 
 export const env = parsed.data;
