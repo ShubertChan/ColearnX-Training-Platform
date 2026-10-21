@@ -48,15 +48,18 @@ export function securityHeaders(env) {
   const stripeScripts = paymentsOn ? ["https://js.stripe.com", "https://*.js.stripe.com", "https://checkout.stripe.com"] : [];
   const stripeFrames = paymentsOn ? [...stripeScripts, "https://hooks.stripe.com", "https://link.com", "https://*.link.com"] : [];
   const stripeConnect = paymentsOn ? ["https://api.stripe.com", "https://checkout.stripe.com", "https://link.com", "https://*.link.com"] : [];
-  const connect = [...new Set(["'self'", ...api, ...media, ...upload, ...stripeConnect])].join(" ");
+  // Google is enabled at API runtime; its narrowly scoped SDK origins must be
+  // present in the tested artifact before deployment (no build-time secrets).
+  const googleBase = "https://accounts.google.com/gsi/";
+  const connect = [...new Set(["'self'", ...api, ...media, ...upload, ...stripeConnect, googleBase])].join(" ");
   const img = ["'self'", "data:", ...media, ...(paymentsOn ? ["https://*.stripe.com", "https://*.link.com"] : [])].join(" ");
   const mediaSrc = ["'self'", "blob:", ...media].join(" ");
 
   const csp = [
     "default-src 'self'",
-    ["script-src 'self'", ...stripeScripts].join(" "),
-    ["frame-src 'self'", ...stripeFrames].join(" "),
-    "style-src 'self' 'unsafe-inline'",
+    ["script-src 'self'", ...stripeScripts, `${googleBase}client`].join(" "),
+    ["frame-src 'self'", ...stripeFrames, googleBase].join(" "),
+    `style-src 'self' 'unsafe-inline' ${googleBase}style`,
     "img-src " + img,
     "font-src 'self'",
     "connect-src " + connect,
@@ -76,7 +79,7 @@ export function securityHeaders(env) {
     "  X-Frame-Options: DENY",
     "  Referrer-Policy: no-referrer",
     `  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=${paymentsOn ? '(self "https://js.stripe.com" "https://*.js.stripe.com")' : '()'}, usb=(), interest-cohort=()`,
-    `  Cross-Origin-Opener-Policy: ${paymentsOn ? "same-origin-allow-popups" : "same-origin"}`,
+    "  Cross-Origin-Opener-Policy: same-origin-allow-popups",
     "",
   ].join("\n");
 }
