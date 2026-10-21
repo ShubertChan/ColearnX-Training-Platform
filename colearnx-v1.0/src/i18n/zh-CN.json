@@ -1,4 +1,12 @@
 {
+  "Refund approved": "退款申请已批准",
+  "Refund rejected": "退款申请已拒绝",
+  "View order": "查看订单",
+  "Got it": "我知道了",
+  "Your refund of {points} points has been credited to your wallet.": "退款的 {points} 积分已退回您的钱包。",
+  "Your refund request was rejected. No points were refunded.": "您的退款申请未获批准，积分未退回。",
+  "Review reason": "审核说明",
+  "We could not save your confirmation. Please try again.": "暂时无法保存您的确认，请重试。",
   "Secure payment": "安全支付",
   "Complete your points top-up": "完成积分充值",
   "Choose your payment method on the next page. Your payment details are securely collected by Stripe.": "请在下一页选择支付方式。您的支付信息将由 Stripe 安全收集。",

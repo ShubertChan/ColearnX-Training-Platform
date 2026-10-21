@@ -579,6 +579,8 @@ try {
   assert.equal(retentionCommand.code, 0, retentionCommand.stderr);
   assert.match(retentionCommand.stdout, /removed 1 security events older than 180 days, 0 closed reset tokens/);
   passed('real second-delete failure rolls back the first deletion; CLI rejects malformed days before deletion and succeeds with the corrected schema');
+  const { runRefundNotificationChecks } = await import('./refund-notification-checks.mjs');
+  await runRefundNotificationChecks({ owner, app, environment, buyerId, sellerId, adminId, courseRunId, accessToken, passed });
   const { runMfaSessionChecks } = await import('./mfa-session-checks.mjs');
   await runMfaSessionChecks({ owner, app, apiPool, environment, passed });
   const { runVideoOrderIntegrityChecks } = await import('./video-order-integrity-checks.mjs');
