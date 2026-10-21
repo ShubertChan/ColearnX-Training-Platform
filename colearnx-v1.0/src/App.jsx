@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, Link, useLocation } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 import Layout from "./components/Layout";
 const VideoLearningPage = lazy(() => import("./pages/VideoLearningPage"));
+const TopUpCheckoutPage = lazy(() => import("./pages/TopUpCheckoutPage"));
 import PublicLayout from "./components/PublicLayout";
 import AdminMfaGate from "./components/AdminMfaGate";
 import { EmptyState } from "./components/ui";
@@ -114,6 +115,7 @@ export default function App() {
   const { t } = useTranslation();
   return (
     <Routes>
+      <Route path="/wallet/checkout/:paymentTransactionId" element={<Workspace><Suspense fallback={<p role="status">{t("Loading secure payment…")}</p>}><TopUpCheckoutPage /></Suspense></Workspace>} />
       <Route path="/admin/inbox" element={<Workspace><Protected roles={["Admin"]}><AdminInboxPage /></Protected></Workspace>} />
       <Route path="/admin/certifications" element={<Workspace><Protected roles={["Admin"]}><AdminCertificationsPage /></Protected></Workspace>} />
       <Route path="/login" element={<AnonymousOnly><AuthPage /></AnonymousOnly>} />

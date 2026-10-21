@@ -1,5 +1,5 @@
 import { getFormatLocale, useTranslation } from "../i18n/LanguageContext";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -189,7 +189,10 @@ export function WalletPage() {
 }
 
 function TopUpModal({ onClose }) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const navigate = useNavigate();
+  const pendingCheckout = useRef(null);
+  const submitting = useRef(false);
   const [step, setStep] = useState(1);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -214,36 +217,42 @@ function TopUpModal({ onClose }) {
 
   const selectedPlan = packages.find((plan) => plan.id === selectedPackageId);
   const startCheckout = async () => {
+    if (submitting.current) return;
     if (!selectedPlan) {
       setError("No top-up package is available. Please try again shortly.");
       return;
     }
+    submitting.current = true;
     setLoading(true);
     setError("");
-    const idempotencyKey = crypto.randomUUID();
+    const locale = language === "zh-CN" ? "zh" : "en";
+    const signature = `${selectedPlan.id}:${locale}`;
+    if (pendingCheckout.current?.signature !== signature) {
+      pendingCheckout.current = { signature, key: crypto.randomUUID() };
+    }
     try {
       const session = await createTopUpCheckoutSession({
         topUpPackageId: selectedPlan.id,
-        idempotencyKey,
+        idempotencyKey: pendingCheckout.current.key,
+        locale,
       });
-      const checkoutUrl = new URL(session.checkoutUrl);
-      if (checkoutUrl.protocol !== "https:")
-        throw new Error("The payment provider returned an unsafe checkout URL.");
-      window.location.assign(checkoutUrl.toString());
+      navigate(`/wallet/checkout/${encodeURIComponent(session.paymentTransactionId)}`);
     } catch (checkoutError) {
       setError(checkoutError.message);
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
   return (
     <Modal
       title={t("Add points to your wallet")}
-      onClose={onClose}
+      onClose={() => !submitting.current && onClose()}
       footer={
         <>
           <Button
             variant="secondary"
+            disabled={loading}
             onClick={() => (step === 1 ? onClose() : setStep(step - 1))}
           >
             {step === 1 ? t("Cancel") : t("Back")}
@@ -314,11 +323,11 @@ function TopUpModal({ onClose }) {
       {step === 2 && selectedPlan && (
         <div className="payment-preview">
           <ShieldCheck size={30} />
-          <h3>{t("Secure external checkout")}</h3>
-          <p>{t("CoLearnX creates a top-up order, then the external payment provider collects payment details. Raw card data never enters CoLearnX.")}</p>
+          <h3>{t("Secure payment")}</h3>
+          <p>{t("Choose your payment method on the next page. Your payment details are securely collected by Stripe.")}</p>
           <div className="integration-note">
             <b>{t("Stripe sandbox checkout")}</b>
-            <span>{t("Points are credited only after the Express webhook verifies the provider event and idempotency key.")}</span>
+            <span>{t("Your points will be added once payment is confirmed.")}</span>
           </div>
           <div className="summary-row total">
             <span>{t("Amount")}</span>
