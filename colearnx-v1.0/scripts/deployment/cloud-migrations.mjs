@@ -60,6 +60,26 @@ function appliedTimestamp(value) {
   return text.replace(/\.(\d{3})Z$/, (_match, ms) => `.${ms}000Z`);
 }
 
+function verifyClientTransport(client, config) {
+  const stream = client.connection?.stream;
+  const fixtureHost = config.host === '[::1]' ? '::1' : config.host;
+  const clientHost = client.connectionParameters?.host === '[::1]' ? '::1' : client.connectionParameters?.host;
+  // Only the isolated integration runner can use plaintext loopback transport.
+  // Production parsing never supplies this flag, and the real database name
+  // cannot satisfy the fixture prefix even if the flag is accidentally passed.
+  const localFixture = config.testOnlyLocalTransport === true
+    && /^colearnx_release_check_[a-z0-9_]+$/.test(config.database)
+    && ['127.0.0.1', 'localhost', '::1'].includes(fixtureHost)
+    && clientHost === fixtureHost;
+  if (localFixture) return { mode: 'local-fixture' };
+  // pg_stat_ssl describes the proxy-to-backend hop, not necessarily this
+  // client's socket. Verify the actual TLS peer before issuing any query.
+  requireValue(config.ssl?.rejectUnauthorized === true && config.ssl.servername === config.host
+    && stream?.encrypted === true && stream.authorized === true && !stream.authorizationError,
+    'Cloud database connection must use verified TLS.');
+  return { mode: 'verified-tls', encrypted: true, certificateAuthorized: true };
+}
+
 // Catalog inspection only. No business rows, grants, DDL, migrations or credentials are returned.
 const identitySql = `SELECT current_database() AS database, current_user AS role, session_user AS session_role,
   current_setting('transaction_read_only') AS read_only,
@@ -91,6 +111,7 @@ export async function verifyCloudMigrations({ config, inventory, sqlByFilename, 
     client = await clientFactory(config);
     client.on?.('error', () => { /* pg may include connection details in asynchronous errors. Never log them. */ });
     await client.connect();
+    const transport = verifyClientTransport(client, config);
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     transaction = true;
     await client.query("SET LOCAL statement_timeout = '5s'");
@@ -101,11 +122,11 @@ export async function verifyCloudMigrations({ config, inventory, sqlByFilename, 
       && identity.read_only === 'on' && identity.default_read_only === 'on', 'Database identity or read-only session does not match the dedicated release reader.');
     requireValue(['rolsuper', 'rolcreatedb', 'rolcreaterole', 'rolinherit', 'rolreplication', 'rolbypassrls', 'memberships',
       'database_create', 'schema_create', 'table_write', 'sequence_write'].every(key => identity[key] === false), 'Release reader has unexpected ownership, write, membership or administrative privileges.');
-    requireValue(identity.tls === true || config.testOnlyLocalTransport === true, 'Cloud database connection must use verified TLS.');
     const ledger = await client.query(`SELECT filename, checksum,
       to_char(applied_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS applied_at
       FROM public.schema_migrations ORDER BY filename LIMIT 1001`);
     return { schemaVersion: 1, commit, result: 'verified', database: config.database, role: readerRole,
+      transport: { ...transport, backendPgStatSsl: identity.tls === true },
       ...compareMigrationLedger(inventory, ledger.rows, sqlByFilename), checkedAt: new Date().toISOString() };
   } catch (error) {
     throw error instanceof MigrationError ? error : new MigrationError('Cloud migration preflight could not be completed. Check read-only credentials, permissions, connectivity and ledger; no deployment is permitted.');
