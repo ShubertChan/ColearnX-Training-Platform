@@ -20,6 +20,7 @@
     "security:retention": "tsx src/security/retention.ts",
     "security:ledger-audit": "tsx src/security/ledger-audit-run.ts",
     "security:risk-sweep": "tsx src/security/risk-sweep-run.ts",
+    "security:download-audit": "tsx src/security/download-audit-run.ts",
     "video:queue:prepare": "tsx src/video/prepare-queue.ts"
   },
   "dependencies": {

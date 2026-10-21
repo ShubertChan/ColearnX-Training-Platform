@@ -35,5 +35,24 @@ services:
       timeout: 3s
       retries: 20
 
+  # W8 malware scanning. Behind a profile because the image downloads several
+  # hundred MB of signatures and takes a few minutes before it answers:
+  #   docker compose --profile scan up -d clamav
+  # then set UPLOAD_MALWARE_SCANNER=clamav for the API. Loopback only: clamd
+  # has no authentication.
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["scan"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3310:3310"
+    volumes:
+      - colearnx_clamav:/var/lib/clamav
+      # Raises StreamMaxLength above the 100 MB video limit; clamd's 25 MB
+      # default would make every large upload fail closed.
+      - ./deploy/clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+    # The image ships its own HEALTHCHECK (clamd PING/PONG).
+
 volumes:
   colearnx_pgdata:
+  colearnx_clamav:

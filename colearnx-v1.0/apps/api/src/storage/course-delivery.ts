@@ -21,6 +21,15 @@ import {
 import { canFinalizeStorageAssetDeletion, remainingSignedUploadTtlSeconds } from './storage-deletion.js';
 import { assertAccountStorageQuota, lockStorageAccount } from './storage-quota.js';
 import { assertVideoStarted, videoAvailability } from '../video/availability.js';
+import { recordDownloadIssued } from '../security/download-audit.js';
+import {
+  recordScanUnavailable,
+  recordUploadRejection,
+  uploadRejectedError,
+  verifyUploadedObject,
+  type UploadVerifier,
+  type VerificationOutcome,
+} from './upload-verification.js';
 
 const uploadIntentInput = z.object({
   filename: z.string().trim().min(1).max(512),
@@ -288,10 +297,15 @@ export function createCourseUploadIntentHandler(dependencies = { withTransaction
 
 export const createCourseUploadIntent = createCourseUploadIntentHandler();
 
+/**
+ * Step 1 of completion (see upload-verification.ts): lock, size/header check.
+ * A mismatch is quarantined and committed; a match is handed on for content
+ * inspection WITHOUT being marked ready.
+ */
 export async function completeCourseUploadTransaction(client: PoolClient,
   input: { actorId: string; courseRunId: string; assetId: string; requestId?: string },
   headObject: typeof headUploadedObject = headUploadedObject) {
-  const { actorId, courseRunId, assetId, requestId } = input;
+  const { actorId, courseRunId, assetId } = input;
   await lockDraftCourse(client, actorId, courseRunId);
   await assertTrainerOperational(client, actorId);
   const asset = await pendingAsset(client, assetId, courseRunId, actorId);
@@ -308,29 +322,92 @@ export async function completeCourseUploadTransaction(client: PoolClient,
     // Return normally so the quarantine is committed. The HTTP 409 is raised afterwards.
     return { kind: 'mismatch' as const, asset };
   }
-  const result = await client.query<CourseAsset>(`UPDATE course_delivery_assets SET asset_status = 'ready',
+  return { kind: 'inspect' as const, asset, etag: headed.etag };
+}
+
+/**
+ * Step 3: commit the inspection verdict, after re-checking under lock that the
+ * row is still the pending upload that was inspected.
+ */
+export async function commitCourseUploadVerdict(client: PoolClient,
+  input: { actorId: string; courseRunId: string; assetId: string; requestId?: string; inspectedKey: string; etag?: string },
+  outcome: VerificationOutcome) {
+  const { actorId, courseRunId, assetId, requestId } = input;
+  await lockDraftCourse(client, actorId, courseRunId);
+  await assertTrainerOperational(client, actorId);
+  const asset = await pendingAsset(client, assetId, courseRunId, actorId);
+  if (asset.asset_status === 'ready') return { kind: 'ready' as const, asset };
+  if (asset.asset_status !== 'pending' || asset.object_key !== input.inspectedKey) {
+    throw new ApiError(409, 'UPLOAD_NOT_PENDING', 'This upload intent cannot be completed.');
+  }
+  if (outcome.kind === 'rejected') {
+    await client.query(`UPDATE course_delivery_assets SET asset_status = 'quarantined',
+      verified_byte_size = $2, etag = $3, uploaded_at = now(), updated_at = now()
+      WHERE course_delivery_asset_id = $1`, [assetId, Number(asset.declared_byte_size), input.etag ?? null]);
+    await audit(client, actorId, 'course.upload.rejected', assetId, requestId, {
+      courseRunId, reason: outcome.verdict.reason, outcome: 'quarantined',
+    });
+    return { kind: 'rejected' as const, asset, verdict: outcome.verdict };
+  }
+  const result = await client.query<CourseAsset>(`UPDATE course_delivery_assets SET asset_status = 'ready', object_key = $5,
     verified_content_type = $2, verified_byte_size = $3, etag = $4, uploaded_at = now(), verified_at = now(), updated_at = now()
     WHERE course_delivery_asset_id = $1
     RETURNING course_delivery_asset_id, course_run_id, owner_user_id, asset_purpose, bucket_name, object_key,
      original_filename, declared_content_type, declared_byte_size, verified_content_type, verified_byte_size,
-     etag, asset_status, upload_expires_at`, [assetId, asset.declared_content_type, Number(asset.declared_byte_size), headed.etag ?? null]);
-  await audit(client, actorId, 'course.upload.completed', assetId, requestId, { courseRunId, outcome: 'success' });
+     etag, asset_status, upload_expires_at`,
+  [assetId, outcome.mediaType, Number(asset.declared_byte_size), input.etag ?? null, outcome.objectKey]);
+  await audit(client, actorId, 'course.upload.completed', assetId, requestId, {
+    courseRunId, malwareScanned: outcome.scanned, outcome: 'success',
+  });
   return { kind: 'ready' as const, asset: result.rows[0] };
 }
 
-export function createCourseUploadCompletionHandler(dependencies = { withTransaction, headObject: headUploadedObject }) {
+type CourseCompletionDependencies = {
+  withTransaction: typeof withTransaction;
+  headObject: typeof headUploadedObject;
+  verify?: UploadVerifier;
+  deleteObject?: typeof deleteStoredObject;
+};
+
+export function createCourseUploadCompletionHandler(dependencies: CourseCompletionDependencies = { withTransaction, headObject: headUploadedObject }) {
+  const verify = dependencies.verify ?? verifyUploadedObject;
+  const deleteObject = dependencies.deleteObject ?? deleteStoredObject;
   return async (req: Request, res: Response) => {
     const actor = res.locals.actor as Actor;
     requireTrainer(actor);
     const courseRunId = parse(uuid, req.params.courseRunId);
     const assetId = parse(uuid, req.params.assetId);
-    const completed = await dependencies.withTransaction((client) => completeCourseUploadTransaction(client, {
-      actorId: actor.id, courseRunId, assetId, requestId: res.locals.requestId,
-    }, dependencies.headObject));
-    if (completed.kind === 'mismatch') {
+    const input = { actorId: actor.id, courseRunId, assetId, requestId: res.locals.requestId };
+    const checked = await dependencies.withTransaction((client) => completeCourseUploadTransaction(client, input, dependencies.headObject));
+    if (checked.kind === 'mismatch') {
       throw new ApiError(409, 'UPLOAD_OBJECT_MISMATCH', 'The uploaded file did not match its upload intent.');
     }
-    return ok(res, assetResponse(completed.asset));
+    if (checked.kind === 'ready') return ok(res, assetResponse(checked.asset));
+
+    const inspected = checked.asset;
+    let outcome: VerificationOutcome;
+    try {
+      outcome = await verify({
+        bucketName: inspected.bucket_name, objectKey: inspected.object_key,
+        declaredContentType: inspected.declared_content_type, byteSize: Number(inspected.declared_byte_size), etag: checked.etag,
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'UPLOAD_SCAN_UNAVAILABLE') {
+        await recordScanUnavailable(req, res, actor.id, assetId, 'course');
+      }
+      throw error;
+    }
+    const finished = await dependencies.withTransaction((client) => commitCourseUploadVerdict(client,
+      { ...input, inspectedKey: inspected.object_key, etag: checked.etag }, outcome));
+    // The incoming object is never served (stale copy or blocked file).
+    await deleteObject({ bucketName: inspected.bucket_name, objectKey: inspected.object_key }).catch(() => undefined);
+    if (finished.kind === 'rejected') {
+      await recordUploadRejection(req, res, actor.id, {
+        assetId, kind: 'course', declaredContentType: inspected.declared_content_type, verdict: finished.verdict,
+      });
+      throw uploadRejectedError();
+    }
+    return ok(res, assetResponse(finished.asset));
   };
 }
 
@@ -465,6 +542,7 @@ export async function createCourseDownloadUrl(req: Request, res: Response) {
   });
   const downloadUrl = await signDownload({ bucketName: result.bucket_name, objectKey: result.object_key },
     result.verified_content_type ?? result.declared_content_type, result.original_filename, 'attachment');
+  await recordDownloadIssued(req, res, actor.id, { assetId: result.course_delivery_asset_id, assetKind: 'course', mode: 'attachment' });
   return ok(res, { assetId: result.course_delivery_asset_id, filename: result.original_filename, downloadUrl });
 }
 
