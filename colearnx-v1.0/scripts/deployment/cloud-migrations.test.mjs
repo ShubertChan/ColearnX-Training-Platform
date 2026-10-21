@@ -61,6 +61,13 @@ test('CRLF and narrow historical checksum compatibility reuse the migrator imple
   assert.throws(() => compareMigrationLedger([inventory[0], { ...inventory[1], filename: '003_gap.sql' }], ledger, sqlByFilename), /checked-in/);
 });
 
+test('ledger evidence preserves PostgreSQL microseconds rather than truncating applied_at to JavaScript milliseconds', () => {
+  const first = [{ ...ledger[0], applied_at: '2026-10-01T00:00:00.123001Z' }, ledger[1]];
+  const second = [{ ...ledger[0], applied_at: '2026-10-01T00:00:00.123002Z' }, ledger[1]];
+  assert.notEqual(compareMigrationLedger(inventory, first, sqlByFilename).ledgerDigest,
+    compareMigrationLedger(inventory, second, sqlByFilename).ledgerDigest);
+});
+
 test('preflight uses a read-only snapshot, checks identity first and always rolls back/closes', async () => {
   const f = fixture();
   const report = await f.run();

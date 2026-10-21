@@ -20,7 +20,7 @@
 4. 拒绝 Owner/超级用户、角色成员关系、DDL、对象所有权、表/字段写权限和序列写权限；应用账号无需获得迁移记录读取权限。
 5. 只读取 `public.schema_migrations` 的 `filename, checksum, applied_at`。必须与仓库完整清单一一匹配，不只看最后一个编号。
 6. checksum 复用迁移器的同一实现：兼容既有 LF/CRLF 和原有狭窄历史别名，不新增任意 checksum 豁免。
-7. 保存迁移清单和 ledger 摘要；发布后要求它们与发布前相同。报告不包含密码、连接串或业务用户数据。
+7. 保存迁移清单和 ledger 摘要；以 UTC 文本保留 PostgreSQL 的微秒级 applied_at，不经 JavaScript Date 截断。发布后要求摘要与发布前相同。报告不包含密码、连接串或业务用户数据。
 8. 总是 ROLLBACK 并关闭会话。失败立即停止后续阶段，没有 Owner 回退或“忽略失败继续”。
 
 这验证的是实际迁移记录，不是完整 schema drift 扫描，也不证明每个业务字段/运行时权限都未被人工更改。已有临时 PostgreSQL 集成测试仍保留。
