@@ -52,6 +52,15 @@ export function securityContext(req: Request, res: Response): RequestFingerprint
   };
 }
 
+// Alerts dispatched but not yet settled. A request path never waits on these;
+// a batch job does (drainSecurityAlerts) before closing its connections, so
+// that a finding's alert is not cut off by the process exiting.
+const pendingAlerts = new Set<Promise<void>>();
+
+export async function drainSecurityAlerts(): Promise<void> {
+  while (pendingAlerts.size) await Promise.allSettled([...pendingAlerts]);
+}
+
 /**
  * Writes one row to security_events and PROPAGATES a write failure.
  *
@@ -96,13 +105,15 @@ export async function persistSecurityEvent(
   if (severity >= env.SECURITY_ALERT_MIN_SEVERITY) {
     // Detached on purpose: the alert is best-effort, so its failure is
     // swallowed and never masks or fails the awaited INSERT above.
-    void dispatchSecurityAlert({
+    const alert = dispatchSecurityAlert({
       type: input.type,
       severity,
       actorUserId: input.actorUserId ?? null,
       requestId: fingerprint.requestId,
       context,
     }).catch(() => { /* best-effort alert; the recorded row is what matters */ });
+    pendingAlerts.add(alert);
+    void alert.finally(() => pendingAlerts.delete(alert));
   }
 }
 
