@@ -588,7 +588,7 @@ export async function resetPassword(req: Request, res: Response) {
  * including a missing migration 014, which would otherwise make every locked
  * sign-in a server error.
  */
-async function notifyAccountLocked(
+export async function notifyAccountLocked(
   userId: string,
   lockedUntil: Date | null,
   fingerprint: ReturnType<typeof securityContext>,

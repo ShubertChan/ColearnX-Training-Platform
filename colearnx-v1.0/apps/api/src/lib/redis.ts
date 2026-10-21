@@ -46,6 +46,24 @@ export function getRedis(): Redis | null {
   return cached;
 }
 
+/**
+ * Closes the shared client, if one was opened. Batch jobs (the W7 ledger audit
+ * and risk sweep) must call this before they finish: an open ioredis socket and
+ * its reconnect timers keep Node's event loop alive, so a job that raised one
+ * high-severity alert would otherwise never exit and the scheduler would never
+ * see its exit code. Safe to call when Redis was never used or is unreachable.
+ */
+export async function closeRedis(): Promise<void> {
+  const client = cached;
+  cached = undefined;
+  if (!client) return;
+  try {
+    await client.quit();
+  } catch {
+    client.disconnect();
+  }
+}
+
 /** Test seam: drops the memoised client so a test can install its own. */
 export function resetRedisForTests(): void {
   cached = undefined;
