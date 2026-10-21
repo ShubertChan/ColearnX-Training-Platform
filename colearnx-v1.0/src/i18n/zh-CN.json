@@ -1391,5 +1391,8 @@
   "Choose a password of at least 12 characters that meets the requirements listed below.": "请选择至少 12 个字符且符合下方要求的密码。",
   "Success": "成功",
   "Topup": "充值",
-  "Purchase": "购买"
+  "Purchase": "购买",
+  "This file was blocked by the security check. Upload the original document in a supported format.": "该文件未通过安全检查，已被拦截。请上传受支持格式的原始文件。",
+  "The file could not be security-checked right now. Wait a moment, then retry the upload.": "暂时无法对该文件进行安全检查。请稍候再重试上传。",
+  "The file changed while it was being checked. Retry the upload.": "文件在检查过程中发生了变化。请重新上传。"
 }
