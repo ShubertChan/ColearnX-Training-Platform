@@ -1,7 +1,8 @@
 import { Pool } from 'pg';
 import { env } from '../config/env.js';
 import { closeDatabase } from '../db/database.js';
-import { persistSecurityEvent, systemFingerprint } from './events.js';
+import { closeRedis } from '../lib/redis.js';
+import { drainSecurityAlerts, persistSecurityEvent, systemFingerprint } from './events.js';
 import { auditLedgerBalances } from './ledger-audit.js';
 
 /**
@@ -46,6 +47,11 @@ async function main() {
     // clean run.
     if (summary.recordFailures > 0) process.exitCode = 1;
   } finally {
+    // Let any alert raised by a finding finish, then close Redis: its socket
+    // would otherwise keep the process alive and the scheduler would never see
+    // this job's exit code.
+    await drainSecurityAlerts();
+    await closeRedis();
     await pool.end();
     await closeDatabase();
   }
