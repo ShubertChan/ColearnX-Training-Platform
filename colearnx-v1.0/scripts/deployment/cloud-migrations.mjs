@@ -44,13 +44,20 @@ export function compareMigrationLedger(inventory, ledger, sqlByFilename) {
     const row = rows[index];
     requireValue(row?.filename === expected.filename && /^[a-f0-9]{64}$/.test(row.checksum ?? ''), 'Cloud migration filenames are missing, duplicated, unexpected or malformed.');
     requireValue(matchesMigrationChecksum(row.checksum, sqlByFilename[expected.filename]), 'Cloud migration checksum differs. Do not rewrite history; review a forward migration.');
-    requireValue((row.applied_at instanceof Date || typeof row.applied_at === 'string')
-      && Number.isFinite(new Date(row.applied_at).valueOf()), 'Cloud migration applied_at is missing or invalid.');
+    appliedTimestamp(row.applied_at);
   }
   return { migrationCount: inventory.length, lastAppliedMigration: inventory.at(-1).filename,
     inventoryDigest: sha256(JSON.stringify(inventory)), ledgerDigest: sha256(JSON.stringify(rows.map(row => ({
-      filename: row.filename, checksum: row.checksum, appliedAt: new Date(row.applied_at).toISOString(),
+      filename: row.filename, checksum: row.checksum, appliedAt: appliedTimestamp(row.applied_at),
     })))) };
+}
+
+function appliedTimestamp(value) {
+  const text = value instanceof Date && Number.isFinite(value.valueOf()) ? value.toISOString() : value;
+  requireValue(typeof text === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}(?:\d{3})?Z$/.test(text)
+    && Number.isFinite(Date.parse(text)), 'Cloud migration applied_at is missing or invalid.');
+  // node-postgres Date parsing truncates microseconds. Production SQL returns UTC text instead.
+  return text.replace(/\.(\d{3})Z$/, (_match, ms) => `.${ms}000Z`);
 }
 
 // Catalog inspection only. No business rows, grants, DDL, migrations or credentials are returned.
@@ -95,7 +102,9 @@ export async function verifyCloudMigrations({ config, inventory, sqlByFilename, 
     requireValue(['rolsuper', 'rolcreatedb', 'rolcreaterole', 'rolinherit', 'rolreplication', 'rolbypassrls', 'memberships',
       'database_create', 'schema_create', 'table_write', 'sequence_write'].every(key => identity[key] === false), 'Release reader has unexpected ownership, write, membership or administrative privileges.');
     requireValue(identity.tls === true || config.testOnlyLocalTransport === true, 'Cloud database connection must use verified TLS.');
-    const ledger = await client.query('SELECT filename, checksum, applied_at FROM public.schema_migrations ORDER BY filename LIMIT 1001');
+    const ledger = await client.query(`SELECT filename, checksum,
+      to_char(applied_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS applied_at
+      FROM public.schema_migrations ORDER BY filename LIMIT 1001`);
     return { schemaVersion: 1, commit, result: 'verified', database: config.database, role: readerRole,
       ...compareMigrationLedger(inventory, ledger.rows, sqlByFilename), checkedAt: new Date().toISOString() };
   } catch (error) {

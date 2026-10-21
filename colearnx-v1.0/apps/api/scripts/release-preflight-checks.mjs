@@ -25,12 +25,13 @@ export async function runReleasePreflightChecks({ owner, ownerUrl, passed }) {
   const inventory = await migrationInventory();
   const sqlByFilename = Object.fromEntries(await Promise.all(inventory.map(async ({ filename }) => [filename,
     await readFile(resolve(appDirectory, 'db/migrations', filename), 'utf8')])));
-  const before = (await owner.query('SELECT filename, checksum, applied_at FROM public.schema_migrations ORDER BY filename')).rows;
+  const ledgerSnapshotSql = 'SELECT filename, checksum, applied_at::text AS applied_at FROM public.schema_migrations ORDER BY filename';
+  const before = (await owner.query(ledgerSnapshotSql)).rows;
   const verify = (overrides = {}) => verifyCloudMigrations({ config: { database, testOnlyLocalTransport: true }, inventory, sqlByFilename,
     commit: 'a'.repeat(40), approved: 'true', lastApplied: inventory.at(-1).filename,
     clientFactory: () => new Client({ connectionString: url.href, connectionTimeoutMillis: 5000, query_timeout: 10000 }), ...overrides });
   assert.equal((await verify()).migrationCount, inventory.length);
-  assert.deepEqual((await owner.query('SELECT filename, checksum, applied_at FROM public.schema_migrations ORDER BY filename')).rows, before);
+  assert.deepEqual((await owner.query(ledgerSnapshotSql)).rows, before);
   passed('release preflight reads the actual ledger through a separate LOGIN/NOINHERIT read-only account without changing any migration row');
 
   const reader = new Client({ connectionString: url.href });
@@ -67,6 +68,6 @@ export async function runReleasePreflightChecks({ owner, ownerUrl, passed }) {
   } finally { await owner.query(`GRANT SELECT ON public.schema_migrations TO ${role}`); }
   await assert.rejects(verify({ approved: 'false', clientFactory: () => assert.fail('Approval must precede connecting') }), /Manual migration approval/);
   assert.equal((await verify()).result, 'verified');
-  assert.deepEqual((await owner.query('SELECT filename, checksum, applied_at FROM public.schema_migrations ORDER BY filename')).rows, before);
+  assert.deepEqual((await owner.query(ledgerSnapshotSql)).rows, before);
   passed('column-level privilege escalation and ledger permission loss fail closed; manual approval remains mandatory');
 }
