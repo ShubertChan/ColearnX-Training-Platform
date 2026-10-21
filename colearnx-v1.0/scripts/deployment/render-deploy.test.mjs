@@ -73,6 +73,26 @@ test('verify-only rejects a different live SHA without creating a deployment', a
   assert.ok(h.calls.every(call => call.method === 'GET'));
 });
 
+test('inspect-only records the actual independent API baseline without any POST or a target-SHA claim', async () => {
+  const h = harness([json(service), json([previous])], { inspectOnly: true });
+  const report = await h.run();
+  assert.equal(report.releaseSha, PREVIOUS_SHA);
+  assert.equal(report.deployId, 'dep-previous');
+  assert.equal(report.observedOnly, true);
+  assert.equal(report.postAttempted, false);
+  assert.ok(h.calls.every(call => call.method === 'GET'));
+});
+
+test('missing or externally replaced Render planning baseline blocks before any deploy POST', async () => {
+  const absent = harness([json(service), json([])], { inspectOnly: true });
+  await assert.rejects(absent.run(), { code: 'missing_live_baseline' });
+  for (const expectedPrevious of [{ id: 'dep-changed', sha: PREVIOUS_SHA }, { id: 'dep-previous', sha: SHA }]) {
+    const h = harness([json(service), json([previous])], { expectedPrevious });
+    await assert.rejects(h.run(), { code: 'baseline_changed' });
+    assert.ok(h.calls.every(call => call.method === 'GET'));
+  }
+});
+
 test('actual npm run start syntax is supported', async () => {
   const actual = structuredClone(service);
   actual.serviceDetails.envSpecificDetails.startCommand = 'npm --prefix apps/api run start';

@@ -1,8 +1,8 @@
 # Staging CI/CD 操作指南
 
-更新：2026-10-16。适用于包含 `018_upload_retry_expiry_permissions.sql` 的代码版本。
+更新：2026-10-21。迁移清单从当前提交动态枚举，不固定为某一迁移编号。新增能力与一次性配置详见 [云端迁移实际预检与组件发布计划](STAGING_RELEASE_PREFLIGHT.md)。
 
-采用 **自动检查 + 人工批准发布**：PR 和 main 更新自动测试、构建；负责人从 main 手动运行发布。API 和前端锁定同一个完整 Git SHA，Pages 上传该次 CI 已检查的产物，不在发布时重新构建。
+采用 **自动检查 + 人工批准发布**：PR 和 main 更新自动测试、构建；负责人从 main 手动运行发布。需要发布的组件锁定本次测试的完整 Git SHA，Pages 上传该次 CI 已检查的产物，不在发布时重新构建。没有运行时代码变更的组件可以保留旧提交，但必须通过独立在线基线、完整 Git 区间差异和最终身份核验；保留的前端文件必须仍与本次测试产物一致。
 
 本文是仓库代码和操作要求，不是“GitHub Actions 已启用成功”的证明。首次使用仍需合并代码、配置受保护 Environment 和部署令牌、实际运行工作流。现有 Render/Pages 自动部署是另一条触发路径，启用前必须关闭，防止绕过检查。
 
@@ -12,10 +12,12 @@
 | --- | --- |
 | 仓库根目录 `.github/workflows/ci.yml` | PR、main push、手动和可复用 CI；测试、临时 PostgreSQL 集成检查、构建并保存产物。 |
 | 仓库根目录 `.github/workflows/deploy-staging.yml` | 仅手动发布；同一环境串行运行，先 API 后 Pages，失败停止后续发布。 |
-| `.node-version` | Node.js 22.22.0。 |
+| `.node-version` | Node.js 22.22.2。 |
 | `deployment/staging.json` | 公开域名、项目、支付/视频开关和媒体/上传来源。 |
-| `deployment/package*.json` | 发布 CLI 独立锁文件，Wrangler 固定 4.151.0，并在发布前核对安装版本与精确版本声明一致。 |
+| `deployment/package*.json` | 发布工具独立锁文件，Wrangler 固定 4.151.0、pg 固定 8.23.0，并核对 CLI 安装版本与精确版本声明一致。 |
 | `scripts/deployment/source-guard.mjs` | 核对仓库、main、完整 SHA 和迁移确认；拒绝排队期间 main 已变化的旧发布。 |
+| `scripts/deployment/cloud-migrations.mjs` | 独立只读连接实际云库，逐项检查迁移文件、checksum、applied_at 与读取账号权限，发布前后核验。 |
+| `scripts/deployment/release-plan.mjs` | 分别对照 Pages、Render 和人工记录的媒体组件基线，识别发布组件；未知范围不静默跳过。 |
 | `scripts/deployment/artifact.mjs` | 干净源码构建；生成及校验 release.json、迁移清单和文件 SHA-256。 |
 | `scripts/deployment/render-deploy.mjs` | 对现有服务发布指定 SHA；轮询 Live，拒绝竞争部署，支持只读复核。 |
 | `scripts/deployment/pages-preflight.mjs` | 只读核对目标、域名、自动部署设置；检查原部署是否被别人替换。 |
@@ -27,11 +29,12 @@
 
 除已注明的仓库根目录文件外，路径均相对 `colearnx-v1.0/`。
 
-工作流用 YAML 编排。发布脚本使用 Node.js JavaScript ES Modules（`.mjs`），主要依赖内置 fs、path、crypto、child_process、fetch 和 AbortController；不是另一套 Express 后端。Cloudflare 发布使用 Wrangler CLI，Render 发布使用 HTTPS API。
+工作流用 YAML 编排。发布脚本使用 Node.js JavaScript ES Modules（`.mjs`），主要依赖内置 fs、path、crypto、child_process、fetch 和 AbortController；不是另一套 Express 后端。只读数据库连接使用锁定版本的 `pg`，并复用 API 的 TypeScript checksum 帮助函数（Node 22.22.2 原生类型剥离）。Cloudflare 发布使用 Wrangler CLI，Render 发布使用 HTTPS API。
 
 ## 2. 安全边界
 
 - CI 只连接 runner 内临时 PostgreSQL 16，凭据是合成测试值，不连接 Neon。
+- CD 在 staging 审批后用专用只读 Secret 查询云端迁移记录，不查询业务用户数据、不运行迁移。该 Secret 不提供给安装、测试和构建步骤。
 - CI 会在临时测试库执行 migration；发布工作流不会执行云端 migration、seed、R2 清理或自动回滚。
 - 不创建 Cron、数据库、域名、Worker 或转码服务器，不购买或升级资源。
 - 安装、测试、构建步骤没有云平台 Secrets；GitHub 内置只读 token 不等于业务密钥。
@@ -49,6 +52,10 @@ Settings → Environments 创建 `staging`，限制部署分支为 main。若套
 | --- | --- | --- |
 | Environment Secret | `RENDER_API_KEY` | 部署现有 Render API。 |
 | Environment Secret | `CLOUDFLARE_API_TOKEN` | 指定账户的 Pages 编辑权限，无需 R2 对象读写。 |
+| Environment Secret | `STAGING_DATABASE_READONLY_URL` | 专用 `colearnx_release_reader` 的 Neon direct 连接；不得使用 Owner、迁移或应用连接。 |
+| Environment Variable | `STAGING_DATABASE_HOST` | 人工核对目标项目/分支后的完整 Neon direct hostname，不含协议、账号、密码。 |
+| Environment Variable | `MEDIA_GATEWAY_DEPLOYED_SHA` | 独立核对过的网关实际部署完整提交；不从 Pages/API 提交推测。 |
+| Environment Variable | `VIDEO_WORKER_DEPLOYED_SHA` | 独立核对过的本机转码镜像/源码实际提交；本机有补丁时需单独审查。 |
 | Environment Variable | `RENDER_SERVICE_ID` | `srv-daa333p42hec739cv710` |
 | Environment Variable | `CLOUDFLARE_ACCOUNT_ID` | `f457ddb114ddef000e8d0c4cc4aa5a97` |
 
@@ -60,7 +67,7 @@ Settings → Environments 创建 `staging`，限制部署分支为 main。若套
 | --- | --- |
 | Repository / Branch | ShubertChan/ColearnX-Training-Platform / main |
 | Runtime / Root | 原生 Node / colearnx-v1.0 |
-| Node | 22.22.0；核对 NODE_VERSION 是否覆盖文件。 |
+| Node | 22.22.2；核对 NODE_VERSION 是否覆盖文件。 |
 | Build | `npm --prefix apps/api ci --include=dev && npm --prefix apps/api run build` |
 | Start | `npm --prefix apps/api run start`，也接受等效 `npm --prefix apps/api start` |
 | Pre-deploy | 空，不隐式 migration 或 seed。 |
@@ -111,10 +118,10 @@ Settings → Environments 创建 `staging`，限制部署分支为 main。若套
 
 ```text
 migrations_reviewed = true
-last_applied_migration = 018_upload_retry_expiry_permissions.sql
+last_applied_migration = 020_refund_decision_notifications.sql
 ```
 
-将来出现新迁移时填写当时仓库最后的文件名。该输入是人工确认，不是自动验证：工作流不持有 Neon 凭据，不查询云端 ledger，同名确认仍需人核对 checksum。本次测试/依赖/CI 修复不添加 SQL，不需要重跑 seed。
+将来出现新迁移时填写当时仓库最后的文件名。人工确认仍然必要，但不再被当成数据库实际状态的证据：CD 还必须通过只读预检，逐项核对云端 ledger 和 checksum，发布后再次检查记录没有变化。未配置专用只读连接、权限过大、迁移缺失/多出/不匹配均停止发布；不会自动申请 Owner 权限或执行迁移。本次 CI/CD 增强不添加业务 migration，不需要 seed。
 
 ## 5. 发布执行顺序
 
@@ -124,10 +131,10 @@ last_applied_migration = 018_upload_retry_expiry_permissions.sql
 4. guard 检查仓库、分支、HEAD 和远端 main；复用 CI 检查同一提交。
 5. 生成 pages-SHA-run_id-run_attempt 构建产物，保留 7 天。
 6. staging Environment 审批通过后下载本次产物，校验 SHA、配置、迁移清单及文件哈希。
-7. 再查远端 main，拒绝排队期间过时的发布；预检 Pages，再部署 Render 指定 SHA。
-8. API Live 后执行 API smoke；失败不继续 Pages。再次只读复核 Render SHA。
+7. 再查远端 main，拒绝排队期间过时的发布；执行实际迁移只读预检，读取 Pages/Render 基线，生成各组件发布计划。
+8. 只有 API 有变更或人工强制完整 web 发布时才部署 Render 指定 SHA；部署前拒绝已被替换的基线。无论是否发布，均执行 API smoke 并核对计划中的 API SHA。
 9. 核对 Pages 主部署 ID 与预检一致；ID 缺失或被替换都中止。
-10. 上传原产物；检查线上 release.json 与全部公共静态文件哈希，最终再核对 Render SHA。
+10. 只有前端需要发布时上传原产物；检查计划中的线上 release.json 与全部公共静态文件哈希。重新检查迁移 ledger 未变化，最终再核对计划中的 Render SHA。
 11. 保存脱敏发布证据 14 天，再进行必要的带账号业务验收。
 
 固定 concurrency group 与 cancel-in-progress=false 防止工作流互相中断，但不能阻止管理员控制台发布，也不能完全消除检查之后的竞争窗口。团队仍需协调发布窗口。
@@ -136,7 +143,7 @@ last_applied_migration = 018_upload_retry_expiry_permissions.sql
 
 ## 6. 本地验证
 
-在 colearnx-v1.0 目录使用 Node 22.22.0：
+在 colearnx-v1.0 目录使用 Node 22.22.2：
 
 ```powershell
 npm ci --include=dev
@@ -177,7 +184,9 @@ build/verify 不发布云端。构建脚本清理继承的 VITE 变量并显式�
 
 release:smoke -- --api-only 是公开 API 只读检查。完整 release:smoke 比较线上版本与本地 dist，未部署版本失败是预期现象。render-deploy.mjs 无参数为真实发布命令，只有 --verify-only 才是只读复核。
 
-## 7. 覆盖范围与本轮实测
+## 7. 覆盖范围与历史实测参考
+
+下表保留 2026-10-16 的历史结果，不作为新增预检已在真实 Neon/GitHub Secrets 上启用的证明。本次新增测试覆盖及配置要求见 [STAGING_RELEASE_PREFLIGHT.md](STAGING_RELEASE_PREFLIGHT.md)。
 
 2026-10-16，本地 Node 24.15.0 / PostgreSQL 16.15（CI 仍固定 Node 22.22.0，尚需以真实 runner 结果确认）：
 
