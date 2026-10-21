@@ -147,14 +147,27 @@ API_ORIGIN=https://api-staging.colearnx.net
 
 ### 第 4 步：运行原有部署 workflow
 
+main 最新发布流程还要求实际云端迁移账本预检。先确认 GitHub `staging` Environment 已按 [STAGING_RELEASE_PREFLIGHT.md](STAGING_RELEASE_PREFLIGHT.md) 配置：
+
+| 类型 | 名称 | 用途 |
+|---|---|---|
+| Secret | `STAGING_DATABASE_READONLY_URL` | 专用 `colearnx_release_reader` 的 Neon direct 只读连接 |
+| Variable | `STAGING_DATABASE_HOST` | 核实过的 Neon staging direct 主机名 |
+| Variable | `MEDIA_GATEWAY_DEPLOYED_SHA` | 实际已部署网关的完整源码 SHA |
+| Variable | `VIDEO_WORKER_DEPLOYED_SHA` | 实际已部署转码服务的完整源码 SHA |
+
+这些是现有部署预检要求，不是 Google OAuth 密钥。尚未配置时由数据库/部署负责人按上述文档建立专用最小权限 reader，不能用 owner 连接替代。工作流会核对全部迁移文件名、checksum、权限及发布前后账本一致性，仅勾选确认框不能绕过检查。
+
 GitHub 仓库 → Actions → **Deploy staging** → Run workflow：
 
 1. 分支选择 `main`。
 2. 确认上面的云数据库迁移已完成后，勾选 `migrations_reviewed`。
 3. `last_applied_migration` 填 `021_google_sign_in.sql`（如果目标版本有更新迁移，填该版本实际最新文件名）。
-4. 点击 Run workflow，等待 guard、validate、deploy 成功。
+4. 本 PR 有 `db/` 变更，新发布计划会保守标记共享依赖组件需要人工审查。部署同学应确认迁移 021 仅新增 Google 认证表、现有网关和转码服务兼容，并核对实际部署基线；完成这项审查后才勾选 `external_components_reviewed`。如果从线上基线到目标版本还有其他媒体变更，应先单独部署/验收那些变更，不能只因为本功能没有改视频代码就直接勾选。
+5. `force_web_release` 通常保持 false，本功能已有 API 和前端变更，会被计划识别。
+6. 点击 Run workflow，等待 guard、validate、deploy 成功。
 
-这条 workflow 会重跑 CI，先发布相同 SHA 的 Render API，通过健康和 CORS 检查后，再发布已测试的 Cloudflare Pages 静态产物。它**不会执行云数据库迁移或 seed**。原有 Render/Cloudflare secrets、environment 审批机制沿用 [STAGING_CICD.md](STAGING_CICD.md)。
+这条 workflow 会重跑 CI、读取实际迁移账本、按已部署基线计算组件变化。本功能涉及 API 和前端，正常会先发布目标 SHA 的 Render API，通过健康和 CORS 检查后，再发布已测试的 Cloudflare Pages 静态产物，最后复核账本。它**不会执行云数据库迁移或 seed，也不会替你发布网关和本机转码服务**。原有 Render/Cloudflare secrets、environment 审批机制沿用 [STAGING_CICD.md](STAGING_CICD.md)。
 
 构建产物已经允许 Google 官方 SDK、frame、style 和连接路径，并允许登录弹窗通信。部署时不要用 Cloudflare 额外规则覆盖这些 CSP/COOP 响应头。
 
@@ -196,6 +209,8 @@ Google Audience：填写 Testing / In production，注明测试账号是否可�
 新增 API 环境变量：GOOGLE_CLIENT_ID
 新增迁移：021_google_sign_in.sql
 执行顺序：确认 CI → 用迁移连接执行 db:migrate → 配置 Render 变量 → 手动 Deploy staging → 真实 Google 验收
+发布预检：确认 STAGING_DATABASE_READONLY_URL、STAGING_DATABASE_HOST 及两个媒体基线 SHA 已配置
+共享迁移审查：确认媒体组件兼容后才勾选 external_components_reviewed
 GitHub OAuth Secret / Client Secret / Redirect URI：均不需要
 验收：中英文按钮、新 Gmail 自动建号、已有 Gmail 原 ID/积分/课程不变、原密码有效、MFA 生效
 详细步骤：colearnx-v1.0/docs/GOOGLE_LOGIN_SETUP_ZH.md

@@ -27,7 +27,7 @@ function normalizedManifest(manifest) {
   };
 }
 
-function validateManifest(manifest, config, releaseSha) {
+export function validateManifest(manifest, config, releaseSha) {
   requireCondition(SHA.test(releaseSha ?? ''), 'RELEASE_SHA must be a full 40-character commit SHA.');
   requireCondition(manifest?.commit === releaseSha, 'Local release manifest does not match RELEASE_SHA.');
   requireCondition(manifest.appOrigin === config.appOrigin && manifest.apiBaseUrl === config.apiBaseUrl
@@ -45,6 +45,10 @@ function validateManifest(manifest, config, releaseSha) {
     paths.add(asset.path);
   }
   requireCondition(paths.has('index.html') && manifest.assets.some(({ path }) => path.endsWith('.js')), 'Local release manifest must include index.html and JavaScript.');
+  requireCondition(Array.isArray(manifest.files) && manifest.files.length <= 110
+    && manifest.files.every(file => isPublicArtifactPath(file?.path) && HASH.test(file.sha256 ?? ''))
+    && new Set(manifest.files.map(file => file.path)).size === manifest.files.length
+    && manifest.assets.every(asset => manifest.files.some(file => file.path === asset.path && file.sha256 === asset.sha256)), 'Invalid complete frontend file inventory.');
 }
 
 function checkCors(response, config, label) {
@@ -197,11 +201,18 @@ export async function runSmoke({ config, manifest, releaseSha, apiOnly = false, 
 
 async function main() {
   const args = process.argv.slice(2);
-  requireCondition(args.length === 0 || (args.length === 1 && args[0] === '--api-only'), 'Usage: node scripts/deployment/smoke.mjs [--api-only]');
+  requireCondition(args.length === 0 || (args.length === 1 && ['--api-only', '--planned'].includes(args[0])), 'Usage: node scripts/deployment/smoke.mjs [--api-only|--planned]');
   const apiOnly = args[0] === '--api-only';
   const config = JSON.parse(await readFile(new URL('../../deployment/staging.json', import.meta.url), 'utf8'));
-  const manifest = apiOnly ? undefined : JSON.parse(await readFile(new URL('../../dist/release.json', import.meta.url), 'utf8'));
-  const result = await runSmoke({ config, manifest, apiOnly, releaseSha: process.env.RELEASE_SHA });
+  let manifest = apiOnly ? undefined : JSON.parse(await readFile(new URL('../../dist/release.json', import.meta.url), 'utf8'));
+  let releaseSha = process.env.RELEASE_SHA;
+  if (args[0] === '--planned') {
+    const { validateReleasePlan } = await import('./release-plan.mjs');
+    const plan = validateReleasePlan(JSON.parse(await readFile(resolve(appDirectory, 'release-report/plan.json'), 'utf8')), releaseSha);
+    manifest = plan.expectedFrontendManifest;
+    releaseSha = plan.components.frontend.expectedCommit;
+  }
+  const result = await runSmoke({ config, manifest, apiOnly, releaseSha });
   await mkdir(resolve(appDirectory, 'release-report'), { recursive: true });
   await writeFile(resolve(appDirectory, `release-report/smoke-${apiOnly ? 'api' : 'full'}.json`), JSON.stringify({ ...result, checkedAt: new Date().toISOString() }, null, 2));
   console.log(`PASS: ${result.mode} smoke checks (${result.attempts} attempt(s))${result.commit ? ` for ${result.commit}` : ''}.`);

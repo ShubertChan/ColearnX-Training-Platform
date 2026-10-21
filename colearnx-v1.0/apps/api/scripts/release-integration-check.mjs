@@ -587,6 +587,8 @@ try {
   await runVideoOrderIntegrityChecks({ owner, buyerId, sellerId, courseId, courseRunId, passed });
   const { runGoogleSignInChecks } = await import('./google-sign-in-checks.mjs');
   await runGoogleSignInChecks({ owner, app, passed });
+  const { runReleasePreflightChecks } = await import('./release-preflight-checks.mjs');
+  await runReleasePreflightChecks({ owner, ownerUrl, passed });
   assert.equal(blockedHttpCalls, 0, 'No email, HIBP, alert, payment, or storage HTTP request may be attempted.');
   process.stdout.write(`SUCCESS ${checks} integration check groups passed; test-only data retained in disposable local PostgreSQL cluster.\n`);
 } finally {

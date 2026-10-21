@@ -74,9 +74,13 @@ export async function deployRender(config, {
   requestTimeoutMs = 20_000,
   pollIntervalMs = 15_000,
   verifyOnly = false,
+  inspectOnly = false,
+  expectedPrevious,
 } = {}) {
   // Validate even when a caller bypasses the CLI environment parser.
   readRenderConfig({ RENDER_API_KEY: config.apiKey, RENDER_SERVICE_ID: config.serviceId, RELEASE_SHA: config.releaseSha });
+  requireValue(!(inspectOnly && verifyOnly), 'invalid_mode', 'Inspect and verify modes cannot be combined.');
+  if (expectedPrevious) requireValue(DEPLOY_PATTERN.test(expectedPrevious.id ?? '') && SHA_PATTERN.test(expectedPrevious.sha ?? ''), 'invalid_baseline', 'Invalid planned Render baseline.');
   requireValue([timeoutMs, requestTimeoutMs, pollIntervalMs].every((value) => Number.isFinite(value) && value > 0), 'invalid_timeout', 'Deployment timeouts must be positive finite numbers.');
   const started = now();
   const deadline = started + timeoutMs;
@@ -189,10 +193,22 @@ export async function deployRender(config, {
   try {
     validateService(await read(servicePath), config.serviceId);
     const previous = requireNoConflict(await listDeploys());
+    if (expectedPrevious) requireValue(previous?.id === expectedPrevious.id && previous?.commit?.id === expectedPrevious.sha,
+      'baseline_changed', 'Render changed since component planning. Stop and review the new live baseline before deploying.');
     if (previous) {
       requireValue(SHA_PATTERN.test(previous.commit?.id ?? ''), 'invalid_previous_commit', 'The current live Git commit could not be recorded for rollback.');
       report.previousLiveDeployId = previous.id;
       report.previousLiveSha = previous.commit.id;
+    }
+    if (inspectOnly) {
+      requireValue(Boolean(previous), 'missing_live_baseline', 'A live Render deployment is required for component planning.');
+      report.releaseSha = previous.commit.id;
+      report.deployId = previous.id;
+      report.status = 'live';
+      report.result = 'success';
+      report.observedOnly = true;
+      await checkpoint();
+      return { ...report };
     }
     if (verifyOnly || previous?.commit?.id === config.releaseSha) {
       requireValue(previous?.commit?.id === config.releaseSha, 'commit_not_live', 'The tested Render commit is not live. Do not publish or accept the frontend.');
@@ -255,22 +271,26 @@ export function renderOutputs(report) {
 
 async function main() {
   const args = process.argv.slice(2);
-  requireValue(args.length === 0 || (args.length === 1 && args[0] === '--verify-only'), 'invalid_args', 'Use render-deploy.mjs [--verify-only].');
+  requireValue(args.length === 0 || (args.length === 1 && ['--verify-only', '--inspect-only'].includes(args[0])), 'invalid_args', 'Use render-deploy.mjs [--verify-only|--inspect-only].');
   const verifyOnly = args[0] === '--verify-only';
+  const inspectOnly = args[0] === '--inspect-only';
+  const reportName = inspectOnly ? 'render-before' : verifyOnly ? 'render-check' : 'render';
   let finalReport;
   try {
     const config = readRenderConfig();
-    await deployRender(config, { verifyOnly, onReport: async (report) => {
+    const expectedPrevious = process.env.EXPECTED_RENDER_DEPLOY_ID || process.env.EXPECTED_RENDER_SHA
+      ? { id: process.env.EXPECTED_RENDER_DEPLOY_ID, sha: process.env.EXPECTED_RENDER_SHA } : undefined;
+    await deployRender(config, { verifyOnly, inspectOnly, expectedPrevious, onReport: async (report) => {
       finalReport = report;
       await mkdir('release-report', { recursive: true });
-      await writeFile(`release-report/${verifyOnly ? 'render-check' : 'render'}.json`, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+      await writeFile(`release-report/${reportName}.json`, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     } });
-    console.log(`Render confirmed the exact release SHA is live. Release evidence: release-report/${verifyOnly ? 'render-check' : 'render'}.json`);
+    console.log(`Render ${inspectOnly ? 'read-only baseline recorded' : 'confirmed the expected component SHA is live'}. Release evidence: release-report/${reportName}.json`);
   } catch (error) {
     console.error(error instanceof SafeError ? error.message : 'The deployment helper failed; no sensitive details were logged.');
     process.exitCode = 1;
   } finally {
-    if (finalReport && process.env.GITHUB_OUTPUT && !verifyOnly) {
+    if (finalReport && process.env.GITHUB_OUTPUT && !verifyOnly && !inspectOnly) {
       try {
         await appendFile(process.env.GITHUB_OUTPUT, Object.entries(renderOutputs(finalReport)).map(([key, value]) => `${key}=${value}\n`).join(''), 'utf8');
       } catch {
