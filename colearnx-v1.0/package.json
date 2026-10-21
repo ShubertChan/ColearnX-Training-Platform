@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:i18n": "node scripts/check-i18n.mjs",
-    "test": "node --test src/**/*.test.js",
+    "test": "node --test \"src/**/*.test.js\"",
     "test:components": "vitest run --config vitest.config.js --configLoader native",
     "test:e2e": "playwright test",
     "api:build": "npm --prefix apps/api run build",
