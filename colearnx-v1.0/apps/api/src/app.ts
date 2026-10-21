@@ -21,6 +21,7 @@ import { createContent, createCourse, decideContentSubmission, decideCourseSubmi
 import { listContentVersions, listCourseVersions, saveCourseResources, validateCourseResources } from './catalog/publishing-tools.js';
 import { checkout, getOrder, listOrders } from './orders/commerce.js';
 import { createRefundRequest, decideRefund, getRefundRequest, listRefundRequestsForAdmin } from './refunds/service.js';
+import { acknowledgeRefundNotification, listRefundNotifications } from './refunds/notifications.js';
 import { createRoleApplication, createTrainerCertification, decideRoleApplication, decideTrainerCertification, listRoleApplications, listTrainerCertifications, myRoleApplications, myTrainerCertifications } from './governance/governance.js';
 import { getPublicProfile, requestAccountDeletion, requestDataExport } from './account/privacy.js';
 import { addCartItem, listCart, removeCartItem } from './cart/cart.js';
@@ -177,6 +178,8 @@ export function createApp() {
   api.get('/trainer-certifications/me', authenticate, myTrainerCertifications);
 
   api.get('/wallet', authenticate, noStore, wallet);
+  api.get('/notifications/refunds', authenticate, noStore, listRefundNotifications);
+  api.post('/notifications/refunds/:id/read', authenticate, mutationLimiter, noStore, acknowledgeRefundNotification);
   api.get('/wallet/transactions', authenticate, noStore, walletTransactions);
   api.get('/wallet/top-up-packages', topUpPackages);
   api.get('/cart', authenticate, listCart);
