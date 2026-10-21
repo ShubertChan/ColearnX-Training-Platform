@@ -21,6 +21,16 @@ import { assertAccountStorageQuota, lockStorageAccount } from './storage-quota.j
 import { REPLACEMENT_ASSET_ORDER_BY_SQL } from './storage-asset-order.js';
 import { canFinalizeStorageAssetDeletion, remainingSignedUploadTtlSeconds } from './storage-deletion.js';
 import { env } from '../config/env.js';
+import { recordDownloadIssued } from '../security/download-audit.js';
+import {
+  discardUncommittedPromotion,
+  recordScanUnavailable,
+  recordUploadRejection,
+  uploadRejectedError,
+  verifyUploadedObject,
+  type UploadVerifier,
+  type VerificationOutcome,
+} from './upload-verification.js';
 
 const uploadIntentInput = z.object({
   filename: z.string().trim().min(1).max(512),
@@ -264,53 +274,128 @@ async function bestEffortDelete(asset: Pick<AssetRow, 'storage_asset_id' | 'buck
   }
 }
 
-export async function completeUploadIntent(req: Request, res: Response) {
-  const actor = res.locals.actor as Actor;
-  requireCreator(actor);
-  const contentVersionId = parse(uuid, req.params.contentVersionId);
-  const assetId = parse(uuid, req.params.assetId);
+type CompletionDependencies = {
+  withTransaction: typeof withTransaction;
+  headObject: typeof headUploadedObject;
+  verify: UploadVerifier;
+  deleteObject: typeof deleteStoredObject;
+};
 
-  const outcome = await withTransaction(async (client) => {
-    await lockOwnedDraftVersion(client, actor.id, contentVersionId);
-    const asset = await pendingAsset(client, assetId, contentVersionId, actor.id);
-    if (asset.asset_status === 'ready') return { kind: 'ready' as const, asset };
-    if (asset.asset_status !== 'pending') {
-      throw new ApiError(409, 'UPLOAD_NOT_PENDING', 'This upload intent cannot be completed.');
-    }
-    if (expired(asset.upload_expires_at)) {
-      throw new ApiError(409, 'UPLOAD_INTENT_EXPIRED', 'The upload intent has expired. Start a new upload.');
-    }
-    const headed = await headUploadedObject({ bucketName: asset.bucket_name, objectKey: asset.object_key });
-    if (mismatch(headed, asset)) {
-      await client.query(`UPDATE storage_assets
-        SET asset_status = 'quarantined', verified_content_type = $2, verified_byte_size = $3, etag = $4,
-          uploaded_at = now(), updated_at = now()
-        WHERE storage_asset_id = $1`, [asset.storage_asset_id, headed.contentType?.split(';', 1)[0]?.trim() ?? null,
-        headed.contentLength && headed.contentLength > 0 ? headed.contentLength : null, headed.etag ?? null]);
-      return { kind: 'mismatch' as const, asset };
-    }
+const completionDefaults: CompletionDependencies = {
+  withTransaction, headObject: headUploadedObject, verify: verifyUploadedObject, deleteObject: deleteStoredObject,
+};
 
-    await client.query(`UPDATE storage_assets
-      SET asset_status = 'ready', verified_content_type = $2, verified_byte_size = $3, etag = $4,
-        uploaded_at = now(), verified_at = now(), updated_at = now()
-      WHERE storage_asset_id = $1`, [asset.storage_asset_id, asset.declared_content_type, Number(asset.declared_byte_size), headed.etag ?? null]);
-    // Keep the first verified asset as the backwards-compatible primary file.
-    // Other verified assets remain attached to the same content version.
-    await client.query(`UPDATE content_versions
-      SET storage_asset_id = COALESCE(storage_asset_id, $2)
-      WHERE content_version_id = $1`, [contentVersionId, asset.storage_asset_id]);
-    await audit(client, actor.id, 'content.upload.completed', asset.storage_asset_id, res.locals.requestId, {
-      contentVersionId, sizeBytes: Number(asset.declared_byte_size), mediaType: asset.declared_content_type, outcome: 'success',
+/**
+ * Completes an upload in three steps (see upload-verification.ts): a short
+ * transaction for the size check, the content inspection with no transaction
+ * open, and a second short transaction that commits the verdict. A file only
+ * becomes `ready` -- and downloadable -- once its bytes have been inspected.
+ */
+export function createContentUploadCompletionHandler(dependencies: CompletionDependencies = completionDefaults) {
+  return async (req: Request, res: Response) => {
+    const actor = res.locals.actor as Actor;
+    requireCreator(actor);
+    const contentVersionId = parse(uuid, req.params.contentVersionId);
+    const assetId = parse(uuid, req.params.assetId);
+
+    const checked = await dependencies.withTransaction(async (client) => {
+      await lockOwnedDraftVersion(client, actor.id, contentVersionId);
+      const asset = await pendingAsset(client, assetId, contentVersionId, actor.id);
+      if (asset.asset_status === 'ready') return { kind: 'ready' as const, asset };
+      if (asset.asset_status !== 'pending') {
+        throw new ApiError(409, 'UPLOAD_NOT_PENDING', 'This upload intent cannot be completed.');
+      }
+      if (expired(asset.upload_expires_at)) {
+        throw new ApiError(409, 'UPLOAD_INTENT_EXPIRED', 'The upload intent has expired. Start a new upload.');
+      }
+      const headed = await dependencies.headObject({ bucketName: asset.bucket_name, objectKey: asset.object_key });
+      if (mismatch(headed, asset)) {
+        await client.query(`UPDATE storage_assets
+          SET asset_status = 'quarantined', verified_content_type = $2, verified_byte_size = $3, etag = $4,
+            uploaded_at = now(), updated_at = now()
+          WHERE storage_asset_id = $1`, [asset.storage_asset_id, headed.contentType?.split(';', 1)[0]?.trim() ?? null,
+          headed.contentLength && headed.contentLength > 0 ? headed.contentLength : null, headed.etag ?? null]);
+        return { kind: 'mismatch' as const, asset };
+      }
+      return { kind: 'inspect' as const, asset, etag: headed.etag };
     });
-    return { kind: 'ready' as const, asset: { ...asset, asset_status: 'ready', verified_content_type: asset.declared_content_type,
-      verified_byte_size: asset.declared_byte_size } };
-  });
+    if (checked.kind === 'mismatch') {
+      throw new ApiError(409, 'UPLOAD_OBJECT_MISMATCH', 'The uploaded file did not match its upload intent.');
+    }
+    if (checked.kind === 'ready') return ok(res, assetResponse(checked.asset));
 
-  if (outcome.kind === 'mismatch') {
-    throw new ApiError(409, 'UPLOAD_OBJECT_MISMATCH', 'The uploaded file did not match its upload intent.');
-  }
-  return ok(res, assetResponse(outcome.asset));
+    const inspected = checked.asset;
+    let outcome: VerificationOutcome;
+    try {
+      outcome = await dependencies.verify({
+        bucketName: inspected.bucket_name, objectKey: inspected.object_key,
+        declaredContentType: inspected.declared_content_type, byteSize: Number(inspected.declared_byte_size), etag: checked.etag,
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'UPLOAD_SCAN_UNAVAILABLE') {
+        await recordScanUnavailable(req, res, actor.id, assetId, 'content');
+      }
+      throw error;
+    }
+
+    let finished;
+    try {
+      finished = await dependencies.withTransaction(async (client) => {
+        await lockOwnedDraftVersion(client, actor.id, contentVersionId);
+        const asset = await pendingAsset(client, assetId, contentVersionId, actor.id);
+        // A concurrent completion of the same upload already committed.
+        if (asset.asset_status === 'ready') return { kind: 'ready' as const, asset };
+        if (asset.asset_status !== 'pending' || asset.object_key !== inspected.object_key) {
+          throw new ApiError(409, 'UPLOAD_NOT_PENDING', 'This upload intent cannot be completed.');
+        }
+        if (outcome.kind === 'rejected') {
+          await client.query(`UPDATE storage_assets
+            SET asset_status = 'quarantined', verified_byte_size = $2, etag = $3, uploaded_at = now(), updated_at = now()
+            WHERE storage_asset_id = $1`, [asset.storage_asset_id, Number(asset.declared_byte_size), checked.etag ?? null]);
+          await audit(client, actor.id, 'content.upload.rejected', asset.storage_asset_id, res.locals.requestId, {
+            contentVersionId, reason: outcome.verdict.reason, outcome: 'quarantined',
+          });
+          return { kind: 'rejected' as const, asset, verdict: outcome.verdict };
+        }
+        await client.query(`UPDATE storage_assets
+          SET asset_status = 'ready', object_key = $5, verified_content_type = $2, verified_byte_size = $3, etag = $4,
+            uploaded_at = now(), verified_at = now(), updated_at = now()
+          WHERE storage_asset_id = $1`,
+        [asset.storage_asset_id, outcome.mediaType, Number(asset.declared_byte_size), checked.etag ?? null, outcome.objectKey]);
+        // Keep the first verified asset as the backwards-compatible primary file.
+        // Other verified assets remain attached to the same content version.
+        await client.query(`UPDATE content_versions
+          SET storage_asset_id = COALESCE(storage_asset_id, $2)
+          WHERE content_version_id = $1`, [contentVersionId, asset.storage_asset_id]);
+        await audit(client, actor.id, 'content.upload.completed', asset.storage_asset_id, res.locals.requestId, {
+          contentVersionId, sizeBytes: Number(asset.declared_byte_size), mediaType: outcome.mediaType,
+          malwareScanned: outcome.scanned, outcome: 'success',
+        });
+        return { kind: 'ready' as const, asset: { ...asset, asset_status: 'ready', object_key: outcome.objectKey,
+          verified_content_type: outcome.mediaType, verified_byte_size: asset.declared_byte_size } };
+      });
+    } catch (error) {
+      await discardUncommittedPromotion(outcome, inspected.bucket_name, null, dependencies.deleteObject);
+      throw error;
+    }
+    await discardUncommittedPromotion(outcome, inspected.bucket_name,
+      finished.kind === 'ready' ? finished.asset.object_key : null, dependencies.deleteObject);
+
+    // The incoming object is never served: after promotion it is a stale copy,
+    // after a rejection it is the blocked file. Either way it goes; a failure
+    // here is left to reconciliation and the incoming/ lifecycle rule.
+    await dependencies.deleteObject({ bucketName: inspected.bucket_name, objectKey: inspected.object_key }).catch(() => undefined);
+    if (finished.kind === 'rejected') {
+      await recordUploadRejection(req, res, actor.id, {
+        assetId, kind: 'content', declaredContentType: inspected.declared_content_type, verdict: finished.verdict,
+      });
+      throw uploadRejectedError();
+    }
+    return ok(res, assetResponse(finished.asset));
+  };
 }
+
+export const completeUploadIntent = createContentUploadCompletionHandler();
 
 export async function deleteUploadIntent(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
@@ -363,7 +448,11 @@ export async function listContentAssets(req: Request, res: Response) {
   if (!access.rowCount) throw new ApiError(404, 'CONTENT_VERSION_NOT_FOUND', 'Content version was not found.');
 
   const version = access.rows[0];
-  const privileged = version.creator_user_id === actor.id || actor.roles.includes('admin');
+  // Only the creator. Administrators review files through the MFA- and
+  // step-up-gated /admin/content-versions/:id/preview-url route; an `admin`
+  // branch here let a stolen admin session (or an admin without MFA) list and
+  // download every private asset with nothing but a bearer token.
+  const privileged = version.creator_user_id === actor.id;
   const publicDownloadable = version.publication_status === 'published' && version.version_status === 'published';
   if (!privileged && (!publicDownloadable || !version.has_grant)) {
     throw new ApiError(403, 'CONTENT_ACCESS_DENIED', 'You do not have access to these content files.');
@@ -399,6 +488,7 @@ export async function previewContentAsset(req: Request, res: Response) {
   const asset = result.rows[0];
   const previewUrl = await signDownload({ bucketName: asset.bucket_name, objectKey: asset.object_key },
     asset.verified_content_type ?? asset.declared_content_type, asset.original_filename, 'inline');
+  await recordDownloadIssued(req, res, actor.id, { assetId: asset.storage_asset_id, assetKind: 'content', mode: 'inline' });
   return ok(res, { ...assetResponse(asset), previewUrl,
     expiresAt: new Date(Date.now() + env.R2_SIGNED_DOWNLOAD_TTL_SECONDS * 1000).toISOString() });
 }
@@ -424,7 +514,8 @@ export async function createContentDownloadUrl(req: Request, res: Response) {
     LIMIT 1`, [contentVersionId, selectedAssetId, actor.id]);
   if (!result.rowCount) throw new ApiError(404, 'CONTENT_VERSION_NOT_FOUND', 'A downloadable content file was not found.');
   const asset = result.rows[0];
-  const privileged = asset.creator_user_id === actor.id || actor.roles.includes('admin');
+  // Creator only; see listContentAssets for why administrators are excluded.
+  const privileged = asset.creator_user_id === actor.id;
   if (!privileged && !asset.has_grant) {
     throw new ApiError(403, 'CONTENT_ACCESS_DENIED', 'You do not have access to this content file.');
   }
@@ -434,6 +525,7 @@ export async function createContentDownloadUrl(req: Request, res: Response) {
     await query(`UPDATE content_access_grants SET first_accessed_at = COALESCE(first_accessed_at, now())
       WHERE content_version_id = $1 AND user_id = $2 AND (expires_at IS NULL OR expires_at > now())`, [contentVersionId, actor.id]);
   }
+  await recordDownloadIssued(req, res, actor.id, { assetId: asset.storage_asset_id, assetKind: 'content', mode: 'attachment' });
   return ok(res, { filename: asset.original_filename,
     mediaType: asset.verified_content_type ?? asset.declared_content_type,
     sizeBytes: numberFromDatabase(asset.verified_byte_size ?? asset.declared_byte_size), downloadUrl,
