@@ -22,6 +22,8 @@ const schema = z.object({
   REFRESH_TOKEN_SECRET: z.string().min(32),
   CSRF_SECRET: z.string().min(32),
   COOKIE_DOMAIN: z.string().optional().default(''),
+  // Runtime-only public client ID. Blank disables Google without breaking CI.
+  GOOGLE_CLIENT_ID: z.string().trim().regex(/^$|^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/).default(''),
   STRIPE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_PUBLISHABLE_KEY: z.string().optional().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),

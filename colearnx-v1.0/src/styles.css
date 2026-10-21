@@ -2722,6 +2722,15 @@ tbody tr[role="button"]:focus-visible {
   margin: 5px 0;
   font-size: 28px;
 }
+
+.google-sign-in { display: grid; gap: 14px; min-width: 0; }
+.auth-divider { display: flex; align-items: center; gap: 12px; color: #52606d; font-size: 13px; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: #dce2e8; }
+.google-sign-in-button { width: 100%; min-width: 0; min-height: 44px; display: flex; justify-content: center; }
+.google-sign-in-button[inert] { opacity: .6; }
+.google-sign-in-status { margin: 0; text-align: center; color: #52606d; font-size: 13px; }
+.google-registration { display: grid; gap: 14px; }
+.google-registration > p { margin: 0; }
 .auth-form > p {
   margin-bottom: 20px;
 }

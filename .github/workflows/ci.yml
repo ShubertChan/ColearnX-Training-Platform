@@ -75,6 +75,8 @@ jobs:
         run: npm run release:test
       - name: Frontend tests
         run: npm test
+      - name: Translation catalog
+        run: npm run check:i18n
       - name: Frontend component tests
         run: npm run test:components
       - name: API tests
