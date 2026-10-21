@@ -71,7 +71,7 @@ jobs:
           npm --prefix apps/video-worker audit --audit-level=high
           npm --prefix apps/media-gateway audit --audit-level=high
           npm --prefix deployment audit --audit-level=high
-      - name: Deployment script tests (mock network only)
+      - name: Deployment script tests (mock network only, including cloud ledger and component planning)
         run: npm run release:test
       - name: Frontend tests
         run: npm test
