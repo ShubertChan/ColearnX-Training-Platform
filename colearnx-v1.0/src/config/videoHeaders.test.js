@@ -2,6 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { securityHeaders } from "../../build/videoHeaders.js";
 
+test("onsite payments permit Stripe Elements, wallet permissions and Link popups only when enabled", () => {
+  const headers = securityHeaders({ VITE_PAYMENTS_API_ENABLED: "true" });
+  assert.match(headers, /script-src 'self' https:\/\/js.stripe.com/);
+  assert.match(headers, /frame-src[^;]*https:\/\/hooks.stripe.com/);
+  assert.match(headers, /connect-src[^;]*https:\/\/api.stripe.com/);
+  assert.match(headers, /frame-src[^;]*https:\/\/\*.link.com/);
+  assert.match(headers, /payment=\(self "https:\/\/js.stripe.com"/);
+  assert.match(headers, /Cross-Origin-Opener-Policy: same-origin-allow-popups/);
+  assert.doesNotMatch(headers, /script-src[^;]*unsafe-inline/);
+  const disabled = securityHeaders({ VITE_PAYMENTS_API_ENABLED: "false" });
+  assert.doesNotMatch(disabled, /stripe.com|link.com|same-origin-allow-popups/);
+  assert.match(disabled, /payment=\(\)/);
+});
+
 test("a full security header set is always emitted, even with hosted video off", () => {
   const headers = securityHeaders({ VITE_API_BASE_URL: "https://api.example/api/v1" });
   assert.match(headers, /Content-Security-Policy: default-src 'self'/);
