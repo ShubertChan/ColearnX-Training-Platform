@@ -15,7 +15,7 @@ import { confirmMfaEnrolment, disableMfaForSelf, getMfaStatus, requestStepUp, ro
 import { requireAdminMfa, requireStepUp } from './auth/mfa/guards.js';
 import { listSessions, revokeOtherSessions, revokeSession } from './auth/sessions.js';
 import { authenticate, csrf, forgotPassword, login, logout, me, refresh, register, resendEmailVerification, requireRole, resetPassword, updateMe, verifyEmail, verifyMfaLogin } from './auth/auth.js';
-import { createCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
+import { createCheckoutSession, getCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
 import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, deleteContentDraft, deleteCourseDraft, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse, updateCourse } from './catalog/catalog.js';
 import { listContentVersions, listCourseVersions, saveCourseResources, validateCourseResources } from './catalog/publishing-tools.js';
@@ -182,7 +182,8 @@ export function createApp() {
   api.get('/cart', authenticate, listCart);
   api.post('/cart/items', authenticate, mutationLimiter, addCartItem);
   api.delete('/cart/items/:id', authenticate, mutationLimiter, removeCartItem);
-  api.post('/wallet/top-ups/checkout-session', authenticate, mutationLimiter, createCheckoutSession);
+  api.post('/wallet/top-ups/checkout-session', authenticate, mutationLimiter, noStore, createCheckoutSession);
+  api.get('/wallet/top-ups/:id/checkout-session', authenticate, noStore, getCheckoutSession);
   api.get('/wallet/top-ups/:id', authenticate, getTopUp);
 
   api.post('/checkout', authenticate, mutationLimiter, checkout);
