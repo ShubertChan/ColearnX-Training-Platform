@@ -21,6 +21,7 @@ import { migrationChecksum } from '../src/db/migration-checksum.ts';
 const apiRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const migrationDirectory = join(apiRoot, '../../db/migrations');
 const permissionMigration = '018_upload_retry_expiry_permissions.sql';
+const promotionMigration = '019_upload_promotion_permissions.sql';
 const rawUrl = process.env.RELEASE_CHECK_DATABASE_URL;
 assert.ok(rawUrl, 'Set RELEASE_CHECK_DATABASE_URL to a new disposable LOCAL PostgreSQL 16 database.');
 const ownerUrl = new URL(rawUrl);
@@ -61,6 +62,16 @@ let runtime;
 let checks = 0;
 function passed(message) { checks++; process.stdout.write(`PASS ${message}\n`); }
 const permissionDenied = (error) => error.code === '42501';
+
+async function applyFixtureMigration(filename) {
+  const sql = await readFile(join(migrationDirectory, filename), 'utf8');
+  await owner.query('BEGIN');
+  try {
+    await owner.query(sql);
+    await owner.query('INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)', [filename, migrationChecksum(sql)]);
+    await owner.query('COMMIT');
+  } catch (error) { await owner.query('ROLLBACK'); throw error; }
+}
 
 async function migrate() {
   return new Promise((resolve, reject) => {
@@ -110,15 +121,7 @@ try {
   const files = (await readdir(migrationDirectory)).filter(file => file.endsWith('.sql')).sort();
   const baseline = files.filter(file => Number(file.slice(0, 3)) <= 17);
   assert.equal(baseline.length, 17, 'The pre-fix baseline must contain migrations 001-017.');
-  for (const filename of baseline) {
-    const sql = await readFile(join(migrationDirectory, filename), 'utf8');
-    await owner.query('BEGIN');
-    try {
-      await owner.query(sql);
-      await owner.query('INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)', [filename, migrationChecksum(sql)]);
-      await owner.query('COMMIT');
-    } catch (error) { await owner.query('ROLLBACK'); throw error; }
-  }
+  for (const filename of baseline) await applyFixtureMigration(filename);
   const ledgerBefore = (await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows;
   const database = await import('../src/db/database.ts'); runtime = database.pool;
   assert.deepEqual((await runtime.query('SELECT session_user, current_user')).rows[0],
@@ -153,8 +156,8 @@ try {
   const uploadRequest = f => request(app).post(`${f.base}/upload-intents`).set('Authorization', `Bearer ${token}`).set('Idempotency-Key', f.key).send(metadata);
   const expire = f => owner.query(`UPDATE ${f.table} SET created_at = now() - interval '1 day', upload_expires_at = now() - interval '1 minute'
     WHERE ${f.idColumn} = $1`, [f.assetId]);
-  const snapshot = async () => (await runtime.query(`SELECT 'content' AS kind, storage_asset_id AS id, upload_expires_at, updated_at FROM storage_assets
-    UNION ALL SELECT 'course', course_delivery_asset_id, upload_expires_at, updated_at FROM course_delivery_assets ORDER BY kind, id`)).rows;
+  const snapshot = async () => (await runtime.query(`SELECT 'content' AS kind, storage_asset_id AS id, to_jsonb(asset) AS metadata FROM storage_assets asset
+    UNION ALL SELECT 'course', course_delivery_asset_id, to_jsonb(asset) FROM course_delivery_assets asset ORDER BY kind, id`)).rows;
 
   for (const f of fixtures) {
     f.key = randomUUID();
@@ -171,7 +174,8 @@ try {
     WHERE table_schema = 'public' AND table_name IN ('storage_assets', 'course_delivery_assets')
       AND grantee = 'colearnx_app' AND privilege_type = 'UPDATE' ORDER BY table_name, column_name`)).rows;
   const grantsBefore = await updateGrants();
-  const applied = await migrate();
+  // Reproduce staging's exact 001-018 baseline before testing the W8 fix.
+  await applyFixtureMigration(permissionMigration);
   assert.deepEqual(await snapshot(), rowsBefore, 'Permission migration must not change file records.');
   assert.deepEqual((await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows.slice(0, 17), ledgerBefore,
     'Previously applied migration records must remain unchanged.');
@@ -201,7 +205,6 @@ try {
     assert.equal((await runtime.query('SELECT has_table_privilege(current_user, $1, $2) AS allowed', [`public.${f.table}`, 'UPDATE'])).rows[0].allowed, false);
     passed(`${f.kind}: six expired retries renew the same asset, while unrelated column/table privileges remain restricted`);
   }
-  assert.deepEqual(applied, [`Applied ${permissionMigration}`]);
   const usage = (await runtime.query(`SELECT count(*)::int AS assets, sum(declared_byte_size)::text AS bytes FROM (
     SELECT declared_byte_size FROM storage_assets WHERE owner_user_id = $1 AND asset_status <> 'deleted'
     UNION ALL SELECT declared_byte_size FROM course_delivery_assets WHERE owner_user_id = $1 AND asset_status <> 'deleted'
@@ -211,12 +214,77 @@ try {
   await database.withTransaction(client => assertAccountStorageQuota(client, userId, 314572800, { maxBytes: 524288000, maxPendingUploads: 3 }));
   passed('combined Creator/Trainer quota remains exactly 200 MiB after 12 renewals, with 300 MiB still available');
 
+  const { createContentUploadCompletionHandler } = await import('../src/storage/content-assets.ts');
+  const { createCourseUploadCompletionHandler } = await import('../src/storage/course-delivery.ts');
+  const { promotedObjectKey } = await import('../src/storage/r2.ts');
+  const completions = fixtures.map(f => {
+    const state = { inspections: 0, deleted: [], promoted: [] };
+    const handler = (f.kind === 'content' ? createContentUploadCompletionHandler : createCourseUploadCompletionHandler)({
+      withTransaction: database.withTransaction,
+      headObject: async () => ({ contentLength: metadata.sizeBytes, contentType: metadata.mediaType, etag: 'fixture-etag' }),
+      verify: async object => {
+        state.inspections++;
+        assert.equal(object.etag, 'fixture-etag');
+        const objectKey = promotedObjectKey(object.objectKey);
+        state.promoted.push(objectKey);
+        return { kind: 'accepted', objectKey, mediaType: metadata.mediaType, scanned: false };
+      },
+      deleteObject: async locator => { state.deleted.push(locator.objectKey); },
+    });
+    return { f, state, complete: () => handler({
+      params: { contentVersionId: versionId, courseRunId: runId, assetId: f.assetId },
+      ip: '127.0.0.1', get: () => undefined,
+    }, { locals: { actor: { id: userId, roles: ['member', 'creator', 'trainer'] }, requestId: randomUUID() },
+      status() { return this; }, json(body) { return body; } }) };
+  });
+  const beforePromotion = await snapshot();
+  for (const { complete, state } of completions) {
+    await assert.rejects(complete(), permissionDenied);
+    assert.equal(state.inspections, 1);
+    assert.deepEqual(state.deleted, state.promoted, 'A failed commit must discard only its unreferenced promoted copy.');
+  }
+  assert.deepEqual(await snapshot(), beforePromotion, 'Both failed W8 commits must roll back their file-row updates.');
+  passed('001-018 reproduces both real W8 completion-handler permission failures and safely discards uncommitted copies');
+
+  const promotionGrantsBefore = await updateGrants();
+  const promotionLedgerBefore = (await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows;
+  assert.deepEqual(await migrate(), [`Applied ${promotionMigration}`]);
+  assert.deepEqual(await snapshot(), beforePromotion, '019 must not rewrite any existing file records.');
+  const promotionGrantsAfter = await updateGrants();
+  assert.deepEqual(promotionGrantsAfter.filter(row => !promotionGrantsBefore.some(before => JSON.stringify(before) === JSON.stringify(row))), [
+    { table_name: 'course_delivery_assets', column_name: 'object_key', is_grantable: 'NO' },
+    { table_name: 'storage_assets', column_name: 'object_key', is_grantable: 'NO' },
+  ]);
+  assert.ok(promotionGrantsBefore.every(before => promotionGrantsAfter.some(row => JSON.stringify(before) === JSON.stringify(row))));
+  assert.deepEqual((await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows.slice(0, 18), promotionLedgerBefore);
+  passed('019 adds exactly two non-delegable object-key column grants and preserves existing data, grants and migration history');
+
+  for (const { f, complete, state } of completions) {
+    const originalKey = (await runtime.query(`SELECT object_key FROM ${f.table} WHERE ${f.idColumn} = $1`, [f.assetId])).rows[0].object_key;
+    const result = await complete();
+    assert.equal(result.data.status, 'ready'); assert.equal(result.data.assetId, f.assetId);
+    const stored = (await runtime.query(`SELECT object_key, asset_status, verified_byte_size, declared_byte_size FROM ${f.table} WHERE ${f.idColumn} = $1`, [f.assetId])).rows[0];
+    assert.equal(stored.object_key, state.promoted.at(-1)); assert.notEqual(stored.object_key, originalKey);
+    assert.ok(!stored.object_key.startsWith('incoming/')); assert.equal(stored.asset_status, 'ready');
+    assert.equal(stored.verified_byte_size, stored.declared_byte_size);
+    const inspections = state.inspections, deleted = [...state.deleted];
+    await complete();
+    assert.equal(state.inspections, inspections); assert.deepEqual(state.deleted, deleted);
+    assert.ok(state.deleted.includes(originalKey)); assert.ok(!state.deleted.includes(stored.object_key));
+    for (const column of ['owner_user_id', f.parentColumn, 'declared_content_type', 'declared_byte_size', 'bucket_name']) {
+      await assert.rejects(runtime.query(`UPDATE ${f.table} SET ${column} = ${column} WHERE ${f.idColumn} = $1`, [f.assetId]), permissionDenied);
+    }
+    await assert.rejects(runtime.query(`DELETE FROM ${f.table} WHERE ${f.idColumn} = $1`, [f.assetId]), permissionDenied);
+    assert.equal((await runtime.query('SELECT has_table_privilege(current_user, $1, $2) AS allowed', [`public.${f.table}`, 'UPDATE'])).rows[0].allowed, false);
+    passed(`${f.kind}: real restricted-role W8 completion promotes once, preserves the delivered copy and retains all unrelated permission restrictions`);
+  }
+
   await assert.rejects(runtime.query('CREATE TABLE prohibited_runtime_ddl (id int)'), permissionDenied);
   await assert.rejects(runtime.query('SELECT * FROM schema_migrations'), permissionDenied);
   const ledgerAfter = (await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows;
   assert.deepEqual(await migrate(), []);
   assert.deepEqual((await owner.query('SELECT * FROM schema_migrations ORDER BY filename')).rows, ledgerAfter);
-  passed('forward migration is ledgered once; rerunning it is a no-op without broadening runtime privileges');
+  passed('forward migrations are ledgered once; rerunning is a no-op without broadening runtime privileges');
 
   for (const f of fixtures) {
     await owner.query(`UPDATE ${f.table} SET asset_status = 'ready', verified_content_type = declared_content_type,

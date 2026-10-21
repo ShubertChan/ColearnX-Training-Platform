@@ -162,7 +162,14 @@ ready 文件执行同一套检查。默认只报告并写入安全事件；确�
 **R2 生命周期规则（部署时一次性配置）：** 在 R2 桶上为前缀 `incoming/` 设置"创建 1 天后删除"。
 正常流程下 incoming 对象在完成时就被删除；该规则清理的是被放弃的上传和第 1.3 节所述的过期前重复 PUT。
 
-**无数据库迁移。** 新事件类型由 `taxonomy.ts` 约束，009 的 CHECK 只校验格式。
+**没有数据库结构变更，但部署前必须执行权限迁移 `019_upload_promotion_permissions.sql`。**
+W8 完成上传时会把数据库的 `object_key` 从 incoming key 改成检查通过后的正式 key；
+005/008/018 没有授予这个字段的 UPDATE 权限。019 仅给 `colearnx_app` 在
+`storage_assets.object_key` 和 `course_delivery_assets.object_key` 上增加列级 UPDATE，
+不授予整表 UPDATE、转授权或 DDL 权限，不改已有文件记录，不修改历史迁移。
+由部署人员确认后，在受控环境用 Neon Owner 的 direct/unpooled 连接执行 `npm run db:migrate`，
+核对迁移账本包含 019 后才发布新 API；不要运行 seed 或导入本地数据库。
+新事件类型仍由 `taxonomy.ts` 约束，009 的 CHECK 只校验格式。
 
 ---
 
