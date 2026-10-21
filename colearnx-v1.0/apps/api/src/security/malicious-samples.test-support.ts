@@ -39,6 +39,12 @@ export type ZipEntrySpec = {
   // Override what the central directory claims -- how a lying header is built.
   declaredUncompressedSize?: number;
   flags?: number;
+  // Extractor-confusion knobs: the LOCAL header says something different from
+  // the central directory, or carries an alternative-name extra field.
+  localName?: string;
+  localMethod?: 0 | 8;
+  extraField?: { id: number; data: Buffer };
+  crc?: number;
 };
 
 /**
@@ -47,10 +53,46 @@ export type ZipEntrySpec = {
  * traversal names, and central-directory entries that all point at one local
  * entry (the overlapping-entries bomb).
  */
-export function buildZip(entries: ZipEntrySpec[], options: { overlapCopies?: number; trailing?: Buffer } = {}): Buffer {
+export function buildZip(entries: ZipEntrySpec[], options: {
+  overlapCopies?: number;
+  trailing?: Buffer;
+  // Local records placed first but left OUT of the central directory: visible
+  // to streaming extractors, invisible to central-directory readers.
+  hidden?: ZipEntrySpec[];
+} = {}): Buffer {
   const locals: Buffer[] = [];
   const centrals: Buffer[] = [];
   let offset = 0;
+  const extraFor = (spec: ZipEntrySpec) => {
+    if (!spec.extraField) return Buffer.alloc(0);
+    const header = Buffer.alloc(4);
+    header.writeUInt16LE(spec.extraField.id, 0);
+    header.writeUInt16LE(spec.extraField.data.length, 2);
+    return Buffer.concat([header, spec.extraField.data]);
+  };
+  const localFor = (spec: ZipEntrySpec) => {
+    const raw = spec.data ?? Buffer.alloc(0);
+    const method = spec.method ?? 8;
+    const compressed = method === 8 ? deflateRawSync(raw) : raw;
+    const name = Buffer.from(spec.localName ?? spec.name, 'utf8');
+    const extra = extraFor(spec);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE((spec.flags ?? 0) | 0x0800, 6);
+    local.writeUInt16LE(spec.localMethod ?? method, 8);
+    local.writeUInt32LE(spec.crc ?? crc32(raw), 14);
+    local.writeUInt32LE(compressed.length, 18);
+    local.writeUInt32LE(spec.declaredUncompressedSize ?? raw.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    local.writeUInt16LE(extra.length, 28);
+    return { record: Buffer.concat([local, name, extra, compressed]), raw, compressed, method };
+  };
+  for (const spec of options.hidden ?? []) {
+    const { record } = localFor(spec);
+    locals.push(record);
+    offset += record.length;
+  }
   const centralFor = (spec: ZipEntrySpec, name: Buffer, raw: Buffer, compressed: Buffer, method: number, localOffset: number) => {
     const central = Buffer.alloc(46);
     central.writeUInt32LE(0x02014b50, 0);
@@ -58,33 +100,23 @@ export function buildZip(entries: ZipEntrySpec[], options: { overlapCopies?: num
     central.writeUInt16LE(20, 6);
     central.writeUInt16LE((spec.flags ?? 0) | 0x0800, 8);
     central.writeUInt16LE(method, 10);
-    central.writeUInt32LE(crc32(raw), 16);
+    central.writeUInt32LE(spec.crc ?? crc32(raw), 16);
     central.writeUInt32LE(compressed.length, 20);
     central.writeUInt32LE(spec.declaredUncompressedSize ?? raw.length, 24);
+    const extra = extraFor(spec);
     central.writeUInt16LE(name.length, 28);
+    central.writeUInt16LE(extra.length, 30);
     central.writeUInt32LE(localOffset, 42);
-    return Buffer.concat([central, name]);
+    return Buffer.concat([central, name, extra]);
   };
   for (const spec of entries) {
-    const name = Buffer.from(spec.name, 'utf8');
-    const raw = spec.data ?? Buffer.alloc(0);
-    const method = spec.method ?? 8;
-    const compressed = method === 8 ? deflateRawSync(raw) : raw;
-    const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4);
-    local.writeUInt16LE((spec.flags ?? 0) | 0x0800, 6);
-    local.writeUInt16LE(method, 8);
-    local.writeUInt32LE(crc32(raw), 14);
-    local.writeUInt32LE(compressed.length, 18);
-    local.writeUInt32LE(spec.declaredUncompressedSize ?? raw.length, 22);
-    local.writeUInt16LE(name.length, 26);
-    locals.push(local, name, compressed);
-    centrals.push(centralFor(spec, name, raw, compressed, method, offset));
+    const { record, raw, compressed, method } = localFor(spec);
+    locals.push(record);
+    centrals.push(centralFor(spec, Buffer.from(spec.name, 'utf8'), raw, compressed, method, offset));
     for (let copy = 1; copy <= (options.overlapCopies ?? 0); copy += 1) {
-      centrals.push(centralFor({ ...spec }, Buffer.from(`${copy}-${spec.name}`, 'utf8'), raw, compressed, method, offset));
+      centrals.push(centralFor(spec, Buffer.from(spec.name, 'utf8'), raw, compressed, method, offset));
     }
-    offset += local.length + name.length + compressed.length;
+    offset += record.length;
   }
   const central = Buffer.concat(centrals);
   const end = Buffer.alloc(22);

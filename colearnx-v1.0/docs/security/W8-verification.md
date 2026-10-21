@@ -39,16 +39,29 @@ W8 改为读取对象本身：
 
 | 限制 | 默认值 | 拦截的攻击 |
 |------|--------|-----------|
-| 解压总量预算 | 512 MiB | 经典炸弹、重叠条目炸弹（多条中央目录指向同一份数据） |
+| 解压总量预算 | 512 MiB | 经典炸弹 |
+| 单个条目解压上限 | 100 MiB | 低于 clamd 的 `MaxFileSize`（110M）。超过 clamd 上限的文件会被 clamd **跳过并照样回答 OK**，必须在我们这一侧挡住 |
 | 压缩比（总量 > 10 MiB 后才生效） | 100 : 1 | 小文件高倍膨胀；小文本文件天然高压缩比，不误伤 |
-| 实际解压量 ≠ 声明大小 | 严格相等 | 谎报头部以绕过预筛 |
+| 实际解压量 ≠ 声明大小；CRC-32 不符 | 严格相等 | 谎报头部以绕过预筛 |
 | 条目数 | 10 000 | 海量空条目耗尽解压方资源 |
 | 加密条目 / ZIP64 / 分卷 / 非 0、8 压缩方法 | 拒绝 | 无法检查的内容（不能扫描 = 不能放行） |
 | `../`、绝对路径、盘符 | 拒绝 | Zip Slip：解压到目标目录之外 |
 | 归档尾部附加数据 | 拒绝 | zip 与其他格式拼接的混合文件 |
+| 文件名以 `.` 或空格结尾、含 `:` | 拒绝 | Windows 解压时会把 `evil.vbs.` 改写成 `evil.vbs`，绕过扩展名检查；`:` 是 NTFS 备用数据流 |
+| `.docx` 的 `[Content_Types].xml` 声明了 VBA / macroEnabled 类型 | 拒绝 | 把宏部件改名（不叫 `vbaProject.bin`）以绕过按文件名的检查 |
 | 条目为原生可执行文件（按内容）或 Windows 可执行扩展名 | 拒绝 | 合法 zip 里夹带 setup.exe |
 
-编程课常见的 `.sh`、`.py`、`.js`、`.bat` **刻意不拦**，否则误伤正常课程资料；它们的内容仍经病毒扫描。
+编程课常见的 `.sh`、`.py`、`.js`、`.bat` **刻意不拦**，否则误伤正常课程资料；它们的内容仍经病毒扫描
+（单条目上限保证 clamd 一定会完整扫描它们）。zip 内的 OLE 文件（.doc/.xls、Word 内嵌对象）与 Java
+`.class` 也不按"可执行"拦截——它们是正常资料，内容交给病毒扫描；只有 PE / ELF / Mach-O 原生程序按内容拒绝。
+
+**一份归档只能有一种解读。** 不同解压工具信任的结构不同：流式解压（Java `ZipInputStream`、
+部分浏览器预览）从前往后读**本地头**；unzip / 7-Zip / Windows 读**中央目录**；Info-ZIP 还会优先采用
+"Unicode 路径"扩展字段里的另一个文件名。只检查其中一种视图，攻击者就能给其他工具准备另一份内容
+（例如中央目录写 `readme.txt`、本地头写 `setup.vbs`，或在中央目录之外藏一个本地条目 `setup.exe`）。因此要求：
+每个本地头的文件名字节、压缩方法、加密标志与中央目录**完全一致**；所有本地记录必须从偏移 0 起
+**首尾相接、恰好铺满**到中央目录为止（无空隙、无重复偏移、无未登记条目——这也顺带挡住了"重叠条目炸弹"）；
+中央目录必须恰好结束于结尾记录；带 Unicode 路径/注释扩展字段（0x7075、0x6375）的条目一律拒绝。
 
 ### 1.3 检查与送达之间不留缝隙（incoming/ → 正式 key）
 
@@ -57,9 +70,14 @@ W8 改为读取对象本身：
 
 因此：浏览器上传到 `incoming/...`；检查**以 HEAD 时的 ETag 为条件**读取（`If-Match`），
 保证检查的正是做过大小校验的那份字节；通过后**以同一 ETag 为条件**服务端复制到正式 key
-（去掉 `incoming/` 前缀），数据库行改指向正式 key，再删除 incoming 对象。之后再用旧链接 PUT，
-只会落到一个没有任何记录引用、永远不会被下发的 incoming key 上。W8 之前签发、尚未完成的上传
-没有 `incoming/` 前缀，晋升时改用 `.verified` 后缀，同样与可写 key 分离。
+（去掉 `incoming/` 前缀，并加上**本次尝试独有**的 `.v-<uuid>` 后缀），数据库行改指向正式 key，
+再删除 incoming 对象。之后再用旧链接 PUT，只会落到一个没有任何记录引用、永远不会被下发的
+incoming key 上。W8 之前签发、尚未完成的上传没有 `incoming/` 前缀，同样晋升到带后缀的新 key。
+
+正式 key 每次尝试都不同，是为了**能安全地清理**：若第三步没有把这次的副本提交为 ready
+（并发的另一次完成先提交了、草稿状态变了、行被删除了），这份副本就没有任何行引用，
+立即删除即可，绝不会误删别的行正在下发的对象。否则这类副本会落在 `incoming/` 之外，
+生命周期规则和对账都清理不到，还不计入配额，可被反复利用来无限占用存储。
 
 ### 1.4 检查在事务之外，完成流程拆成三步
 
@@ -68,7 +86,8 @@ W8 改为读取对象本身：
 
 1. 短事务：锁草稿、HEAD、大小比对（不一致即隔离，与原逻辑相同）
 2. **无事务**：内容检查 + 晋升（`upload-verification.ts`），进程内信号量限制同时进行的检查数
-   （`UPLOAD_INSPECTION_CONCURRENCY`，默认 2）以约束内存
+   （`UPLOAD_INSPECTION_CONCURRENCY`，默认 2）以约束内存。释放的名额**直接交给**下一个等待者
+   （计数不先减再加），否则新来的请求可能抢在被唤醒者之前进入，实际并发超过上限
 3. 短事务：重新加锁，**确认该行仍是被检查的那条 pending 记录**（状态与 object_key 都未变），
    再提交 ready 或 quarantined；若并发的另一次完成已提交 ready，直接返回 ready
 
@@ -79,6 +98,12 @@ W8 改为读取对象本身：
 资产保持 pending，创作者稍后点"重试"即可；同时记一条 `upload.scan_unavailable`（2 中）。
 绝不会"扫不了就放行"。这与第三周"诱饵失败要降级、服务存活是底线"的原则不冲突：
 这里降级的是**单次上传完成**，API 其余功能完全不受影响。
+
+clamd 默认会**跳过**超过其大小/深度上限的内容并仍回答 `OK`。`clamd.conf` 打开了 `AlertExceedsMax`，
+此时 clamd 改报 `Heuristics.Limits.Exceeded`；API 把所有 `Heuristics.*` 结果（超限、OLE2 宏等）
+视为"无法放行"而拒绝，但记为 `upload.archive_rejected`（2 中），**不**当作病毒记成 4 级告警。
+只有真正的病毒特征码才记 `upload.malware_detected`。`AlertEncrypted` 关闭：加密 zip 已在我们这一侧
+被拒绝，而普通的带权限密码的 PDF 不应被当成威胁。
 
 ### 1.6 拒绝原因只进账本，不告诉客户端
 
@@ -112,7 +137,17 @@ CLAMAV_PORT=3310
 
 # 下载链接审计（建议每日）：窗口可用 DOWNLOAD_AUDIT_WINDOW_HOURS 调整，默认 24
 npm --prefix apps/api run security:download-audit
+
+# 一次性存量回扫（部署 W8 后执行）：检查 W8 之前就已是 ready 的文件
+npm --prefix apps/api run security:upload-backfill            # 只报告，不改动
+npm --prefix apps/api run security:upload-backfill -- --apply # 把不通过的文件置为 quarantined
 ```
+
+**为什么需要回扫：** 上传完成时的检查只保护部署之后完成的上传。部署前就已上传、状态为 ready 的文件
+（例如早就改名成 .pdf 的可执行文件）不会被重新检查，仍可下载。回扫作业对两张表中所有可下载的
+ready 文件执行同一套检查。默认只报告并写入安全事件；确认影响范围后再加 `--apply` 隔离（只改状态，
+对象保留供复核；隔离状态不会被下发）。有文件因存储或扫描器不可用而无法检查时，作业以非零码退出——
+这些文件**没有**被判定为干净，必须重跑。
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
@@ -137,10 +172,12 @@ npm --prefix apps/api run security:download-audit
 
 | 测试文件 | 覆盖 |
 |----------|------|
-| `security/upload-inspection.test.ts` | 恶意样本集全部被拦截：改名 PDF/PNG/MP4/ZIP/DOCX 的 PE；HTML 冒充 PNG；EICAR（PDF 内、zip 内）；zip 内夹带 .exe（按扩展名、按内容）；比例炸弹；重叠条目炸弹（声明总量 + 谎报大小两种）；预算耗尽；加密、路径穿越、盘符、尾部附加、截断；带宏/非 Word 的 .docx。合法 PDF/PNG/zip/docx/视频通过；视频不整体缓冲；扫描器故障向上抛出（fail closed） |
+| `security/upload-inspection.test.ts` | 恶意样本集全部被拦截（含独立审查给出的绕过样本：本地头/中央目录名称或压缩方法不一致、中央目录外的隐藏条目、Unicode 路径扩展字段、CRC 不符、`evil.vbs.` 等会被 Windows 改写的文件名、改名的宏部件、超过 clamd 扫描上限的单个条目）：改名 PDF/PNG/MP4/ZIP/DOCX 的 PE；HTML 冒充 PNG；EICAR（PDF 内、zip 内）；zip 内夹带 .exe（按扩展名、按内容）；比例炸弹；重叠条目炸弹（声明总量 + 谎报大小两种）；预算耗尽；加密、路径穿越、盘符、尾部附加、截断；带宏/非 Word 的 .docx。合法 PDF/PNG/zip/docx/视频通过；视频不整体缓冲；扫描器故障向上抛出（fail closed） |
 | `security/malware-scan.test.ts` | 与模拟 clamd 走真实 INSTREAM 协议：分块、干净、EICAR 命中；拒连、超时、提前断开、超限报错均判为不可用。设置 `CLAMAV_TEST_HOST` 时额外对真实 clamd 跑 EICAR |
 | `storage/course-delivery.test.ts` | 三步完成流程：通过后指向晋升 key 并删除 incoming；拒绝时隔离 + 删除 + 通用 422 且不泄露原因；扫描器不可用时保持 pending；检查期间行被替换则不置 ready |
 | `security/download-audit.test.ts` | 规则阈值与评分；作业逐条发事件、统计写入失败数 |
+| `security/upload-backfill.test.ts` | 存量回扫：dry run 不改动、分批翻页、`--apply` 只隔离不通过的文件、无法检查的文件不被当作干净 |
+| `storage/upload-verification.test.ts` | 信号量在名额交接时不超限（旧实现可复现峰值 2/上限 1）；未提交的晋升副本被删除、已提交的不动 |
 | `storage/r2.test.ts` | 新上传 key 位于 `incoming/`；晋升 key 与可写 key 分离（含旧 key） |
 | 前端 `src/api/uploads.test.js` | 三个新错误码映射为固定、可翻译、不泄露原因的提示 |
 
@@ -182,7 +219,10 @@ SELECT asset_status, object_key FROM storage_assets ORDER BY created_at DESC LIM
   有效期内（`R2_SIGNED_DOWNLOAD_TTL_SECONDS`，默认 300 秒）的转发无法阻止，只能缩短 TTL 与事后审计。
   真正的"使用审计"需要 R2 访问日志（Cloudflare Logpush），超出本周范围。
 - **嵌套归档只检查一层：** 外层 zip 由我们逐条目解压检查；内层压缩包的再展开交给 clamd
-  （`MaxRecursion 16`、`MaxScanSize 512M`）。未启用 clamd 时内层不展开，但其解压体积仍计入外层预算。
+  （`MaxRecursion 16`、`MaxScanSize 600M`，超限即报告而非跳过）。未启用 clamd 时内层不展开，
+  但其解压体积仍计入外层预算。
+- **存量文件（决策/部署清单）：** 部署后需运行一次 `security:upload-backfill`（先 dry run，再 `--apply`），
+  见第 2 节。未运行前，W8 之前上传的文件未经内容检查。
 - **托管视频（分片上传）链路不在本次范围：** `video/` 的 multipart 源文件进入转码流水线，
   由 ffmpeg 解析失败即拒绝；W8 覆盖的是课程附件与内容资产这两条可直接下载的链路。
 - **代码审查中发现、未在本 PR 处置的问题**（另见 PR 说明）：刷新令牌无宽限窗口导致慢网络重试被判为盗用、
@@ -193,8 +233,8 @@ SELECT asset_status, object_key FROM storage_assets ORDER BY created_at DESC LIM
 ## 5. 改动清单
 
 新增：`security/file-signature.ts`、`zip-inspection.ts`、`malware-scan.ts`、`upload-inspection.ts`、
-`download-audit.ts`、`download-audit-run.ts`、`storage/upload-verification.ts`、
-`deploy/clamav/clamd.conf`、测试样本 `security/malicious-samples.test-support.ts` 及四个测试文件。
+`download-audit.ts`、`download-audit-run.ts`、`upload-backfill.ts`、`upload-backfill-run.ts`、`storage/upload-verification.ts`、
+`deploy/clamav/clamd.conf`、测试样本 `security/malicious-samples.test-support.ts` 及六个测试文件。
 
 修改：`storage/r2.ts`（incoming 前缀、ETag 固定读取、条件复制）、`storage/content-assets.ts`
 （三步完成流程、下载签发审计、F-28）与 `storage/course-delivery.ts`（三步完成流程、下载签发审计）、`security/taxonomy.ts`
