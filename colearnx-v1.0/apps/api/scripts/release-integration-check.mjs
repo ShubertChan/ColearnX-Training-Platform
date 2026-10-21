@@ -585,6 +585,8 @@ try {
   await runMfaSessionChecks({ owner, app, apiPool, environment, passed });
   const { runVideoOrderIntegrityChecks } = await import('./video-order-integrity-checks.mjs');
   await runVideoOrderIntegrityChecks({ owner, buyerId, sellerId, courseId, courseRunId, passed });
+  const { runReleasePreflightChecks } = await import('./release-preflight-checks.mjs');
+  await runReleasePreflightChecks({ owner, ownerUrl, passed });
   assert.equal(blockedHttpCalls, 0, 'No email, HIBP, alert, payment, or storage HTTP request may be attempted.');
   process.stdout.write(`SUCCESS ${checks} integration check groups passed; test-only data retained in disposable local PostgreSQL cluster.\n`);
 } finally {
