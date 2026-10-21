@@ -130,6 +130,7 @@ const titleMap = {
 };
 
 function titleFor(pathname) {
+  if (pathname.startsWith("/wallet/checkout/")) return ["Secure payment", "Complete your points top-up"];
   if (pathname.startsWith("/purchases/")) return ["Course learning", "Your protected video course"];
   if (titleMap[pathname]) return titleMap[pathname];
   if (pathname.startsWith("/checkout-success/"))

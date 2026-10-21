@@ -10,9 +10,13 @@ import { ApiError, ok } from '../lib/http.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 import { loadSystemPointAccount, postPointTransaction } from '../points/ledger.js';
 import type { Actor } from '../auth/auth.js';
-import { requireStripeSandboxSecret, stripeCheckoutError, stripeFailureLogFields } from './stripe-support.js';
+import { requireStripeSandboxSecret, requireStripeSandboxPublishableKey, stripeCheckoutError, stripeFailureLogFields } from './stripe-support.js';
 
-const checkoutSchema = z.object({ topUpPackageId: uuid });
+const checkoutSchema = z.object({
+  topUpPackageId: uuid,
+  uiMode: z.enum(['elements']).optional(),
+  locale: z.enum(['en', 'zh']).optional(),
+});
 
 function stripeClient() {
   return new Stripe(requireStripeSandboxSecret(env.STRIPE_SECRET_KEY));
@@ -33,7 +37,7 @@ type PaymentRow = {
 type CheckoutResponse = {
   paymentTransactionId: string;
   topUpOrderId: string;
-  checkoutUrl: string;
+  checkoutUrl?: string;
   status: 'pending';
 };
 
@@ -69,6 +73,7 @@ export async function createCheckoutSession(req: Request, res: Response) {
   // Fail before creating local orders when the sandbox is not configured.
   // Keeping this outside the Stripe API catch preserves STRIPE_NOT_CONFIGURED as a 503.
   const stripe = stripeClient();
+  if (input.uiMode === 'elements') requireStripeSandboxPublishableKey(env.STRIPE_PUBLISHABLE_KEY);
   const prepared = await withTransaction(async (client) => {
     const cached = await claimIdempotency(client, actor.id, scope, key, fingerprint);
     if (cached) return { cached };
@@ -120,8 +125,17 @@ export async function createCheckoutSession(req: Request, res: Response) {
       mode: 'payment',
       customer_email: actor.email,
       line_items: [{ price_data: { currency: prepared.currency, product_data: { name: prepared.displayName }, unit_amount: prepared.amountMinor }, quantity: 1 }],
-      success_url: `${env.APP_ORIGIN}/#/wallet?topUp=processing&paymentTransactionId=${prepared.paymentTransactionId}`,
-      cancel_url: `${env.APP_ORIGIN}/#/wallet?topUp=cancelled`,
+      ...(input.uiMode === 'elements' ? {
+        ui_mode: 'elements' as const,
+        return_url: `${env.APP_ORIGIN}/#/wallet?topUp=processing&paymentTransactionId=${prepared.paymentTransactionId}`,
+        // Local top-up amounts are fixed; currency conversion would invalidate settlement checks.
+        adaptive_pricing: { enabled: false },
+        payment_method_types: prepared.currency === 'sgd' ? ['card', 'paynow', 'link'] : ['card', 'link'],
+      } : {
+        success_url: `${env.APP_ORIGIN}/#/wallet?topUp=processing&paymentTransactionId=${prepared.paymentTransactionId}`,
+        cancel_url: `${env.APP_ORIGIN}/#/wallet?topUp=cancelled`,
+      }),
+      ...(input.locale ? { locale: input.locale } : {}),
       metadata: { paymentTransactionId: prepared.paymentTransactionId, topUpOrderId: prepared.topUpOrderId, userId: actor.id },
     }, { idempotencyKey: `colearnx_${prepared.paymentTransactionId}` });
   } catch (error) {
@@ -139,8 +153,9 @@ export async function createCheckoutSession(req: Request, res: Response) {
     });
     throw stripeCheckoutError(error);
   }
-  if (!session.url) throw new ApiError(502, 'STRIPE_CHECKOUT_URL_MISSING', 'Stripe did not return a checkout URL.');
-  const response: CheckoutResponse = { paymentTransactionId: prepared.paymentTransactionId, topUpOrderId: prepared.topUpOrderId, checkoutUrl: session.url, status: 'pending' };
+  if (input.uiMode !== 'elements' && !session.url) throw new ApiError(502, 'STRIPE_CHECKOUT_URL_MISSING', 'Stripe did not return a checkout URL.');
+  // Never persist a client secret in idempotency records. The owner loads it through the authenticated GET below.
+  const response: CheckoutResponse = { paymentTransactionId: prepared.paymentTransactionId, topUpOrderId: prepared.topUpOrderId, ...(session.url ? { checkoutUrl: session.url } : {}), status: 'pending' };
   await withTransaction(async (client) => {
     await client.query(`UPDATE payment_transactions SET provider_transaction_id = $2, payment_status = 'checkout_created'
       WHERE payment_transaction_id = $1`, [prepared.paymentTransactionId, session.id]);
@@ -149,6 +164,46 @@ export async function createCheckoutSession(req: Request, res: Response) {
       WHERE actor_user_id = $1 AND operation_scope = $2 AND idempotency_key = $3 AND request_fingerprint = $4`, [actor.id, scope, key, fingerprint, JSON.stringify(response)]);
   });
   return ok(res, response, 201);
+}
+
+export async function getCheckoutSession(req: Request, res: Response) {
+  const actor = res.locals.actor as Actor;
+  const id = parse(uuid, req.params.id);
+  const payment = await query<PaymentRow>(`SELECT pt.payment_transaction_id, pt.topup_order_id,
+    pto.point_account_id, pa.user_id, pt.amount, pt.currency_code, pto.points_amount,
+    pt.payment_status, pt.provider_transaction_id
+    FROM payment_transactions pt
+    JOIN point_topup_orders pto ON pto.topup_order_id = pt.topup_order_id
+    JOIN point_accounts pa ON pa.point_account_id = pto.point_account_id
+    WHERE pt.payment_transaction_id = $1 AND pa.user_id = $2`, [id, actor.id]);
+  if (!payment.rowCount) throw new ApiError(404, 'TOP_UP_NOT_FOUND', 'Top-up transaction was not found.');
+  const row = payment.rows[0];
+  if (row.payment_status === 'paid') return ok(res, { status: 'complete' });
+  if (!row.provider_transaction_id || row.payment_status !== 'checkout_created') {
+    throw new ApiError(409, 'CHECKOUT_UNAVAILABLE', 'This payment session is no longer available.');
+  }
+  const publishableKey = requireStripeSandboxPublishableKey(env.STRIPE_PUBLISHABLE_KEY);
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripeClient().checkout.sessions.retrieve(row.provider_transaction_id);
+  } catch {
+    throw new ApiError(502, 'STRIPE_CHECKOUT_UNAVAILABLE', 'Unable to load secure payment. Please try again.');
+  }
+  if (session.livemode || session.ui_mode !== 'elements' || session.mode !== 'payment'
+    || session.metadata?.userId !== actor.id || session.metadata?.paymentTransactionId !== id
+    || session.metadata?.topUpOrderId !== row.topup_order_id
+    || session.amount_total !== Number(row.amount) || session.currency !== row.currency_code) {
+    throw new ApiError(409, 'CHECKOUT_UNAVAILABLE', 'This payment session is no longer available.');
+  }
+  if (session.status === 'complete') return ok(res, { status: 'complete' });
+  if (session.status !== 'open' || session.expires_at <= Math.floor(Date.now() / 1000) || !session.client_secret) {
+    throw new ApiError(409, 'CHECKOUT_EXPIRED', 'This payment session has expired. Return to your wallet to start again.');
+  }
+  return ok(res, {
+    status: 'open', clientSecret: session.client_secret, publishableKey,
+    email: session.customer_email, amountMinor: Number(row.amount), currency: row.currency_code,
+    points: Number(row.points_amount), expiresAt: session.expires_at,
+  });
 }
 
 function sessionIsPayable(session: Stripe.Checkout.Session, payment: PaymentRow) {
