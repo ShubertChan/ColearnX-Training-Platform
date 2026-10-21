@@ -9,6 +9,7 @@ import { loadSystemPointAccount, postPointTransaction } from '../points/ledger.j
 import { evaluateRefund, type RefundDecision } from './policy.js';
 import { uniqueWatchedSeconds } from '../video/progress.js';
 import { refundRequestSchema } from './request-schema.js';
+import { recordRefundNotification } from './notifications.js';
 
 const decisionSchema = z.object({ decision: z.enum(['approved', 'rejected']), reason: z.string().trim().min(3).max(2000) });
 const reviewListSchema = z.object({ status: z.enum(['pending', 'approved', 'rejected', 'cancelled']).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) });
@@ -174,8 +175,9 @@ export async function decideRefund(req: Request, res: Response) {
       order_id: string;
       fulfilment_status: string;
       point_account_id: string;
+      item_title_snapshot: string;
     }>(`SELECT rr.refund_request_id, rr.refund_status, rr.order_item_id, rr.requested_by_user_id, rr.requested_points,
-      rr.eligibility_snapshot_json, oi.order_id, oi.fulfilment_status, pa.point_account_id
+      rr.eligibility_snapshot_json, oi.order_id, oi.fulfilment_status, oi.item_title_snapshot, pa.point_account_id
       FROM refund_requests rr
       JOIN order_items oi ON oi.order_item_id = rr.order_item_id
       JOIN point_accounts pa ON pa.user_id = rr.requested_by_user_id AND pa.account_status IN ('active', 'restricted')
@@ -241,6 +243,10 @@ export async function decideRefund(req: Request, res: Response) {
       VALUES ($1, 'refund.decision', 'refund_requests', $2,
         jsonb_build_object('decision', $3::text, 'reason', $4::text, 'pointTransactionId', $5::uuid, 'outcome', 'success'), $6)`,
       [admin.id, refundRequestId, input.decision, input.reason, pointTransactionId, res.locals.requestId]);
+    await recordRefundNotification(client, {
+      refundRequestId, userId: current.requested_by_user_id,
+      title: current.item_title_snapshot, reason: input.reason,
+    });
     return { id: refundRequestId, status: input.decision, pointTransactionId };
   });
   return ok(res, response);

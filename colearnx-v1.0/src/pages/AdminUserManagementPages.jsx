@@ -16,6 +16,7 @@ import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
 const roleLabel = (role) => role.charAt(0).toUpperCase() + role.slice(1);
 
 function AccountStatus({ status }) {
+  const { t } = useTranslation();
   const tone = status === "active" ? "success" : status === "suspended" ? "warning" : "danger";
   return <Badge tone={tone}>{t(roleLabel(status))}</Badge>;
 }

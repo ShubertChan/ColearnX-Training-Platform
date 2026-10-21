@@ -122,3 +122,4 @@ html:lang(zh-CN) { font-family: Inter, system-ui, "Microsoft YaHei", "PingFang S
   .home-action-grid .home-action { transition: none; }
   .home-action-grid .home-action:hover { transform: none; }
 }
+.refund-decision-reason { white-space: pre-wrap; overflow-wrap: anywhere; }

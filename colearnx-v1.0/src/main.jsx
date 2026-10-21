@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router-dom";
 import App from "./App";
 import SessionStorageNotice from "./components/SessionStorageNotice";
+import RefundDecisionNotice from "./components/RefundDecisionNotice";
 import StepUpProvider from "./components/StepUpProvider";
 import { PlatformProvider } from "./context/PlatformContext";
 import { AdminInboxProvider } from "./context/AdminInboxContext";
@@ -16,7 +17,7 @@ createRoot(document.getElementById("root")).render(
     <HashRouter>
       <PlatformProvider>
         <SessionStorageNotice />
-        <StepUpProvider><AdminInboxProvider><App /></AdminInboxProvider></StepUpProvider>
+        <StepUpProvider><AdminInboxProvider><App /><RefundDecisionNotice /></AdminInboxProvider></StepUpProvider>
       </PlatformProvider>
     </HashRouter>
   </React.StrictMode>,
