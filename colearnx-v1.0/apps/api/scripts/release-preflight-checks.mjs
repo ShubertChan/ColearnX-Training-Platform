@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { Client } from 'pg';
 import { appDirectory, migrationInventory } from '../../../scripts/deployment/artifact.mjs';
 import { verifyCloudMigrations } from '../../../scripts/deployment/cloud-migrations.mjs';
+import { runReleaseTlsChecks } from './release-tls-checks.mjs';
 
 export async function runReleasePreflightChecks({ owner, ownerUrl, passed }) {
   assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(ownerUrl.hostname));
@@ -27,12 +28,15 @@ export async function runReleasePreflightChecks({ owner, ownerUrl, passed }) {
     await readFile(resolve(appDirectory, 'db/migrations', filename), 'utf8')])));
   const ledgerSnapshotSql = 'SELECT filename, checksum, applied_at::text AS applied_at FROM public.schema_migrations ORDER BY filename';
   const before = (await owner.query(ledgerSnapshotSql)).rows;
-  const verify = (overrides = {}) => verifyCloudMigrations({ config: { database, testOnlyLocalTransport: true }, inventory, sqlByFilename,
+  const verify = (overrides = {}) => verifyCloudMigrations({ config: { database, host: ownerUrl.hostname, testOnlyLocalTransport: true }, inventory, sqlByFilename,
     commit: 'a'.repeat(40), approved: 'true', lastApplied: inventory.at(-1).filename,
     clientFactory: () => new Client({ connectionString: url.href, connectionTimeoutMillis: 5000, query_timeout: 10000 }), ...overrides });
   assert.equal((await verify()).migrationCount, inventory.length);
   assert.deepEqual((await owner.query(ledgerSnapshotSql)).rows, before);
   passed('release preflight reads the actual ledger through a separate LOGIN/NOINHERIT read-only account without changing any migration row');
+
+  await runReleaseTlsChecks({ database, host: ownerUrl.hostname, port: Number(ownerUrl.port || 5432),
+    role, password, inventory, sqlByFilename, passed });
 
   const reader = new Client({ connectionString: url.href });
   await reader.connect();
