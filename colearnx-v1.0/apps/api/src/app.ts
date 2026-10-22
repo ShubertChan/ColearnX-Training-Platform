@@ -95,9 +95,12 @@ export function createApp() {
   app.use(cors({ origin(origin, callback) { if (!origin || origin === env.APP_ORIGIN) return callback(null, true); return callback(new ApiError(403, 'ORIGIN_NOT_ALLOWED', 'The request origin is not allowed.')); }, credentials: true, maxAge: 600 }));
 
   // This route deliberately precedes JSON parsing: Stripe signature verification needs the untouched body bytes.
-  app.post('/api/v1/payments/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), stripeWebhook);
-  app.use(express.json({ limit: '1mb', type: 'application/json' }));
-  app.use(express.urlencoded({ extended: false, limit: '20kb' }));
+  // Clients send uncompressed request bodies. Reject compression before invoking
+  // any decoder, including on the unauthenticated webhook path (CVE-2026-111497).
+  // This is defense in depth; all Node runtimes must also receive security updates.
+  app.post('/api/v1/payments/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb', inflate: false }), stripeWebhook);
+  app.use(express.json({ limit: '1mb', type: 'application/json', inflate: false }));
+  app.use(express.urlencoded({ extended: false, limit: '20kb', inflate: false }));
   app.use(cookieParser());
 
   app.get('/health/live', (_req, res) => ok(res, { status: 'live' }));

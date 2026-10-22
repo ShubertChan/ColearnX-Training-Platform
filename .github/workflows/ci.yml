@@ -53,6 +53,8 @@ jobs:
             colearnx-v1.0/apps/video-worker/package-lock.json
             colearnx-v1.0/apps/media-gateway/package-lock.json
             colearnx-v1.0/deployment/package-lock.json
+      - name: Record Node runtime used for validation
+        run: node --version
       - name: Install frontend dependencies
         run: npm ci --include=dev
       - name: Install API dependencies
