@@ -60,7 +60,7 @@ function itemMessage(item, contentVersionId) {
     return contentVersionId ? "Waiting to upload." : "Create the draft to start uploading.";
   }
   if (item.status === "preparing") return "Preparing upload…";
-  if (item.status === "uploading") return `Uploading ${item.progress}%`;
+  if (item.status === "uploading") return { key: "Uploading {progress}%", values: { progress: item.progress } };
   if (item.status === "verifying") return "Checking file…";
   if (item.status === "ready") return "Uploaded";
   if (item.status === "deleting") return "Removing file…";
@@ -278,11 +278,11 @@ export default function PrivateAssetUploader({
   const hasQueuedFiles = items.some((item) => item.status === "queued");
 
   return (
-    <section className="private-uploader" aria-label={label}>
+    <section className="private-uploader" aria-label={t(label)}>
       {listing && <p role="status">{t("Loading private files…")}</p>}
       {listError && <div className="form-error" role="alert">{t(listError)} <button className="button secondary sm" type="button" onClick={() => setListAttempt((value) => value + 1)}>{t("Retry file list")}</button></div>}
       {renderPicker ? renderPicker({ addFiles, disabled }) : <UploadDropzone onFiles={addFiles}
-        inputLabel={`Choose ${label.toLowerCase()}`} accept={PRIVATE_ASSET_ACCEPT} disabled={disabled}
+        inputLabel={t("Choose {label}", { label: t(label).toLowerCase() })} accept={PRIVATE_ASSET_ACCEPT} disabled={disabled}
         hint={t("PDF, DOCX, ZIP and images up to 25 MiB · MP4 up to 100 MiB · 500 MiB total")} />}
 
       {!contentVersionId && hasQueuedFiles && (

@@ -1,5 +1,6 @@
-import { beforeEach, expect, test, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { setLanguage } from "../../src/i18n/LanguageContext";
 import PrivateAssetUploader from "../../src/components/uploads/PrivateAssetUploader";
 import { uploadFileToPresignedUrl } from "../../src/utils/uploadFile";
 
@@ -10,6 +11,7 @@ const network = () => Object.assign(new Error("Network interrupted."), { code: "
 const asset = { assetId: "asset-1", filename: "lesson.mp4", mediaType: "video/mp4", sizeBytes: 10, status: "ready" };
 
 beforeEach(() => vi.resetAllMocks());
+afterEach(() => act(() => setLanguage("en")));
 
 function setup(apiOverrides = {}) {
   const reservations = new Map();
@@ -31,6 +33,28 @@ function setup(apiOverrides = {}) {
   });
   return { api, reservations, select };
 }
+
+test("upload progress and errors translate without restarting the transfer", async () => {
+  let finish;
+  const abort = vi.fn();
+  uploadFileToPresignedUrl.mockImplementation(({ onProgress }) => {
+    onProgress({ loaded: 37, total: 100 });
+    return { promise: new Promise(resolve => { finish = resolve; }), abort };
+  });
+  const { api, select } = setup();
+  const picker = screen.getByLabelText("Choose content files");
+  select();
+  await screen.findByText("Uploading 37%");
+  act(() => setLanguage("zh-CN"));
+  expect(screen.getByText("正在上传 37%")).not.toBeNull();
+  expect(screen.getByLabelText("选择内容文件")).toBe(picker);
+  expect(screen.getByText("lesson.mp4")).not.toBeNull();
+  expect(api.request).toHaveBeenCalledTimes(1);
+  expect(uploadFileToPresignedUrl).toHaveBeenCalledTimes(1);
+  expect(abort).not.toHaveBeenCalled();
+  await act(async () => finish());
+  expect(screen.getByText("已上传")).not.toBeNull();
+});
 
 test("repeated interrupted uploads reuse one reservation and reset the progress", async () => {
   uploadFileToPresignedUrl.mockImplementation(({ onProgress }) => {

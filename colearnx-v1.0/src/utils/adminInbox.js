@@ -11,6 +11,9 @@ export function inboxMessages(queues) {
       : source.kind === "certification" ? "Trainer certification" : "Refund request";
     return {
       id: `${source.kind}:${item.id}`, kind: source.kind, sender, title,
+      senderFallback: !item.applicant?.displayName && !item.trainer?.displayName && !item.requester?.displayName,
+      titleKey: source.kind === "role" ? "{role} application" : title,
+      requestedRole: item.requestedRole || "Role",
       status: String(item.status || "unknown").toLowerCase(),
       submittedAt: item.submittedAt || item.requestedAt || item.createdAt || "",
       summary: source.kind === "role" ? item.supportingText

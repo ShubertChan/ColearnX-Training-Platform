@@ -82,7 +82,7 @@ export function passwordChecklist(password, context = {}) {
   return [
     {
       id: "length",
-      label: `At least ${PASSWORD_MIN_LENGTH} characters`,
+      label: { key: "At least {count} characters", values: { count: PASSWORD_MIN_LENGTH } },
       passed: length >= PASSWORD_MIN_LENGTH && length <= PASSWORD_MAX_LENGTH,
     },
     {

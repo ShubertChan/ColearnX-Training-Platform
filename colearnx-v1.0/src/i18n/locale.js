@@ -23,5 +23,13 @@ export function translateText(text, language = "en", values = {}) {
   if (!phrase) return text;
   const translated = language === "zh-CN" && Object.hasOwn(zhCN, phrase) ? zhCN[phrase] : phrase;
   const result = text.slice(0, text.length - text.trimStart().length) + translated + text.slice(text.trimEnd().length);
-  return result.replace(/\{([\w]+)\}/g, (match, name) => Object.hasOwn(values, name) ? String(values[name]) : match);
+  return result.replace(/\{([\w]+)\}/g, (match, name) => {
+    if (!Object.hasOwn(values, name)) return match;
+    const value = values[name];
+    // Only explicit descriptors are translated. Names, titles and other string
+    // values stay verbatim even when they happen to match a catalogue key.
+    return value && typeof value === "object" && typeof value.key === "string"
+      ? translateText(value, language)
+      : String(value);
+  });
 }
