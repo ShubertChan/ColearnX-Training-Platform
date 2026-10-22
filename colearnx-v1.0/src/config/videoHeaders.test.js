@@ -12,6 +12,27 @@ test("runtime Google sign-in permits only its SDK paths and popup communication"
   assert.doesNotMatch(headers, /script-src[^;]*(?:unsafe-inline|unsafe-eval|\*)/);
 });
 
+test("Google iframes inherit one origin-only document policy across feature combinations", () => {
+  for (const env of [
+    {},
+    { VITE_PAYMENTS_API_ENABLED: "true" },
+    { VITE_UPLOAD_ORIGINS: "https://account.r2.cloudflarestorage.com" },
+    {
+      VITE_PAYMENTS_API_ENABLED: "true",
+      VITE_ENABLE_HOSTED_VIDEO: "true",
+      VITE_MEDIA_ORIGINS: "https://media.example",
+      VITE_UPLOAD_ORIGINS: "https://account.r2.cloudflarestorage.com",
+    },
+  ]) {
+    const headers = securityHeaders(env);
+    assert.deepEqual(headers.split("\n").filter(line => line.trim().startsWith("Referrer-Policy:")), [
+      "  Referrer-Policy: strict-origin",
+    ]);
+    assert.match(headers, /frame-ancestors 'none'/);
+    assert.match(headers, /Cross-Origin-Opener-Policy: same-origin-allow-popups/);
+  }
+});
+
 test("onsite payments permit Stripe Elements, wallet permissions and Link popups only when enabled", () => {
   const headers = securityHeaders({ VITE_PAYMENTS_API_ENABLED: "true" });
   assert.match(headers, /script-src 'self' https:\/\/js.stripe.com/);
@@ -37,7 +58,7 @@ test("a full security header set is always emitted, even with hosted video off",
   assert.match(headers, /Strict-Transport-Security: max-age=63072000; includeSubDomains; preload/);
   assert.match(headers, /X-Content-Type-Options: nosniff/);
   assert.match(headers, /X-Frame-Options: DENY/);
-  assert.match(headers, /Referrer-Policy: no-referrer/);
+  assert.match(headers, /Referrer-Policy: strict-origin/);
   // No unconfigured storage origins are allowed.
   assert.doesNotMatch(headers, /cloudflarestorage/);
 });
@@ -52,7 +73,7 @@ test("hosted video adds the exact API/media/R2 origins to connect/media and keep
   assert.match(headers, /connect-src 'self' https:\/\/api.example https:\/\/media.example https:\/\/account.r2.cloudflarestorage.com/);
   assert.match(headers, /media-src 'self' blob: https:\/\/media.example/);
   assert.match(headers, /worker-src 'self' blob:/);
-  assert.match(headers, /Referrer-Policy: no-referrer/);
+  assert.match(headers, /Referrer-Policy: strict-origin/);
 });
 
 test("hosted video rejects a non-origin (path) upload value", () => {

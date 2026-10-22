@@ -30,10 +30,15 @@ async function googleFixture(page) {
 for (const width of [375, 768, 1440]) test(`Google sign-in translates and fits ${width}px`, async ({ page }) => {
   await googleFixture(page);
   await page.setViewportSize({ width, height: 950 });
-  await page.goto('/#/login');
+  const response = await page.goto('/#/login');
+  // A mocked SDK alone cannot detect a deployed document-header regression.
+  // Google's real button iframe inherits this policy; the script attribute is
+  // necessary for its own request but cannot override the iframe's policy.
+  expect(response.headers()['referrer-policy']).toBe('strict-origin');
   const passwordButton = page.getByRole('button', { name: 'Sign in', exact: true });
   const googleButton = page.getByRole('button', { name: 'Sign in with Google', exact: true });
   await expect(googleButton).toBeVisible();
+  await expect(page.locator('script[src="https://accounts.google.com/gsi/client"]')).toHaveAttribute('referrerpolicy', 'strict-origin');
   expect((await googleButton.boundingBox()).y).toBeGreaterThan((await passwordButton.boundingBox()).y);
   await page.getByLabel('Email address').fill('kept@gmail.com');
   await page.getByRole('combobox', { name: 'Language' }).selectOption('zh-CN');
