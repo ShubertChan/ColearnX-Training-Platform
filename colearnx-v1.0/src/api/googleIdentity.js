@@ -20,7 +20,9 @@ export function loadGoogleIdentity() {
   scriptPending = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
-    script.referrerPolicy = 'strict-origin-when-cross-origin';
+    // Match the document policy required by Google's generated button iframe.
+    // Neither same-origin nor cross-origin requests need a path or query string.
+    script.referrerPolicy = 'strict-origin';
     script.async = true;
     const fail = () => { clearTimeout(timer); script.remove(); reject(new Error('Google sign-in could not load. Check your connection and try again.')); };
     const timer = setTimeout(fail, 15000);

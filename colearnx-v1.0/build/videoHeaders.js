@@ -77,7 +77,11 @@ export function securityHeaders(env) {
     "  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload",
     "  X-Content-Type-Options: nosniff",
     "  X-Frame-Options: DENY",
-    "  Referrer-Policy: no-referrer",
+    // Google's generated button iframe inherits the document policy, not the
+    // SDK script's policy. Send only the public origin (never paths or query
+    // parameters), including same-origin requests, and omit HTTPS downgrades.
+    // API response policies and private-media access controls are unaffected.
+    "  Referrer-Policy: strict-origin",
     `  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=${paymentsOn ? '(self "https://js.stripe.com" "https://*.js.stripe.com")' : '()'}, usb=(), interest-cohort=()`,
     "  Cross-Origin-Opener-Policy: same-origin-allow-popups",
     "",
