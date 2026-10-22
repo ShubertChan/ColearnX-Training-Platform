@@ -27,8 +27,14 @@ To point at a separately running backend, copy `.env.example` to `.env.local` an
 
 ```powershell
 npm.cmd test
+npm.cmd run check:i18n
+npm.cmd run test:components
 npm.cmd run build
 ```
+
+Language switching is covered by component tests and `tests/e2e/translation-regressions.spec.js`. Run the browser suite with `npm.cmd run test:e2e` after installing the Playwright browsers. The catalogue check follows shipped imports and API refund-policy text, validates placeholders, and rejects untranslated feedback and translated technical field values. Store dynamic notices as `{ key, values }` and translate them when rendering so an existing notice updates when the language changes. User names, course titles, descriptions and form input remain in their original language.
+
+Stripe payment fields use the language selected when the secure SDK is initialized. Switching the surrounding interface keeps that SDK instance, its entered details and any pending confirmation intact; opening the checkout again initializes the fields in the newly selected language. Payment browser tests use the Stripe fixture and do not exercise a real charge.
 
 The frontend/backend boundary and the server work still required for the reported issues are documented in [docs/FRONTEND_BACKEND_HANDOFF.md](docs/FRONTEND_BACKEND_HANDOFF.md).
 

@@ -374,7 +374,7 @@ export default function Layout({ children }) {
         </header>
         <div className="page-content">
           {role === "Admin" && arrivalCount > 0 && <div className="inbox-arrival" role="status"><Mail size={21} /><span><b>{arrivalCount}{t(" new application ")}{arrivalCount === 1 ? t("message") : t("messages")}</b><small>{t("New requests are waiting in your inbox.")}</small></span><button className="button secondary sm" onClick={() => { dismissArrival(); navigate("/admin/inbox"); }}>{t("Open inbox")}</button><button className="icon-button" aria-label={t("Dismiss new mail notice")} onClick={dismissArrival}><X size={18} /></button></div>}
-          {Object.keys(dataErrors).length > 0 && <div className="data-warning" role="status"><AlertTriangle size={18} /><div><b>{t("Some workspace data could not be refreshed.")}</b><span>{Object.keys(dataErrors).join(", ")}{t(" · your signed-in session remains active.")}</span></div><button className="button secondary sm" onClick={() => void retryAccountData()}><RotateCcw size={14} />{t(" Retry")}</button></div>}
+          {Object.keys(dataErrors).length > 0 && <div className="data-warning" role="status"><AlertTriangle size={18} /><div><b>{t("Some workspace data could not be refreshed.")}</b><span>{Object.keys(dataErrors).map(name => t(name)).join(", ")}{t(" · your signed-in session remains active.")}</span></div><button className="button secondary sm" onClick={() => void retryAccountData()}><RotateCcw size={14} />{t(" Retry")}</button></div>}
           {children}
         </div>
       </main>

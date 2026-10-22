@@ -83,6 +83,26 @@ test("refresh loads the existing payment using its ID without storing its secret
   expect(JSON.stringify(sessionStorage)).not.toContain("cs_test_secret");
 });
 
+test("switching languages retains payment fields and an in-flight confirmation", async () => {
+  let resolve;
+  mocks.confirm.mockReturnValue(new Promise(done => { resolve = done; }));
+  mount(true);
+  const element = await screen.findByTestId("payment-element");
+  ready();
+  fireEvent.click(screen.getByRole("button", { name: /Pay/ }));
+  act(() => setLanguage("zh-CN"));
+  await screen.findByRole("heading", { name: "支付方式" });
+  expect(screen.getByTestId("payment-element")).toBe(element);
+  expect(screen.getByRole("button", { name: "正在处理…" }).disabled).toBe(true);
+  expect(mocks.load).toHaveBeenCalledTimes(1);
+  expect(mocks.stripe).toHaveBeenCalledTimes(1);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Processing…" }).disabled).toBe(true);
+  expect(mocks.confirm).toHaveBeenCalledTimes(1);
+  await act(async () => resolve({ type: "error", error: { message: "We could not confirm this payment. Please try again." } }));
+  expect(screen.getByRole("button", { name: /Pay/ }).disabled).toBe(false);
+});
+
 test("completed sessions return to server reconciliation without loading Stripe", async () => {
   mocks.load.mockResolvedValue({ status: "complete" }); mount(true);
   await waitFor(() => expect(screen.getByTestId("location").textContent).toContain("topUp=processing"));

@@ -29,7 +29,7 @@ function CourseUploadPicker({ video, disabled }) {
       : video.processing ? t("Your video is processing. You can submit for review once it is ready.")
       : t("Another main video cannot be uploaded right now. Check the video status above or refresh it.")}</p>}
     <UploadDropzone onFiles={addFiles} disabled={video.disabled} multiple={false}
-      title={t("Drop video here")} buttonLabel="Choose video"
+      title={t("Drop video here")} buttonLabel={t("Choose video")}
       inputLabel={video.resuming ? "Choose original video to resume" : "Choose course video"}
       accept={VIDEO_UPLOAD_ACCEPT}
       hint={t("One video · up to 4 hours · duration verified after processing")}

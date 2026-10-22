@@ -15,7 +15,7 @@ vi.mock("../../src/context/PlatformContext", () => ({ usePlatform: () => ({
 }) }));
 vi.mock("../../src/context/AdminInboxContext", () => ({ useAdminInbox: () => ({ unreadCount: 0, errors: [], arrivalCount: 0, dismissArrival: vi.fn() }) }));
 import { AuthPage } from "../../src/pages/AuthPages";
-import { CourseDetailPage } from "../../src/pages/MarketplacePlatformPages";
+import { CourseDetailPage, CourseMarketplacePage } from "../../src/pages/MarketplacePlatformPages";
 import Layout from "../../src/components/Layout";
 
 beforeEach(() => {
@@ -78,4 +78,23 @@ test("cross-tab language changes propagate without remounting the form", () => {
   act(() => window.dispatchEvent(new StorageEvent("storage", { key: LANGUAGE_STORAGE_KEY, newValue: "zh-CN" })));
   expect(screen.getByLabelText("电子邮箱")).toBe(field);
   expect(field.value).toBe("keep@example.test");
+});
+
+test("translated category options preserve the original filter value and URL", () => {
+  render(<MemoryRouter initialEntries={["/courses?category=Design"]}><LanguageSwitcher /><CourseMarketplacePage /></MemoryRouter>);
+  fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "zh-CN" } });
+  const filter = screen.getByRole("combobox", { name: "筛选课程类别" });
+  expect(filter.value).toBe("Design");
+  expect(screen.getByRole("option", { name: "设计" }).value).toBe("Design");
+  expect(screen.getByRole("heading", { name: "Home" })).not.toBeNull();
+  fireEvent.change(filter, { target: { value: "" } });
+  fireEvent.change(filter, { target: { value: "Design" } });
+  expect(screen.getByRole("heading", { name: "Home" })).not.toBeNull();
+});
+
+test("nested presentation values translate but names and embedded placeholders remain literal", () => {
+  const notice = { key: "{role} application submitted for administrator review.", values: { role: { key: "Trainer" } } };
+  expect(translateText(notice, "zh-CN")).toBe("讲师申请已提交管理员审核。");
+  expect(translateText(notice, "en")).toBe("Trainer application submitted for administrator review.");
+  expect(translateText("Welcome, {name}.", "zh-CN", { name: "Home {role} <script>" })).toBe("欢迎，Home {role} <script>。");
 });
