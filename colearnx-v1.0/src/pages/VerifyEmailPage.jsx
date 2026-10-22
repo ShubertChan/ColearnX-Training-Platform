@@ -143,7 +143,7 @@ export function VerifyEmailPage() {
             />
           </FormField>
           {error && <div className="form-error" role="alert">{t(error)}</div>}
-          {message && <div className="form-success" role="status">{message}</div>}
+          {message && <div className="form-success" role="status">{t(message)}</div>}
           <Button className="wide" type="submit" disabled={submitting}>
             {submitting ? t("Verifying…") : t("Verify email")}
           </Button>

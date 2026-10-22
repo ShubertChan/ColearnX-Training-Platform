@@ -142,6 +142,7 @@ const transactionPresentation = (transaction) => {
     createdAt: transaction.createdAt,
     type: String(transaction.type || "transaction").replaceAll("_", " "),
     item: String(transaction.reference || "CoLearnX transaction").replaceAll("_", " "),
+    itemTranslationKey: transaction.type === "admin_adjustment" ? "" : String(transaction.reference || "CoLearnX transaction").replaceAll("_", " "),
     category,
     amount,
     deltas,
@@ -671,7 +672,7 @@ export function PlatformProvider({ children }) {
 
   const setRole = (nextRole) => {
     if (!approvedRoles.includes(nextRole)) {
-      notify(`The ${nextRole} workspace has not been assigned to your account.`);
+      notify({ key: "The {role} workspace has not been assigned to your account.", values: { role: { key: nextRole } } });
       return false;
     }
     setRoleState(nextRole);
@@ -693,7 +694,7 @@ export function PlatformProvider({ children }) {
       return false;
     }
     setCart((current) => [...current, nextItem]);
-    notify(`${kind === "content" ? "Resource" : "Course"} added to cart.`);
+    notify(kind === "content" ? "Resource added to cart." : "Course added to cart.");
     return true;
   };
 
@@ -758,7 +759,7 @@ export function PlatformProvider({ children }) {
   const decideRefund = async (refundRequestId, status, decisionReason) => {
     await decideRefundRequest(refundRequestId, { decision: String(status).toLowerCase(), reason: decisionReason });
     await Promise.all([refreshAdminQueues(), refreshWallet(), refreshOrders()]);
-    notify(`Refund request ${String(status).toLowerCase()}.`);
+    notify({ key: "Refund request {status}.", values: { status: { key: String(status).toLowerCase() } } });
     return true;
   };
 
@@ -774,7 +775,7 @@ export function PlatformProvider({ children }) {
       supportingText: supportingText || "Role application submitted through CoLearnX.",
     });
     await refreshMyApplications();
-    notify(`${type} application submitted for administrator review.`);
+    notify({ key: "{role} application submitted for administrator review.", values: { role: { key: type } } });
     return result;
   };
 
@@ -790,14 +791,14 @@ export function PlatformProvider({ children }) {
     setRoleApplications((current) => current.map((application) => application.id === applicationId
       ? { ...application, status: titleCase(status), decisionReason }
       : application));
-    notify(`Role application ${String(status).toLowerCase()}.`);
+    notify({ key: "Role application {status}.", values: { status: { key: String(status).toLowerCase() } } });
     return true;
   };
 
   const decideTrainerCertification = async (certificationId, status, decisionReason) => {
     await decideTrainerCertificationApi(certificationId, { decision: String(status).toLowerCase(), reason: decisionReason });
     await refreshAdminQueues();
-    notify(`Trainer certification ${String(status).toLowerCase()}.`);
+    notify({ key: "Trainer certification {status}.", values: { status: { key: String(status).toLowerCase() } } });
     return true;
   };
 

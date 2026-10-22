@@ -39,8 +39,9 @@ function normalizeWebUrl(value) {
 }
 
 function ServerStatus({ value }) {
+  const { t } = useTranslation();
   const tone = value === "Approved" || value === "Published" ? "success" : value === "Rejected" ? "danger" : "warning";
-  return <Badge tone={tone}>{value}</Badge>;
+  return <Badge tone={tone}>{t(value)}</Badge>;
 }
 
 function RoleApplicationCard({ type, status, onSubmit }) {
@@ -75,13 +76,13 @@ function RoleApplicationCard({ type, status, onSubmit }) {
         </span>
         <div>
           <div className="badge-row"><ServerStatus value={status} /></div>
-          <h3>{type}</h3>
-          <p>{roleCopy[type].description}</p>
+          <h3>{t(type)}</h3>
+          <p>{t(roleCopy[type].description)}</p>
         </div>
       </header>
       {status === "Not applied" || status === "Rejected" ? (
         <Button variant="secondary" onClick={() => setOpen((value) => !value)}>
-          {open ? t("Cancel") : t("Apply for {0}", { 0: type })}
+          {open ? t("Cancel") : t("Apply for {0}", { 0: t(type) })}
         </Button>
       ) : null}
       {open && (
@@ -376,8 +377,8 @@ export function PublishedPage() {
     return (
       <EmptyState
         icon={BookOpen}
-        title={copy.emptyTitle}
-        description={copy.emptyDescription}
+        title={t(copy.emptyTitle)}
+        description={t(copy.emptyDescription)}
         action={<Button onClick={refresh} disabled={loading}>{loading ? t("Refreshing…") : t("Refresh")}</Button>}
       />
     );
@@ -386,7 +387,7 @@ export function PublishedPage() {
   return (
     <Card>
       <div className="card-heading">
-        <div><span className="eyebrow">{t(role)}{t(" workspace")}</span><h2>{copy.title}</h2></div>
+        <div><span className="eyebrow">{t(role)}{t(" workspace")}</span><h2>{t(copy.title)}</h2></div>
         <Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? t("Refreshing…") : t("Refresh")}</Button>
       </div>
       <div className="queue-list">
