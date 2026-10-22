@@ -46,7 +46,7 @@ function TrendChart({ daily }) {
   if (!bars.length) return <p className="empty-copy">{t("No activity in this window.")}</p>;
   const first = bars[0]?.date;
   const last = bars[bars.length - 1]?.date;
-  const label = `Daily security events from ${first} to ${last}; busiest day ${peak} events.`;
+  const label = t("Daily security events from {first} to {last}; busiest day {peak} events.", { first, last, peak });
   return (
     <div className="sec-trend-wrap">
       <div className="sec-trend" role="img" aria-label={label}>
@@ -54,7 +54,7 @@ function TrendChart({ daily }) {
           <div
             key={bar.date}
             className="sec-trend-col"
-            title={t("{0}: {1} event{2}{3}", { 0: bar.date, 1: bar.total, 2: bar.total === 1 ? "" : "s", 3: bar.severe ? ` · ${bar.severe} high/critical` : "" })}
+            title={t(bar.total === 1 ? "{date}: {count} event" : "{date}: {count} events", { date: bar.date, count: bar.total }) + (bar.severe ? t(" · {count} high/critical", { count: bar.severe }) : "")}
           >
             <div className="sec-trend-stack">
               {bar.routine > 0 && (
@@ -240,8 +240,8 @@ export default function AdminSecurityDashboardPage() {
             {typeOptions.map((row) => (
               <li key={row.type}>
                 <button type="button" className="sec-type-row" onClick={() => applyType(row.type)}>
-                  <span className="sec-type-name">{formatEventType(row.type)}</span>
-                  <Badge tone={severityTone(row.severity)}>{severityLabel(row.severity)}</Badge>
+                  <span className="sec-type-name">{t(formatEventType(row.type))}</span>
+                  <Badge tone={severityTone(row.severity)}>{t(severityLabel(row.severity))}</Badge>
                   <b className="sec-type-count">{row.count}</b>
                 </button>
               </li>
@@ -262,7 +262,7 @@ export default function AdminSecurityDashboardPage() {
           <div className="sec-filters">
             <Segmented options={SEVERITY_FILTERS} value={minSeverity} onChange={applySeverity} />
             {typeFilter && (
-              <Button variant="secondary" className="sm" onClick={() => applyType("")}>{t("Clear “")}{formatEventType(typeFilter)}”
+              <Button variant="secondary" className="sm" onClick={() => applyType("")}>{t("Clear “")}{t(formatEventType(typeFilter))}”
               </Button>
             )}
           </div>
@@ -288,9 +288,9 @@ export default function AdminSecurityDashboardPage() {
                   {events.map((event) => (
                     <tr key={event.id}>
                       <td>{formatWhen(event.occurredAt)}</td>
-                      <td><span className="sec-event-type">{formatEventType(event.type)}</span></td>
-                      <td><Badge tone={severityTone(event.severity)}>{severityLabel(event.severity)}</Badge></td>
-                      <td><span className={`sec-decision ${event.decision}`}>{event.decision}</span></td>
+                      <td><span className="sec-event-type">{t(formatEventType(event.type))}</span></td>
+                      <td><Badge tone={severityTone(event.severity)}>{t(severityLabel(event.severity))}</Badge></td>
+                      <td><span className={`sec-decision ${event.decision}`}>{t(event.decision)}</span></td>
                       <td><code className="sec-source">{event.source || "—"}</code></td>
                       <td><code>{shortId(event.actorId)}</code></td>
                     </tr>

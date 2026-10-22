@@ -291,7 +291,7 @@ function TopUpModal({ onClose }) {
               onClick={() => setSelectedPackageId(plan.id)}
             >
               <span>{plan.points}</span>
-              <small>{plan.displayName}</small>
+              <small>{plan.displayName === `${plan.points} points` ? t("{0} points", { 0: plan.points }) : t(plan.displayName)}</small>
               <b>{t("S$")}{(plan.amountMinor / 100).toFixed(2)}</b>
             </button>
           ))}
@@ -374,7 +374,7 @@ function TransactionTable({ transactions }) {
               </td>
               <td>
                 <b>{t(tx.type)}</b>
-                <small className="table-subtitle">{tx.item}</small>
+                <small className="table-subtitle">{tx.itemTranslationKey ? t(tx.itemTranslationKey) : tx.item}</small>
                 {(tx.orderReference || tx.refundReference) && <small className="table-subtitle">{tx.orderReference && t("Order: {0}", { 0: tx.orderReference })}{tx.orderReference && tx.refundReference ? " · " : ""}{tx.refundReference && t("Refund: {0}", { 0: tx.refundReference })}</small>}
               </td>
               <td>

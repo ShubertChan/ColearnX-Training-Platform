@@ -28,9 +28,13 @@ export default function TopUpCheckoutPage() {
 function CheckoutLoader({ paymentTransactionId }) {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
+  const languageRef = useRef(language);
+  languageRef.current = language;
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState(null);
   const [error, setError] = useState("");
+  // Stripe fixes its field locale at initialization. Language changes must not
+  // discard entered payment details or reset an in-flight confirmation.
   useEffect(() => {
     let cancelled = false;
     let expiryTimer;
@@ -44,7 +48,7 @@ function CheckoutLoader({ paymentTransactionId }) {
           navigate(verificationPath(paymentTransactionId), { replace: true });
           return;
         }
-        const stripe = await loadStripe(session.publishableKey, { locale: language === "zh-CN" ? "zh" : "en" });
+        const stripe = await loadStripe(session.publishableKey, { locale: languageRef.current === "zh-CN" ? "zh" : "en" });
         if (cancelled) return;
         if (!stripe) throw new Error("Unable to load secure payment. Please try again.");
         setLoaded({ session, stripe });
@@ -58,7 +62,7 @@ function CheckoutLoader({ paymentTransactionId }) {
     }
     void load();
     return () => { cancelled = true; window.clearTimeout(expiryTimer); };
-  }, [paymentTransactionId, attempt, language, navigate]);
+  }, [paymentTransactionId, attempt, navigate]);
   const options = useMemo(() => loaded ? { clientSecret: loaded.session.clientSecret, elementsOptions: { appearance } } : null, [loaded]);
 
   return <div className="topup-checkout">
