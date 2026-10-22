@@ -12,7 +12,7 @@
 | --- | --- |
 | 仓库根目录 `.github/workflows/ci.yml` | PR、main push、手动和可复用 CI；测试、临时 PostgreSQL 集成检查、构建并保存产物。 |
 | 仓库根目录 `.github/workflows/deploy-staging.yml` | 仅手动发布；同一环境串行运行，先 API 后 Pages，失败停止后续发布。 |
-| `.node-version` | Node.js 22.22.2。 |
+| `.node-version` | Node.js 22.23.4。 |
 | `deployment/staging.json` | 公开域名、项目、支付/视频开关和媒体/上传来源。 |
 | `deployment/package*.json` | 发布工具独立锁文件，Wrangler 固定 4.151.0、pg 固定 8.23.0，并核对 CLI 安装版本与精确版本声明一致。 |
 | `scripts/deployment/source-guard.mjs` | 核对仓库、main、完整 SHA 和迁移确认；拒绝排队期间 main 已变化的旧发布。 |
@@ -29,7 +29,7 @@
 
 除已注明的仓库根目录文件外，路径均相对 `colearnx-v1.0/`。
 
-工作流用 YAML 编排。发布脚本使用 Node.js JavaScript ES Modules（`.mjs`），主要依赖内置 fs、path、crypto、child_process、fetch 和 AbortController；不是另一套 Express 后端。只读数据库连接使用锁定版本的 `pg`，并复用 API 的 TypeScript checksum 帮助函数（Node 22.22.2 原生类型剥离）。Cloudflare 发布使用 Wrangler CLI，Render 发布使用 HTTPS API。
+工作流用 YAML 编排。发布脚本使用 Node.js JavaScript ES Modules（`.mjs`），主要依赖内置 fs、path、crypto、child_process、fetch 和 AbortController；不是另一套 Express 后端。只读数据库连接使用锁定版本的 `pg`，并复用 API 的 TypeScript checksum 帮助函数（Node 22.23.4 原生类型剥离）。Cloudflare 发布使用 Wrangler CLI，Render 发布使用 HTTPS API。
 
 ## 2. 安全边界
 
@@ -67,7 +67,7 @@ Settings → Environments 创建 `staging`，限制部署分支为 main。若套
 | --- | --- |
 | Repository / Branch | ShubertChan/ColearnX-Training-Platform / main |
 | Runtime / Root | 原生 Node / colearnx-v1.0 |
-| Node | 22.22.2；核对 NODE_VERSION 是否覆盖文件。 |
+| Node | 22.23.4；核对 NODE_VERSION 是否覆盖文件。 |
 | Build | `npm --prefix apps/api ci --include=dev && npm --prefix apps/api run build` |
 | Start | `npm --prefix apps/api run start`，也接受等效 `npm --prefix apps/api start` |
 | Pre-deploy | 空，不隐式 migration 或 seed。 |
@@ -143,7 +143,7 @@ last_applied_migration = 020_refund_decision_notifications.sql
 
 ## 6. 本地验证
 
-在 colearnx-v1.0 目录使用 Node 22.22.2：
+在 colearnx-v1.0 目录使用 Node 22.23.4：
 
 ```powershell
 npm ci --include=dev

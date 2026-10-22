@@ -42,7 +42,7 @@ try {
 if ($Action -eq 'Build') {
     # Does not read cloud credentials or start a worker.
     $buildContext = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../apps/video-worker'))
-    & docker --context desktop-linux build --tag $imageName $buildContext
+    & docker --context desktop-linux build --pull --tag $imageName $buildContext
     if ($LASTEXITCODE -ne 0) { throw 'Worker image build failed.' }
     Write-Host 'Batch worker image prepared; no worker was started.'
     return
