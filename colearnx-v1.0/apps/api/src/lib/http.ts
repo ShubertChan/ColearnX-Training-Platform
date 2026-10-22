@@ -11,7 +11,12 @@ export function ok<T>(res: Response, data: T, status = 200, meta: Record<string,
 }
 
 export function errorHandler(error: unknown, _req: Request, res: Response, _next: NextFunction) {
-  const known = error as { status?: number; code?: string };
+  const known = error as { status?: number; code?: string; type?: string };
+  // body-parser rejects compressed requests before decompression. Preserve that
+  // client error without logging attacker-controlled parser data as a server fault.
+  if (known.status === 415 && known.type === 'encoding.unsupported') {
+    error = new ApiError(415, 'UNSUPPORTED_CONTENT_ENCODING', 'Send an uncompressed request body.');
+  }
   const apiError = error instanceof ApiError
     ? error
     : known.status === 429

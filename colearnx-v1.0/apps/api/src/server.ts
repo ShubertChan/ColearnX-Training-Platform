@@ -15,7 +15,7 @@ const app = createApp();
 void primeCredentialVerifier().then((ready) => {
   if (!ready) process.stderr.write('Credential verifier decoy unavailable; login timing defence is degraded.\n');
 });
-const server = app.listen(env.PORT, () => { process.stdout.write(`CoLearnX API listening on port ${env.PORT}\n`); });
+const server = app.listen(env.PORT, () => { process.stdout.write(`CoLearnX API listening on port ${env.PORT}; Node ${process.version}\n`); });
 
 async function shutdown(signal: string) {
   process.stdout.write(`Received ${signal}; shutting down.\n`);
