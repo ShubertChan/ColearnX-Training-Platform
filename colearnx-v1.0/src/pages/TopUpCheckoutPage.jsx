@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, LockKeyhole, ShieldCheck } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js/pure";
@@ -14,9 +14,25 @@ const appearance = {
   variables: { colorPrimary: "#4057d6", colorText: "#172033", colorTextSecondary: "#667085", colorDanger: "#b42318", borderRadius: "8px", fontFamily: "system-ui, sans-serif", fontSizeBase: "16px", spacingUnit: "4px" },
   rules: { ".Input": { boxShadow: "none" }, ".AccordionItem": { boxShadow: "none" } },
 };
-const paymentOptions = { layout: { type: "accordion", defaultCollapsed: false, radios: true, spacedAccordionItems: false }, paymentMethodOrder: ["card", "paynow"], wallets: { applePay: "never", googlePay: "never" } };
+/** @type {import('@stripe/stripe-js').StripeCheckoutPaymentElementOptions} */
+const paymentOptions = { layout: { type: "accordion", defaultCollapsed: false, radios: "always", spacedAccordionItems: false }, paymentMethodOrder: ["card", "paynow"], wallets: { applePay: "never", googlePay: "never" } };
 const expressOptions = { buttonHeight: 48, layout: { maxColumns: 2, maxRows: 2, overflow: "never" }, paymentMethodOrder: ["apple_pay", "link", "google_pay"], buttonTheme: { applePay: "black" } };
 const verificationPath = (id) => `/wallet?topUp=processing&paymentTransactionId=${encodeURIComponent(id)}`;
+export const PAYMENT_LOAD_TIMEOUT_MS = 20000;
+const loadError = "Unable to load secure payment. Please try again.";
+
+// Stripe Elements can throw during creation/mount, before onLoadError exists.
+// Keep those failures inside checkout instead of unmounting the entire app.
+class PaymentBoundary extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
+
+function PaymentUnavailable({ message = loadError, onRetry }) {
+  const { t } = useTranslation();
+  return <section className="topup-checkout-state"><h2>{t("Payment unavailable")}</h2><p role="alert">{t(message)}</p><Button variant="secondary" onClick={onRetry}>{t("Retry")}</Button></section>;
+}
 
 export default function TopUpCheckoutPage() {
   const { paymentTransactionId } = useParams();
@@ -40,6 +56,12 @@ function CheckoutLoader({ paymentTransactionId }) {
     let expiryTimer;
     setLoaded(null);
     setError("");
+    // Neither script injection nor a stalled SDK request guarantees rejection.
+    // Ignore late results from a timed-out attempt, just as on unmount.
+    const loadTimer = window.setTimeout(() => {
+      cancelled = true;
+      setError(loadError);
+    }, PAYMENT_LOAD_TIMEOUT_MS);
     async function load() {
       try {
         const session = await getTopUpCheckoutSession(paymentTransactionId);
@@ -51,6 +73,7 @@ function CheckoutLoader({ paymentTransactionId }) {
         const stripe = await loadStripe(session.publishableKey, { locale: languageRef.current === "zh-CN" ? "zh" : "en" });
         if (cancelled) return;
         if (!stripe) throw new Error("Unable to load secure payment. Please try again.");
+        window.clearTimeout(loadTimer);
         setLoaded({ session, stripe });
         expiryTimer = window.setTimeout(() => {
           setLoaded(null);
@@ -58,20 +81,22 @@ function CheckoutLoader({ paymentTransactionId }) {
         }, Math.max(0, session.expiresAt * 1000 - Date.now()));
       } catch (failure) {
         if (!cancelled) setError(failure.message || "Unable to load secure payment. Please try again.");
+      } finally {
+        window.clearTimeout(loadTimer);
       }
     }
     void load();
-    return () => { cancelled = true; window.clearTimeout(expiryTimer); };
+    return () => { cancelled = true; window.clearTimeout(loadTimer); window.clearTimeout(expiryTimer); };
   }, [paymentTransactionId, attempt, navigate]);
   const options = useMemo(() => loaded ? { clientSecret: loaded.session.clientSecret, elementsOptions: { appearance } } : null, [loaded]);
 
   return <div className="topup-checkout">
     <Link to="/wallet" className="back-link"><ArrowLeft size={16} aria-hidden="true" />{t("Back to wallet")}</Link>
-    {error ? <section className="topup-checkout-state"><h2>{t("Payment unavailable")}</h2><p role="alert">{t(error)}</p><Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>{t("Retry")}</Button></section>
+    {error ? <PaymentUnavailable message={error} onRetry={() => setAttempt(value => value + 1)} />
       : !loaded ? <section className="topup-checkout-state" role="status"><span className="session-spinner" /><p>{t("Loading secure payment…")}</p></section>
-        : <CheckoutElementsProvider stripe={loaded.stripe} options={options}>
+        : <PaymentBoundary fallback={<PaymentUnavailable onRetry={() => setAttempt(value => value + 1)} />}><CheckoutElementsProvider stripe={loaded.stripe} options={options}>
           <TopUpPaymentForm session={loaded.session} paymentTransactionId={paymentTransactionId} onRetry={() => setAttempt(value => value + 1)} />
-        </CheckoutElementsProvider>}
+        </CheckoutElementsProvider></PaymentBoundary>}
   </div>;
 }
 
@@ -88,8 +113,17 @@ export function TopUpPaymentForm({ session, paymentTransactionId, onRetry }) {
   const submitting = useRef(false);
   const amount = new Intl.NumberFormat(formatLocale, { style: "currency", currency: session.currency }).format(session.amountMinor / 100);
 
+  useEffect(() => {
+    if (busy || elementFailed || checkoutState.type === "error" || (checkoutState.type === "success" && ready)) return;
+    const timer = window.setTimeout(() => {
+      setElementFailed(true);
+      setError(loadError);
+    }, PAYMENT_LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [checkoutState.type, ready, elementFailed, busy]);
+
   async function confirm(expressCheckoutConfirmEvent) {
-    if (submitting.current || checkoutState.type !== "success") {
+    if (submitting.current || elementFailed || checkoutState.type !== "success") {
       expressCheckoutConfirmEvent?.paymentFailed({ reason: "fail" });
       return;
     }
@@ -126,19 +160,18 @@ export function TopUpPaymentForm({ session, paymentTransactionId, onRetry }) {
         <h2 id="topup-contact-title">{t("Contact information")}</h2>
         <dl><dt>{t("Email")}</dt><dd>{session.email}</dd></dl>
       </section>
-      {checkoutState.type === "loading" ? <p role="status">{t("Loading secure payment…")}</p>
-        : checkoutState.type === "error" ? <div className="topup-payment-error"><p role="alert">{t("Unable to load secure payment. Please try again.")}</p><Button variant="secondary" onClick={onRetry}>{t("Retry")}</Button></div>
+      {elementFailed || checkoutState.type === "error" ? <div className="topup-payment-error"><p role="alert">{t(loadError)}</p><Button variant="secondary" onClick={onRetry}>{t("Retry")}</Button></div>
+        : checkoutState.type === "loading" ? <p role="status">{t("Loading secure payment…")}</p>
           : <form onSubmit={event => { event.preventDefault(); if (ready && complete && !elementFailed) void confirm(); }}>
             <section aria-labelledby="topup-methods-title">
               <h2 id="topup-methods-title">{t("Payment method")}</h2>
               <PaymentElement options={{ ...paymentOptions, readOnly: busy }} onReady={() => setReady(true)} onChange={event => setComplete(event.complete)} onLoadError={loadFailed} />
             </section>
-            <section className="topup-express" hidden={expressAvailable === false} aria-label={t("Express payment")}>
+            <PaymentBoundary fallback={null}><section className="topup-express" hidden={expressAvailable === false} aria-label={t("Express payment")}>
               {expressAvailable && <div className="topup-payment-divider"><span>{t("Or pay with")}</span></div>}
               <ExpressCheckoutElement options={expressOptions} onReady={event => setExpressAvailable(Boolean(event.availablePaymentMethods && Object.values(event.availablePaymentMethods).some(Boolean)))} onLoadError={() => setExpressAvailable(false)} onConfirm={event => void confirm(event)} />
-            </section>
+            </section></PaymentBoundary>
             {error && <p className="form-error" role="alert">{t(error)}</p>}
-            {elementFailed && <Button type="button" variant="secondary" onClick={onRetry}>{t("Retry")}</Button>}
             <Button type="submit" className="wide topup-pay-button" disabled={busy || !ready || !complete || elementFailed}>
               <LockKeyhole size={17} aria-hidden="true" />{busy ? t("Processing…") : t("Pay {amount}", { amount })}
             </Button>

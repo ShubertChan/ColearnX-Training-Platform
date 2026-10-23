@@ -50,7 +50,19 @@ function stripeFixture() {
     return {
       elements: noop, createToken: noop, createPaymentMethod: noop, confirmCardPayment: noop,
       _registerWrapper: noop, registerAppInfo: noop,
-      initCheckoutElementsSdk: () => ({ on: noop, loadActions: async () => ({ type: "success", actions }), createPaymentElement: () => element("payment"), createExpressCheckoutElement: () => element("express") }),
+      initCheckoutElementsSdk: () => ({
+        on: noop, loadActions: async () => ({ type: "success", actions }),
+        createPaymentElement(options) {
+          // Mirror the SDK contract: a permissive fixture previously hid the
+          // production IntegrationError caused by layout.radios: true.
+          const radios = options?.layout?.radios;
+          if (radios !== undefined && !["always", "never", "auto", "if_multiple"].includes(radios)) {
+            throw new Error("Invalid createPaymentElement options.layout.radios");
+          }
+          return element("payment");
+        },
+        createExpressCheckoutElement: () => element("express"),
+      }),
     };
   };
   window.Stripe.version = "endive";
