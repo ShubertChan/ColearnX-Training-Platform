@@ -1,0 +1,125 @@
+/* Language controls use native selects for keyboard and screen-reader support. */
+html { scrollbar-gutter: stable; }
+html:lang(zh-CN) { font-family: Inter, system-ui, "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+.language-switcher { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; color: var(--muted); padding: 0 9px; min-height: 38px; border: 1px solid var(--line); border-radius: 9px; background: white; }
+.language-switcher select { width: auto; min-width: 94px; max-width: 120px; min-height: 36px; padding: 5px 18px 5px 0; border: 0; border-radius: 0; background-color: transparent; color: var(--ink); font-size: 12px; box-shadow: none; cursor: pointer; }
+.language-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.language-switcher:focus-within { outline: 2px solid var(--brand); outline-offset: 3px; }
+.auth-form-wrap { position: relative; padding-top: 88px; }
+.auth-language { position: absolute; top: 24px; right: 28px; }
+.topbar-actions { flex-shrink: 0; flex-wrap: wrap; }
+
+.home-page { display: grid; gap: 32px; max-width: 1240px; margin: 0 auto; }
+.home-welcome { display: grid; grid-template-columns: minmax(0, 1fr) 230px; align-items: center; gap: 44px; padding: 40px; border: 1px solid #e0e4f3; border-radius: 22px; background: #eef0fc; }
+.home-welcome .eyebrow { color: #4e5b94; font-size: 13px; letter-spacing: .02em; }
+.home-welcome h2 { max-width: 640px; margin: 12px 0 16px; font-size: clamp(28px, 3vw, 42px); line-height: 1.22; letter-spacing: -.035em; font-weight: 750; color: #202953; text-wrap: balance; }
+.home-welcome-copy > p { max-width: 520px; margin: 0 0 25px; color: #56617c; line-height: 1.8; font-size: 14px; }
+.home-welcome .button { min-height: 43px; padding: 11px 17px; }
+.home-welcome .button.secondary { background: #fff; border-color: #d5daed; }
+.home-wallet-summary { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 24px; border: 1px solid #fff; border-radius: 16px; background: rgba(255,255,255,.88); }
+.home-wallet-icon { color: var(--brand); margin-bottom: 7px; }
+.home-wallet-summary > span:not(.home-wallet-icon) { font-size: 12px; font-weight: 600; color: #59647b; }
+.home-wallet-summary strong { display: flex; align-items: baseline; gap: 7px; font-size: 35px; line-height: 1.15; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.home-wallet-summary strong small { font-size: 12px; font-weight: 500; color: #667085; letter-spacing: 0; }
+.home-wallet-summary p { margin: 0; color: var(--muted); font-size: 12px; }
+.home-wallet-summary button { display: inline-flex; gap: 7px; align-items: center; margin-top: 12px; font-size: 12px; }
+.home-page .section-heading { margin: 0 0 16px; }
+.home-page .section-heading h2 { margin: 6px 0 0; font-size: 21px; letter-spacing: -.025em; }
+.home-page .section-heading .eyebrow { color: var(--muted); font-weight: 500; font-size: 12px; }
+.home-page .metric-grid.two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin: 0; }
+.home-page .metric-card { padding: 24px; box-shadow: none; border-radius: 14px; }
+.home-page .metric-card strong { font-size: 29px; font-variant-numeric: tabular-nums; }
+.home-page .metric-card small { margin-top: 5px; font-size: 12px; }
+.home-action-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.home-action-grid .home-action { position: relative; align-items: center; min-height: 116px; padding: 23px; box-shadow: none; border-radius: 14px; border-color: var(--line); }
+.home-action-grid .home-action:hover { border-color: #aab5ef; background: #fafbff; transform: translateY(-2px); box-shadow: 0 6px 20px #24345f09; }
+.home-action-grid .home-action > span { width: 46px; height: 46px; flex-shrink: 0; border-radius: 13px; }
+.home-action-grid .home-action-1 > span { background: #edf7f2; color: #24795a; }
+.home-action-grid .home-action-2 > span { background: #fff4e9; color: #b86c28; }
+.home-action-grid .home-action-3 > span { background: #f1edfc; color: #7756ae; }
+.home-action h3 { font-size: 15px; margin: 0 0 6px; }
+.home-action p { margin: 0; font-size: 12px; line-height: 1.6; }
+.home-action-arrow { margin-left: auto; flex-shrink: 0; color: #8993aa; }
+
+.course-detail-page { max-width: 1240px; margin: 0 auto; }
+.course-detail-page > .back-link { margin: 0 0 20px; font-size: 12px; }
+.course-detail-grid { display: grid; grid-template-columns: minmax(0,1fr) 310px; gap: 24px; align-items: start; }
+.course-detail-main { display: grid; gap: 22px; min-width: 0; }
+.course-overview { padding: 34px; border: 1px solid #e0e4f3; border-radius: 20px; background: #eef0fc; }
+.course-overview-icon { width: 58px; height: 58px; display: grid; place-items: center; color: var(--brand); border-radius: 15px; background: #fff; margin-bottom: 24px; }
+.course-overview h2 { font-size: clamp(26px,2.8vw,38px); line-height: 1.24; letter-spacing: -.035em; margin: 16px 0 25px; overflow-wrap: anywhere; color: #202953; text-wrap: balance; }
+.course-instructor { display: flex; align-items: center; gap: 10px; }
+.course-instructor-avatar { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #d5daed; border-radius: 50%; color: #6573a4; background: #f8f9ff; }
+.course-instructor small { display: block; color: #65708a; font-size: 11px; margin-bottom: 3px; }
+.course-instructor strong, .course-instructor a { font-size: 13px; font-weight: 650; }
+.course-detail-main > .card { padding: 28px; box-shadow: none; border-radius: 16px; }
+.course-detail-main h3 { font-size: 19px; margin: 7px 0 16px; letter-spacing: -.02em; }
+.course-about > p { margin: 0; font-size: 14px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; color: #536079; }
+.course-delivery .purchase-disclosure > b { display: none; }
+.course-delivery .purchase-disclosure ul { margin: 0; padding-left: 20px; }
+.course-delivery .purchase-disclosure li { font-size: 13px; line-height: 1.85; color: #536079; padding-left: 3px; }
+.course-delivery .purchase-disclosure > p { margin: 18px 0 0; padding: 16px; background: #f6f7fb; border: 1px solid #eaedf4; border-radius: 10px; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.course-delivery .purchase-disclosure > p strong { display: block; color: #36415c; margin-bottom: 4px; }
+.course-purchase-card { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 12px; padding: 27px; border: 1px solid #dce1ee; border-radius: 18px; background: #fff; box-shadow: 0 8px 28px #24345f08; }
+.course-purchase-card > .eyebrow { color: #68738b; font-size: 12px; }
+.course-price { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 43px; font-weight: 750; letter-spacing: -.04em; color: #202953; font-variant-numeric: tabular-nums; }
+.course-price > span { font-size: 13px; font-weight: 500; letter-spacing: 0; color: #68738b; }
+.course-purchase-card .button { white-space: normal; text-align: center; min-height: 45px; }
+.course-purchase-card > p { margin: 0; font-size: 12px; line-height: 1.7; }
+.course-purchase-note { display: flex; align-items: center; justify-content: center; gap: 6px; color: #78839b; font-size: 11px !important; }
+.course-purchase-note svg { flex-shrink: 0; }
+.course-facts { margin: 8px 0 0; border-top: 1px solid #eaedf4; }
+.course-facts > div { display: grid; gap: 5px; padding-top: 17px; }
+.course-facts dt { font-size: 11px; color: #7a8499; }
+.course-facts dd { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.6; color: #3d4964; overflow-wrap: anywhere; }
+.course-checkout-hint { padding-top: 13px; border-top: 1px solid #eaedf4; color: #78839b; }
+.payment-reconciliation-notice { margin: 0 0 18px; }
+
+@media (max-width: 1180px) {
+  .home-welcome { gap: 24px; padding: 30px; grid-template-columns: minmax(0,1fr) 200px; }
+  .course-detail-grid { grid-template-columns: minmax(0,1fr) 270px; gap: 18px; }
+  .course-purchase-card { padding: 22px; }
+}
+@media (max-width: 760px) {
+  .home-welcome { padding: 26px; grid-template-columns: 1fr; gap: 24px; }
+  .home-wallet-summary { padding: 19px 22px; display: grid; grid-template-columns: 1fr auto; gap: 5px 18px; align-items: center; }
+  .home-wallet-icon { display: none; }
+  .home-wallet-summary strong { grid-column: 2; grid-row: 1 / 3; font-size: 30px; }
+  .home-wallet-summary button { grid-column: 1; margin-top: 5px; }
+  .home-action-grid { grid-template-columns: 1fr; }
+  .home-page { gap: 26px; }
+  .course-detail-grid { grid-template-columns: 1fr; }
+  .course-detail-main { display: contents; }
+  .course-overview { grid-row: 1; }
+  .course-purchase-card { position: static; grid-row: 2; }
+  .course-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  .course-overview { padding: 26px; }
+  .course-detail-main > .card { padding: 24px; }
+}
+@media (max-width: 600px) {
+  .topbar { flex-wrap: wrap; gap: 12px; padding: 15px; }
+  .topbar-title { min-width: 0; flex: 1 1 120px; }
+  .topbar-title h1 { font-size: 20px; overflow-wrap: anywhere; }
+  .topbar-actions { gap: 8px; }
+  .topbar-actions .icon-button:not(.inbox-button) { display: none; }
+  .topbar-actions .balance-pill { padding: 8px 10px; }
+  .language-switcher { gap: 5px; padding: 0 7px; }
+  .language-switcher select { min-width: 83px; font-size: 12px; }
+  .public-header { flex-wrap: wrap; gap: 12px; }
+  .public-auth-actions { flex-wrap: wrap; }
+  .home-page .metric-grid.two { gap: 12px; }
+  .home-page .metric-card { padding: 18px; flex-wrap: wrap; }
+  .home-page .metric-card .metric-icon { display: none; }
+  .home-welcome h2 { font-size: 30px; }
+  .home-welcome-copy > p { font-size: 13px; }
+  .home-wallet-summary strong { font-size: 27px; }
+  .home-action-grid .home-action { padding: 20px; min-height: 106px; }
+  .course-purchase-card { padding: 23px; }
+  .course-detail-page > .back-link { margin-bottom: 16px; }
+  .course-overview h2 { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-action-grid .home-action { transition: none; }
+  .home-action-grid .home-action:hover { transform: none; }
+}
+.refund-decision-reason { white-space: pre-wrap; overflow-wrap: anywhere; }

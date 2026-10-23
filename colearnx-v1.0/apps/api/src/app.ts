@@ -15,12 +15,14 @@ import { confirmMfaEnrolment, disableMfaForSelf, getMfaStatus, requestStepUp, ro
 import { requireAdminMfa, requireStepUp } from './auth/mfa/guards.js';
 import { listSessions, revokeOtherSessions, revokeSession } from './auth/sessions.js';
 import { authenticate, csrf, forgotPassword, login, logout, me, refresh, register, resendEmailVerification, requireRole, resetPassword, updateMe, verifyEmail, verifyMfaLogin } from './auth/auth.js';
-import { createCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
+import { googleChallenge, googleConfig, googleLogin } from './auth/google.js';
+import { createCheckoutSession, getCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
 import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, deleteContentDraft, deleteCourseDraft, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse, updateCourse } from './catalog/catalog.js';
 import { listContentVersions, listCourseVersions, saveCourseResources, validateCourseResources } from './catalog/publishing-tools.js';
 import { checkout, getOrder, listOrders } from './orders/commerce.js';
 import { createRefundRequest, decideRefund, getRefundRequest, listRefundRequestsForAdmin } from './refunds/service.js';
+import { acknowledgeRefundNotification, listRefundNotifications } from './refunds/notifications.js';
 import { createRoleApplication, createTrainerCertification, decideRoleApplication, decideTrainerCertification, listRoleApplications, listTrainerCertifications, myRoleApplications, myTrainerCertifications } from './governance/governance.js';
 import { getPublicProfile, requestAccountDeletion, requestDataExport } from './account/privacy.js';
 import { addCartItem, listCart, removeCartItem } from './cart/cart.js';
@@ -36,7 +38,7 @@ import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUpload
 import { abortVideoMultipart, completeVideoMultipart, completeVideoUpload, createPlaybackSession, createPreviewPlaybackSession, createVideoUploadIntent, deleteVideoVersion, getCourseVideo, listVideoMultipartParts, listVideoOperations, recordVideoProgress, retryVideo, retryVideoForAdmin, signVideoMultipartPart } from './video/service.js';
 
 
-const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-step-up-token"]', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'req.body.token', 'req.body.mfaToken', 'res.headers.set-cookie'] });
+const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-step-up-token"]', 'req.body.password', 'req.body.passwordConfirmation', 'req.body.code', 'req.body.token', 'req.body.mfaToken', 'req.body.credential', 'res.headers.set-cookie'] });
 // W5 (finding F-06): each limiter uses a Redis-backed store when REDIS_URL is
 // set, so the budget is shared across every API instance instead of living in
 // one process's memory. With no Redis configured, rateLimitStore returns
@@ -93,9 +95,12 @@ export function createApp() {
   app.use(cors({ origin(origin, callback) { if (!origin || origin === env.APP_ORIGIN) return callback(null, true); return callback(new ApiError(403, 'ORIGIN_NOT_ALLOWED', 'The request origin is not allowed.')); }, credentials: true, maxAge: 600 }));
 
   // This route deliberately precedes JSON parsing: Stripe signature verification needs the untouched body bytes.
-  app.post('/api/v1/payments/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), stripeWebhook);
-  app.use(express.json({ limit: '1mb', type: 'application/json' }));
-  app.use(express.urlencoded({ extended: false, limit: '20kb' }));
+  // Clients send uncompressed request bodies. Reject compression before invoking
+  // any decoder, including on the unauthenticated webhook path (CVE-2026-111497).
+  // This is defense in depth; all Node runtimes must also receive security updates.
+  app.post('/api/v1/payments/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb', inflate: false }), stripeWebhook);
+  app.use(express.json({ limit: '1mb', type: 'application/json', inflate: false }));
+  app.use(express.urlencoded({ extended: false, limit: '20kb', inflate: false }));
   app.use(cookieParser());
 
   app.get('/health/live', (_req, res) => ok(res, { status: 'live' }));
@@ -111,6 +116,9 @@ export function createApp() {
   api.post('/auth/verify-email', verificationLimiter, verifyEmail);
   api.post('/auth/resend-verification', verificationLimiter, resendEmailVerification);
   api.post('/auth/login', authLimiter, login);
+  api.get('/auth/google/config', noStore, googleConfig);
+  api.post('/auth/google/challenge', authLimiter, noStore, googleChallenge);
+  api.post('/auth/google', authLimiter, noStore, googleLogin);
   api.post('/auth/refresh', authLimiter, refresh);
   api.get('/profiles/:id', getPublicProfile);
   api.post('/me/data-export', authenticate, mutationLimiter, requestDataExport);
@@ -177,12 +185,15 @@ export function createApp() {
   api.get('/trainer-certifications/me', authenticate, myTrainerCertifications);
 
   api.get('/wallet', authenticate, noStore, wallet);
+  api.get('/notifications/refunds', authenticate, noStore, listRefundNotifications);
+  api.post('/notifications/refunds/:id/read', authenticate, mutationLimiter, noStore, acknowledgeRefundNotification);
   api.get('/wallet/transactions', authenticate, noStore, walletTransactions);
   api.get('/wallet/top-up-packages', topUpPackages);
   api.get('/cart', authenticate, listCart);
   api.post('/cart/items', authenticate, mutationLimiter, addCartItem);
   api.delete('/cart/items/:id', authenticate, mutationLimiter, removeCartItem);
-  api.post('/wallet/top-ups/checkout-session', authenticate, mutationLimiter, createCheckoutSession);
+  api.post('/wallet/top-ups/checkout-session', authenticate, mutationLimiter, noStore, createCheckoutSession);
+  api.get('/wallet/top-ups/:id/checkout-session', authenticate, noStore, getCheckoutSession);
   api.get('/wallet/top-ups/:id', authenticate, getTopUp);
 
   api.post('/checkout', authenticate, mutationLimiter, checkout);

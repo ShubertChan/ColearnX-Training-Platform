@@ -14,6 +14,7 @@ The migration uses UUID public identifiers, UTC `timestamptz`, `bigint` for poin
 - `orders` and `order_items` hold immutable price, seller, delivery, refund-policy and revenue-share snapshots. A course item creates a `course_enrolments` row; a content item creates a `content_access_grants` row.
 - Stripe creates `point_topup_orders` and `payment_transactions`; verified webhook events create a balanced `point_transactions` / `point_ledger_entries` posting and update the point-account balance projection in the same transaction.
 - `admin_action_logs`, `point_transactions`, and `point_ledger_entries` reject ordinary UPDATE and DELETE operations through PostgreSQL triggers.
+- Migration `020_refund_decision_notifications.sql` links `notifications.refund_request_id` uniquely to each reviewed refund. The decision, financial changes, notification and PostgreSQL `NOTIFY` share a transaction. Only an explicit owner acknowledgement sets `is_read` / `read_at`; reconnecting or loading a popup does not consume it. An owner/creation-time partial index supports unread delivery. Existing table grants cover the new column; no runtime schema privileges are added.
 
 ## Important integrity and query support
 

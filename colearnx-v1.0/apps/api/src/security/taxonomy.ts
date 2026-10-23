@@ -78,6 +78,40 @@ export const securityEventSeverity = {
   'access.forbidden': 2,
   'access.origin_rejected': 1,
   'access.rate_limited': 1,
+
+  // --- fund-side risk (W7) ------------------------------------------------
+  // A point account's balance projection disagrees with the sum of its ledger
+  // entries (F-22). High: the ledger is authoritative for real balances, so a
+  // drift is either corruption or an unledgered write path.
+  'finance.ledger_imbalance': 3,
+  // The fund-side rule engine flagged an actor -- refund abuse, self-purchase
+  // or buy-then-refund churn (F-21). Medium by default; the sweep raises the
+  // severity with the risk score, so self-dealing pages an operator.
+  'finance.risk_flagged': 2,
+
+  // --- file and content security (W8) -------------------------------------
+  // The bytes are not what the upload declared (F-09). Medium: usually a
+  // mislabelled file, occasionally a probe; the rate is what matters.
+  'upload.type_mismatch': 2,
+  // A native executable, wherever it was found: renamed to .pdf, or inside a
+  // .zip. Never an accident in course material, so it pages an operator.
+  'upload.executable_blocked': 3,
+  // Decompression bomb, encrypted/ZIP64/path-traversal archive, or a .docx
+  // that is not a Word document or carries a macro project (F-09b).
+  'upload.archive_rejected': 2,
+  // clamd reported a signature. Critical: someone tried to distribute malware
+  // to other learners through the platform.
+  'upload.malware_detected': 4,
+  // The scanner could not give a verdict, so the upload was held (fail
+  // closed). Medium for the same reason as breach_check_unavailable: a
+  // sustained outage blocks every upload.
+  'upload.scan_unavailable': 2,
+  // A signed download URL was issued (F-20). Info: this is the issuance ledger
+  // the download audit reads, not an alert.
+  'content.download_issued': 0,
+  // One account obtained links to the same file from an unusual number of
+  // distinct networks -- the shape of a shared or resold account (F-20).
+  'content.download_anomaly': 2,
 } as const;
 
 export type SecurityEventType = keyof typeof securityEventSeverity;

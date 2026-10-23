@@ -44,6 +44,17 @@ export function getSafeUploadError(error) {
       requestId: "",
     };
   }
+  // W8: the server inspects every file's real content before it is accepted.
+  // These messages are fixed here (and translated), not echoed from the
+  // server, and deliberately do not say which check fired.
+  const securityMessages = {
+    UPLOAD_CONTENT_REJECTED: "This file was blocked by the security check. Upload the original document in a supported format.",
+    UPLOAD_SCAN_UNAVAILABLE: "The file could not be security-checked right now. Wait a moment, then retry the upload.",
+    UPLOAD_OBJECT_CHANGED: "The file changed while it was being checked. Retry the upload.",
+  };
+  if (Object.hasOwn(securityMessages, code)) {
+    return { code, message: securityMessages[code], requestId: error.requestId || "" };
+  }
   if (code === "CONTENT_UPLOAD_PENDING_LIMIT") {
     return {
       code,
