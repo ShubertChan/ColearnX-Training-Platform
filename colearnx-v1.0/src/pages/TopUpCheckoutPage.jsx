@@ -165,12 +165,12 @@ export function TopUpPaymentForm({ session, paymentTransactionId, onRetry }) {
           : <form onSubmit={event => { event.preventDefault(); if (ready && complete && !elementFailed) void confirm(); }}>
             <section aria-labelledby="topup-methods-title">
               <h2 id="topup-methods-title">{t("Payment method")}</h2>
+              <PaymentBoundary fallback={null}><section className="topup-express" hidden={expressAvailable === false} aria-label={t("Express payment")}>
+                <ExpressCheckoutElement options={expressOptions} onReady={event => setExpressAvailable(Boolean(event.availablePaymentMethods && Object.values(event.availablePaymentMethods).some(Boolean)))} onLoadError={() => setExpressAvailable(false)} onConfirm={event => void confirm(event)} />
+                {expressAvailable && <div className="topup-payment-divider"><span>{t("Or use another payment method")}</span></div>}
+              </section></PaymentBoundary>
               <PaymentElement options={{ ...paymentOptions, readOnly: busy }} onReady={() => setReady(true)} onChange={event => setComplete(event.complete)} onLoadError={loadFailed} />
             </section>
-            <PaymentBoundary fallback={null}><section className="topup-express" hidden={expressAvailable === false} aria-label={t("Express payment")}>
-              {expressAvailable && <div className="topup-payment-divider"><span>{t("Or pay with")}</span></div>}
-              <ExpressCheckoutElement options={expressOptions} onReady={event => setExpressAvailable(Boolean(event.availablePaymentMethods && Object.values(event.availablePaymentMethods).some(Boolean)))} onLoadError={() => setExpressAvailable(false)} onConfirm={event => void confirm(event)} />
-            </section></PaymentBoundary>
             {error && <p className="form-error" role="alert">{t(error)}</p>}
             <Button type="submit" className="wide topup-pay-button" disabled={busy || !ready || !complete || elementFailed}>
               <LockKeyhole size={17} aria-hidden="true" />{busy ? t("Processing…") : t("Pay {amount}", { amount })}
