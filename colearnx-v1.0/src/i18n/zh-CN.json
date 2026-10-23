@@ -1279,7 +1279,7 @@
   "Role application submitted through CoLearnX.": "角色申请已提交至 CoLearnX。",
   "Trainer certification submitted for administrator review.": "讲师资质已提交管理员审核。",
   "Refund request submitted for administrator review.": "退款申请已提交管理员审核。",
-  "Refund request submitted. Order history could not refresh; refresh it later.": "退款申请已提交，订单记录无法刷新，请稍后重试。",
+  "Refund request submitted. Order history could not refresh; refresh it later.": "退款申请已提交。订单历史暂时无法刷新，请稍后重试。",
   "Enter at least 3 characters for the refund reason.": "退款原因至少需要 3 个字符。",
   "The refund reason must be no more than 2000 characters.": "退款原因不能超过 2000 个字符。",
   "Current refund evidence is unavailable. The service will recheck your request.": "当前退款凭据不可用，服务端将再次检查您的请求。",
@@ -1671,5 +1671,15 @@
   "Choose {min} or later.": "请选择 {min} 或之后的日期时间。",
   "Choose {max} or earlier.": "请选择 {max} 或之前的日期时间。",
   "Choose a date.": "请选择日期。",
-  "Choose a date and time.": "请选择日期和时间。"
+  "Choose a date and time.": "请选择日期和时间。",
+  "Course added to cart": "课程已加入购物车",
+  "Resource added to cart": "资源已加入购物车",
+  "“{title}” has been added to your shopping cart.": "“{title}”已加入你的购物车。",
+  "View cart": "查看购物车",
+  "Refund request submitted": "退款申请已提交",
+  "Your refund request for “{title}” has been submitted for administrator review. You can check its status in Order History.": "“{title}”的退款申请已提交管理员审核。你可以在订单历史中查看状态。",
+  "Refund successful": "退款成功",
+  "The refund has been approved and the points have been returned to the member's wallet.": "退款已批准，积分已退回会员钱包。",
+  "Refund decision recorded. Some account data could not refresh; refresh it later.": "退款决定已记录。部分账户数据暂时无法刷新，请稍后重试。",
+  "OK": "确定"
 }
