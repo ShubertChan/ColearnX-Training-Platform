@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { setLanguage } from "../../src/i18n/LanguageContext";
 
 const mocks = vi.hoisted(() => ({ summary: vi.fn(), events: vi.fn() }));
 vi.mock("../../src/api/security", () => ({
@@ -58,19 +59,37 @@ const eventsPage = {
 };
 
 beforeEach(() => {
+  setLanguage("en");
   mocks.summary.mockReset();
   mocks.events.mockReset();
   mocks.summary.mockResolvedValue(summary);
   mocks.events.mockResolvedValue(eventsPage);
 });
+afterEach(() => act(() => setLanguage("en")));
 
 const mount = () => render(<MemoryRouter><AdminSecurityDashboardPage /></MemoryRouter>);
+
+test("security event types, severity, decisions and chart descriptions translate without refetching", async () => {
+  mount();
+  await screen.findAllByText("Auth · Login failed");
+  act(() => setLanguage("zh-CN"));
+  expect(screen.getAllByText("身份验证 · 登录失败")).toHaveLength(2);
+  expect(screen.getAllByText("低", { selector: ".badge" }).length).toBeGreaterThan(0);
+  expect(screen.getByText("允许", { selector: ".sec-decision" })).not.toBeNull();
+  expect(screen.getByRole("img").getAttribute("aria-label")).toBe("2026-10-05 至 2026-10-07 的每日安全事件，最多一天 10 起。");
+  expect(document.querySelector('.sec-trend-col').title).toBe("2026-10-05：10 起事件 · 2 起高危或严重事件");
+  expect(mocks.summary).toHaveBeenCalledTimes(1);
+  expect(mocks.events).toHaveBeenCalledTimes(1);
+  act(() => setLanguage("en"));
+  expect(screen.getAllByText("Auth · Login failed")).toHaveLength(2);
+});
 
 test("renders KPI tiles, the trend and a non-identifying event row", async () => {
   mount();
 
   // KPI tiles read from the summary highlights.
-  expect(await screen.findByText("Failed sign-ins")).toBeTruthy();
+  expect((await screen.findAllByText("18")).length).toBeGreaterThan(0);
+  expect(screen.getByText("Failed sign-ins")).toBeTruthy();
   expect(screen.getByText("Account lockouts")).toBeTruthy();
   // 18 appears both as the failed-sign-ins tile and the by-type count.
   expect(screen.getAllByText("18").length).toBeGreaterThan(0);

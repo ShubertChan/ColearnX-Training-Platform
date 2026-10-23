@@ -51,3 +51,18 @@ test("content and course retries send the caller's stable reservation key", asyn
     assert.ok(calls.every(call => call.options.headers["Idempotency-Key"] === "same-request"));
   } finally { apiClient.post = originalPost; }
 });
+
+test("W8 security rejections map to fixed, translatable messages that do not reveal which check fired", async () => {
+  const { getSafeUploadError } = await import("./uploads.js");
+  const rejected = getSafeUploadError({ code: "UPLOAD_CONTENT_REJECTED", message: "server text", requestId: "req-1" });
+  assert.equal(rejected.message, "This file was blocked by the security check. Upload the original document in a supported format.");
+  assert.equal(rejected.requestId, "req-1");
+  assert.doesNotMatch(rejected.message, /executable|malware|virus|zip/i);
+  assert.match(getSafeUploadError({ code: "UPLOAD_SCAN_UNAVAILABLE" }).message, /retry the upload/);
+  assert.match(getSafeUploadError({ code: "UPLOAD_OBJECT_CHANGED" }).message, /Retry the upload/);
+  const { readFile } = await import("node:fs/promises");
+  const catalog = JSON.parse(await readFile(new URL("../i18n/zh-CN.json", import.meta.url), "utf8"));
+  for (const code of ["UPLOAD_CONTENT_REJECTED", "UPLOAD_SCAN_UNAVAILABLE", "UPLOAD_OBJECT_CHANGED"]) {
+    assert.ok(Object.hasOwn(catalog, getSafeUploadError({ code }).message), code);
+  }
+});

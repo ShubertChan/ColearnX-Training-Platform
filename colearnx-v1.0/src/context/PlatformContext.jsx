@@ -1,17 +1,19 @@
+import { useTranslation } from "../i18n/LanguageContext";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCurrentUser,
   getCsrfToken,
   loginAccount,
   logoutAccount,
-  refreshAccount,
   registerAccount,
   resendVerificationEmail,
   updateCurrentUser,
   verifyEmailAddress,
   completeMfaLogin,
 } from "../api/auth";
-import { hasAccessToken, hasCsrfToken, setAccessToken, setCsrfToken } from "../api/client";
+import { hasAccessToken, hasCsrfToken, restoreClientSession, setAccessToken, setCsrfToken } from "../api/client";
+import { loginWithGoogle } from "../api/googleIdentity";
+import { readSessionResource } from "../api/sessionRecovery.js";
 import {
   createContent,
   createCourse,
@@ -56,6 +58,12 @@ import { Link } from "react-router-dom";
 import { Button, Modal } from "../components/ui";
 
 const PlatformContext = createContext(null);
+
+const readSessionIdentity = () => readSessionResource(async (options) => {
+  const user = await getCurrentUser({ ...options, _skipAuthRefresh: true });
+  if (!user?.id) throw Object.assign(new Error("The account service is still connecting. Please try again."), { code: "AUTH_IDENTITY_INVALID", status: 502 });
+  return user;
+});
 
 const roleLabels = {
   member: "Member",
@@ -137,6 +145,7 @@ const transactionPresentation = (transaction) => {
     createdAt: transaction.createdAt,
     type: String(transaction.type || "transaction").replaceAll("_", " "),
     item: String(transaction.reference || "CoLearnX transaction").replaceAll("_", " "),
+    itemTranslationKey: transaction.type === "admin_adjustment" ? "" : String(transaction.reference || "CoLearnX transaction").replaceAll("_", " "),
     category,
     amount,
     deltas,
@@ -252,7 +261,12 @@ const mapPublishedItem = (listing) => ({
 });
 
 export function PlatformProvider({ children }) {
-  const [authenticated, setAuthenticated] = useState(hasAccessToken());
+  const { t } = useTranslation();
+  // A stored bearer token is only a hint until the server confirms identity.
+  const [authenticated, setAuthenticated] = useState(false);
+  const sessionRestore = useRef(null);
+  const authRequestRevision = useRef(0);
+  const mounted = useRef(true);
   const [role, setRoleState] = useState("Member");
   const [approvedRoles, setApprovedRoles] = useState(["Member"]);
   const [profile, setProfile] = useState({ name: "", email: "", phone: "", location: "", bio: "" });
@@ -288,7 +302,6 @@ export function PlatformProvider({ children }) {
   const [successDialog, setSuccessDialog] = useState(null);
   const adminRoleRequestRevision = useRef(0);
   const ordersRequestRevision = useRef(0);
-  const observedRefunds = useRef(null);
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -360,10 +373,6 @@ export function PlatformProvider({ children }) {
     const details = await Promise.all(summaries.map((order) => getOrder(order.id)));
     const nextOrders = details.map(mapOrder);
     if (requestRevision !== ordersRequestRevision.current) return [];
-    const refundedItems = nextOrders.flatMap((order) => order.items).filter((item) => item.fulfilmentStatus === "refunded");
-    const newlyRefunded = observedRefunds.current && refundedItems.filter((item) => observedRefunds.current.has(item.id) && observedRefunds.current.get(item.id) !== "refunded");
-    observedRefunds.current = new Map(nextOrders.flatMap((order) => order.items.map((item) => [item.id, item.fulfilmentStatus])));
-    if (newlyRefunded?.length) setSuccessDialog({ title: "Refund successful", message: `${newlyRefunded.map((item) => `“${item.title}”`).join(", ")} ${newlyRefunded.length === 1 ? "has" : "have"} been refunded. The points have been returned to your wallet.` });
     setOrders(mergeConfirmedOrders(nextOrders, confirmedOrders.current));
     const acknowledgedIds = new Set(nextOrders.map((order) => order.id));
     confirmedOrders.current = confirmedOrders.current.filter((order) => !acknowledgedIds.has(order.id));
@@ -457,7 +466,6 @@ export function PlatformProvider({ children }) {
       accountId.current = user.id;
       confirmedOrders.current = [];
       pendingCheckout.current = null;
-      observedRefunds.current = null;
       setSuccessDialog(null);
       setOrders([]); setTransactions([]); setBalance(0);
       setPublishedItems([]); setTrainerCertifications([]); setAdminTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
@@ -499,47 +507,66 @@ export function PlatformProvider({ children }) {
     return { ok: !Object.keys(failures).length, failures };
   }, [refreshAdminQueues, refreshCatalog, refreshMyApplications, refreshMyListings, refreshMyTrainerCertifications, refreshOrders, refreshWallet, trackDataset]);
 
-  const restoreSession = useCallback(async () => {
+  const restoreSession = useCallback(() => {
+    if (sessionRestore.current) return sessionRestore.current;
+    const revision = authRequestRevision.current;
+    const current = () => mounted.current && revision === authRequestRevision.current;
     setAccountLoading(true); setAccountError("");
-    try {
-      if (hasAccessToken()) {
-        try {
-          const user = await getCurrentUser();
-          const roles = applyServerIdentity(user);
-          void refreshAccountData(roles);
-          return true;
-        } catch (error) {
-          if (![401, 403].includes(error.status)) {
-            setAccountError(error.message);
-            return false;
+    const request = (async () => {
+      try {
+        let user;
+        if (hasAccessToken()) {
+          try {
+            user = await readSessionIdentity();
+          } catch (error) {
+            if (![401, 403].includes(error.status)) throw error;
           }
-          setAccessToken("");
         }
+        if (!current()) return false;
+        if (!user) {
+          const refreshed = await restoreClientSession();
+          if (!current()) return false;
+          user = refreshed.user || await readSessionIdentity();
+        }
+        if (!current()) return false;
+        const roles = applyServerIdentity(user);
+        void refreshAccountData(roles);
+        return true;
+      } catch (error) {
+        if (!current()) return false;
+        if ([401, 403].includes(error.status)) {
+          setAccessToken(""); setCsrfToken(""); setAuthenticated(false);
+        } else {
+          // A timeout is not proof that the user's credentials have expired.
+          setAccountError(error.message);
+        }
+        return false;
+      } finally {
+        if (current()) {
+          setAccountLoading(false);
+          // Do not race public catalog requests against initial cookie rotation.
+          void refreshCatalog();
+        }
+        if (sessionRestore.current === request) sessionRestore.current = null;
       }
-      const csrf = await getCsrfToken();
-      if (!csrf.csrfToken) return false;
-      setCsrfToken(csrf.csrfToken);
-      const refreshed = await refreshAccount();
-      setAccessToken(refreshed.accessToken);
-      setCsrfToken(refreshed.csrfToken);
-      const roles = applyServerIdentity(refreshed.user);
-      void refreshAccountData(roles);
-      return true;
-    } catch (error) {
-      setAccessToken("");
-      setCsrfToken("");
-      setAuthenticated(false);
-      if (![401, 403].includes(error.status)) setAccountError(error.message);
-      return false;
-    } finally {
-      setAccountLoading(false);
-    }
-  }, [applyServerIdentity, refreshAccountData]);
+    })();
+    sessionRestore.current = request;
+    return request;
+  }, [applyServerIdentity, refreshAccountData, refreshCatalog]);
 
   useEffect(() => {
-    void refreshCatalog();
-    restoreSession();
-  }, [refreshCatalog, restoreSession]);
+    mounted.current = true;
+    void restoreSession();
+    return () => { mounted.current = false; };
+  }, [restoreSession]);
+
+  const beginAuthentication = async () => {
+    // The public form stays mounted while bootstrap runs. Serialize submission
+    // with it so a late recovery cannot overwrite a newly signed-in identity.
+    authRequestRevision.current += 1;
+    await sessionRestore.current;
+    setAccountLoading(false); setAccountError("");
+  };
 
   // Shared tail of both sign-in paths. Kept in one place so the second-factor
   // route cannot drift from the single-factor one -- a session established by
@@ -556,6 +583,7 @@ export function PlatformProvider({ children }) {
   };
 
   const signIn = async ({ email, password }) => {
+    await beginAuthentication();
     const result = await loginAccount({ email, password });
     // No session is issued yet when a second factor is enrolled. The caller
     // must collect a code and call completeSignIn; nothing here is stored in
@@ -567,17 +595,27 @@ export function PlatformProvider({ children }) {
   };
 
   const completeSignIn = async ({ mfaToken, code }) => {
+    await beginAuthentication();
     const result = await completeMfaLogin({ mfaToken, code });
     const session = await establishSession(result);
     return { ...session, usedRecoveryCode: result.usedRecoveryCode, recoveryCodesRemaining: result.recoveryCodesRemaining };
   };
 
+  const signInWithGoogle = async (input) => {
+    await beginAuthentication();
+    const result = await loginWithGoogle(input);
+    if (result.mfaRequired || result.registrationRequired) return result;
+    return establishSession(result);
+  };
+
   const registerMember = async ({ name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged }) => {
+    await beginAuthentication();
     const result = await registerAccount({ displayName: name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged });
     return result;
   };
 
   const verifyRegistrationEmail = async (input) => {
+    await beginAuthentication();
     const result = await verifyEmailAddress(input);
     if (!result.authenticated || !result.user || !result.accessToken || !result.csrfToken) {
       return result;
@@ -608,6 +646,9 @@ export function PlatformProvider({ children }) {
 
   const signOut = async () => {
     setSuccessDialog(null);
+    authRequestRevision.current += 1;
+    await sessionRestore.current;
+    setAccountLoading(false);
     sessionRevision.current += 1;
     adminRoleRequestRevision.current += 1;
     try {
@@ -628,7 +669,6 @@ export function PlatformProvider({ children }) {
     setCapabilities({});
     accountId.current = ""; confirmedOrders.current = [];
     pendingCheckout.current = null;
-    observedRefunds.current = null;
     setCart([]); setCartOwner(""); setAccountError(""); setDataErrors({}); setPurchaseSyncWarning("");
     setPublishedItems([]); setTrainerCertifications([]); setAdminTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
     setOrders([]);
@@ -639,7 +679,7 @@ export function PlatformProvider({ children }) {
 
   const setRole = (nextRole) => {
     if (!approvedRoles.includes(nextRole)) {
-      notify(`The ${nextRole} workspace has not been assigned to your account.`);
+      notify({ key: "The {role} workspace has not been assigned to your account.", values: { role: { key: nextRole } } });
       return false;
     }
     setRoleState(nextRole);
@@ -663,7 +703,7 @@ export function PlatformProvider({ children }) {
     setCart((current) => [...current, nextItem]);
     setSuccessDialog({
       title: `${kind === "content" ? "Resource" : "Course"} added to cart`,
-      message: `“${item.title}” has been added to your shopping cart.`,
+      message: { key: "“{title}” has been added to your shopping cart.", values: { title: item.title } },
       action: { to: "/cart", label: "View cart" },
       closeLabel: "Continue browsing",
     });
@@ -725,7 +765,7 @@ export function PlatformProvider({ children }) {
     const result = await createRefundRequest({ orderItemId: course.orderItemId, reason }, requestKey);
     if (!result?.id) throw new Error("The service did not confirm the refund request. Retry to check its status.");
     if (revision !== sessionRevision.current) return result;
-    setSuccessDialog({ title: "Refund request submitted", message: `Your refund request for “${course.title}” has been submitted for administrator review. You can check its status in Order History.` });
+    setSuccessDialog({ title: "Refund request submitted", message: { key: "Your refund request for “{title}” has been submitted for administrator review. You can check its status in Order History.", values: { title: course.title } } });
     try { await refreshOrders(); }
     catch { notify("Refund request submitted. Order history could not refresh; refresh it later."); }
     return result;
@@ -738,7 +778,7 @@ export function PlatformProvider({ children }) {
     if (String(status).toLowerCase() === "approved") {
       setSuccessDialog({ title: "Refund successful", message: "The refund has been approved and the points have been returned to the member's wallet." });
     } else {
-      notify(`Refund request ${String(status).toLowerCase()}.`);
+      notify({ key: "Refund request {status}.", values: { status: { key: String(status).toLowerCase() } } });
     }
     const updates = await Promise.allSettled([refreshAdminQueues(), refreshWallet(), refreshOrders()]);
     if (updates.some((update) => update.status === "rejected" || update.value === false)) notify("Refund decision recorded. Some account data could not refresh; refresh it later.");
@@ -757,7 +797,7 @@ export function PlatformProvider({ children }) {
       supportingText: supportingText || "Role application submitted through CoLearnX.",
     });
     await refreshMyApplications();
-    notify(`${type} application submitted for administrator review.`);
+    notify({ key: "{role} application submitted for administrator review.", values: { role: { key: type } } });
     return result;
   };
 
@@ -773,14 +813,14 @@ export function PlatformProvider({ children }) {
     setRoleApplications((current) => current.map((application) => application.id === applicationId
       ? { ...application, status: titleCase(status), decisionReason }
       : application));
-    notify(`Role application ${String(status).toLowerCase()}.`);
+    notify({ key: "Role application {status}.", values: { status: { key: String(status).toLowerCase() } } });
     return true;
   };
 
   const decideTrainerCertification = async (certificationId, status, decisionReason) => {
     await decideTrainerCertificationApi(certificationId, { decision: String(status).toLowerCase(), reason: decisionReason });
     await refreshAdminQueues();
-    notify(`Trainer certification ${String(status).toLowerCase()}.`);
+    notify({ key: "Trainer certification {status}.", values: { status: { key: String(status).toLowerCase() } } });
     return true;
   };
 
@@ -898,6 +938,7 @@ export function PlatformProvider({ children }) {
     toast,
     notify,
     signIn,
+    signInWithGoogle,
     completeSignIn,
     registerMember,
     verifyRegistrationEmail,
@@ -938,10 +979,10 @@ export function PlatformProvider({ children }) {
 
   return <PlatformContext.Provider value={value}>
     {children}
-    {successDialog && <Modal title={successDialog.title} onClose={() => setSuccessDialog(null)} footer={<>
-      <Button variant={successDialog.action ? "secondary" : "primary"} onClick={() => setSuccessDialog(null)}>{successDialog.closeLabel || "OK"}</Button>
-      {successDialog.action && <Link className="button primary" to={successDialog.action.to} onClick={() => setSuccessDialog(null)}>{successDialog.action.label}</Link>}
-    </>}><p className="action-success-message">{successDialog.message}</p></Modal>}
+    {successDialog && <Modal title={t(successDialog.title)} onClose={() => setSuccessDialog(null)} footer={<>
+      <Button variant={successDialog.action ? "secondary" : "primary"} onClick={() => setSuccessDialog(null)}>{t(successDialog.closeLabel || "OK")}</Button>
+      {successDialog.action && <Link className="button primary" to={successDialog.action.to} onClick={() => setSuccessDialog(null)}>{t(successDialog.action.label)}</Link>}
+    </>}><p className="action-success-message">{typeof successDialog.message === "string" ? t(successDialog.message) : t(successDialog.message.key, successDialog.message.values)}</p></Modal>}
   </PlatformContext.Provider>;
 }
 

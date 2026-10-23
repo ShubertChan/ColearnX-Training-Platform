@@ -35,6 +35,8 @@ Authenticated routes require `Authorization: Bearer <access-token>`. The refresh
 | GET | `/orders`, `/orders/:id` | Order history/detail. |
 | GET/POST/DELETE | `/cart`, `/cart/items`, `/cart/items/:id` | Durable Member-only draft cart. Prices and policy previews are informational; checkout always re-locks the product server-side. |
 | POST/GET | `/refund-requests`, `/refund-requests/:id` | Submit and inspect a policy-evaluated refund request. |
+| GET | `/notifications/refunds` | Authenticated buyer's unread refund decisions, oldest first, at most 20. Optional `?wait=1` waits up to 20 seconds for a committed decision. Returns `{ id, refundRequestId, status, itemTitle, decisionReason, points, orderId, createdAt }[]`. Reads do not mark notices read. `Cache-Control: no-store`. |
+| POST | `/notifications/refunds/:id/read` | Explicitly acknowledge an owned refund notice. Returns `{ id, read: true }`; repeat acknowledgements succeed, foreign/nonexistent IDs return 404. `Cache-Control: no-store`. |
 | POST/GET | `/role-applications`, `/role-applications/me` | Request trainer or creator role and inspect decisions. |
 | POST/GET | `/trainer-certifications`, `/trainer-certifications/me` | Trainer certification workflow. |
 | GET | `/my/listings` | Current trainer/creator's own course drafts, course submissions, content drafts and content submissions. |

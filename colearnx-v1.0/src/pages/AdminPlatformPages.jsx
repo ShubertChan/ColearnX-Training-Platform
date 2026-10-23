@@ -1,3 +1,4 @@
+import { getFormatLocale, useTranslation } from "../i18n/LanguageContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -42,14 +43,16 @@ import {
 } from "../utils/adminReviewAssets";
 
 const titleCase = (value) => String(value || "").replace(/(^|_)([a-z])/g, (_match, _prefix, letter) => letter.toUpperCase());
-const Status = ({ value }) => <Badge tone={String(value).toLowerCase() === "approved" || String(value).toLowerCase() === "published" ? "success" : String(value).toLowerCase() === "rejected" ? "danger" : "warning"}>{titleCase(value)}</Badge>;
+const Status = ({ value }) => { const { t } = useTranslation(); return (<Badge tone={String(value).toLowerCase() === "approved" || String(value).toLowerCase() === "published" ? "success" : String(value).toLowerCase() === "rejected" ? "danger" : "warning"}>{t(titleCase(value))}</Badge>); };
 
 function DecisionButtons({ onDecision, busy, approveValue = "approved", approvalDisabled = false }) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState("");
-  return <div className="queue-actions"><input aria-label="Decision reason" placeholder="Decision reason" value={reason} onChange={(event) => setReason(event.target.value)} /><Button className="sm" disabled={busy || approvalDisabled || reason.trim().length < 3} onClick={() => onDecision(approveValue, reason.trim())}><CheckCircle2 size={14} /> Approve</Button><Button className="sm danger" disabled={busy || reason.trim().length < 3} onClick={() => onDecision("rejected", reason.trim())}><XCircle size={14} /> Reject</Button></div>;
+  return <div className="queue-actions"><input aria-label={t("Decision reason")} placeholder={t("Decision reason")} value={reason} onChange={(event) => setReason(event.target.value)} /><Button className="sm" disabled={busy || approvalDisabled || reason.trim().length < 3} onClick={() => onDecision(approveValue, reason.trim())}><CheckCircle2 size={14} />{t(" Approve")}</Button><Button className="sm danger" disabled={busy || reason.trim().length < 3} onClick={() => onDecision("rejected", reason.trim())}><XCircle size={14} />{t(" Reject")}</Button></div>;
 }
 
 export function ContentReviewActions({ item, busy, onDecision }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [previewedAssetKeys, setPreviewedAssetKeys] = useState(() => new Set());
   const [previewBusyKey, setPreviewBusyKey] = useState("");
@@ -112,10 +115,10 @@ export function ContentReviewActions({ item, busy, onDecision }) {
             onClick={() => setExpanded((current) => !current)}
           >
             <Paperclip size={14} />
-            {fileCount} {fileCount === 1 ? "file" : "files"}
+            {fileCount} {fileCount === 1 ? t("file") : t("files")}
             <ChevronDown className={expanded ? "expanded" : ""} size={14} />
           </Button>
-          <small>{readyCount} ready · {previewedAssetKeys.size} reviewed</small>
+          <small>{readyCount}{t(" ready · ")}{previewedAssetKeys.size}{t(" reviewed")}</small>
         </div>
         <DecisionButtons
           approveValue="published"
@@ -129,12 +132,11 @@ export function ContentReviewActions({ item, busy, onDecision }) {
         <div className="content-review-files" id={filesPanelId}>
           <div className="content-review-files-heading">
             <div>
-              <b>Uploaded files</b>
-              <small>Open each verified attachment before publishing this content.</small>
+              <b>{t("Uploaded files")}</b>
+              <small>{t("Open each verified attachment before publishing this content.")}</small>
             </div>
             <Badge tone={allPreviewed ? "success" : "info"}>
-              {readyAssetEntries.filter(({ key }) => previewedAssetKeys.has(key)).length}/{readyAssetEntries.length} reviewed
-            </Badge>
+              {readyAssetEntries.filter(({ key }) => previewedAssetKeys.has(key)).length}/{readyAssetEntries.length}{t(" reviewed")}</Badge>
           </div>
           {assets.length ? (
             <div className="content-review-file-list">
@@ -149,41 +151,42 @@ export function ContentReviewActions({ item, busy, onDecision }) {
                       <b>{asset.filename}</b>
                       <small>{asset.mediaType} · {formatReviewFileSize(asset.sizeBytes)}</small>
                     </div>
-                    <Badge tone={ready ? "success" : "warning"}>{titleCase(asset.status)}</Badge>
+                    <Badge tone={ready ? "success" : "warning"}>{t(titleCase(asset.status))}</Badge>
                     <Button
                       type="button"
                       className="sm"
                       variant="secondary"
-                      aria-label={`${reviewed ? "Preview again" : "Preview"} ${asset.filename}`}
+                      aria-label={t(reviewed ? "Preview again {filename}" : "Preview {filename}", { filename: asset.filename })}
                       disabled={!ready || busy || Boolean(previewBusyKey)}
                       onClick={() => preview(asset, index)}
                     >
                       {reviewed ? <CheckCircle2 size={14} /> : <ExternalLink size={14} />}
-                      {previewBusyKey === assetKey ? "Opening…" : readyPreview?.key === assetKey ? "Open preview" : reviewed ? "Preview again" : "Preview file"}
+                      {previewBusyKey === assetKey ? t("Opening…") : readyPreview?.key === assetKey ? t("Open preview") : reviewed ? t("Preview again") : t("Preview file")}
                     </Button>
                   </div>
                 );
               })}
             </div>
-          ) : <p className="empty-copy">No uploaded files were found for this submission.</p>}
+          ) : <p className="empty-copy">{t("No uploaded files were found for this submission.")}</p>}
         </div>
       )}
 
-      {previewError && <p className="form-error" role="alert">{previewError}</p>}
+      {previewError && <p className="form-error" role="alert">{t(previewError)}</p>}
       {!allFilesReady && assets.length > 0 && (
-        <small className="muted">Every uploaded file must finish verification before publishing.</small>
+        <small className="muted">{t("Every uploaded file must finish verification before publishing.")}</small>
       )}
       {allFilesReady && !allPreviewed && (
-        <small className="muted">Preview every verified file before publishing.</small>
+        <small className="muted">{t("Preview every verified file before publishing.")}</small>
       )}
       {!assets.length && (
-        <small className="muted">At least one verified file is required before publishing.</small>
+        <small className="muted">{t("At least one verified file is required before publishing.")}</small>
       )}
     </div>
   );
 }
 
 export function AdminDashboardPage() {
+  const { t } = useTranslation();
   const { roleApplications, refundRequests, refreshAdminQueues } = usePlatform();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -193,9 +196,9 @@ export function AdminDashboardPage() {
     setQueueError("");
     try {
       const result = await refreshAdminQueues();
-      if (result.errors?.roles) setQueueError(`Role applications could not be refreshed: ${result.errors.roles.message}`);
+      if (result.errors?.roles) setQueueError({ key: "Role applications could not be refreshed: {error}", values: { error: { key: result.errors.roles.message } } });
     } catch (loadError) {
-      setQueueError(`Administrator queues could not be refreshed: ${loadError.message}`);
+      setQueueError({ key: "Administrator queues could not be refreshed: {error}", values: { error: { key: loadError.message } } });
     } finally {
       setLoading(false);
     }
@@ -204,7 +207,7 @@ export function AdminDashboardPage() {
   const pendingRoleApplications = roleApplications.filter((item) => item.status === "Pending");
   const pendingRoles = pendingRoleApplications.length;
   const pendingRefunds = refundRequests.filter((item) => item.status === "Pending").length;
-  return <><section className="hero-banner"><div><span className="eyebrow light">Administrator workspace</span><h2>Review platform queues</h2><p>Every decision below is sent to the server and audited; no administrator action changes only this browser.</p><div className="button-row"><Button onClick={() => navigate("/admin/applications")}>Review applications <ArrowRight size={16} /></Button><Button variant="glass" onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh queues"}</Button></div></div><ShieldCheck size={54} /></section>{queueError && <p className="form-error" role="alert">{queueError}</p>}<div className="metric-grid three"><Metric label="Pending role applications" value={pendingRoles} detail="Open Role Applications to review each applicant" icon={Users} /><Metric label="Pending refunds" value={pendingRefunds} detail="Policy-evaluated requests" icon={ClipboardCheck} /><Metric label="Catalogue reviews" value="Open catalogue page" detail="Submitted courses and content" icon={BookOpen} /></div><Card><div className="card-heading"><div><span className="eyebrow">Role governance</span><h3>Pending applicants</h3><p>See who is waiting for Creator or Trainer access before opening the full review.</p></div><Button variant="secondary" onClick={() => navigate("/admin/applications")}>Open review queue <ArrowRight size={15} /></Button></div>{pendingRoleApplications.length ? <div className="queue-list">{pendingRoleApplications.slice(0, 4).map((application) => <div key={application.id}><span className="admin-user-avatar">{displayValue(application.user).slice(0, 1).toUpperCase()}</span><div><b>{displayValue(application.user)}</b><small>{application.type} application</small><span className="queue-detail">Submitted {application.submittedAt ? new Date(application.submittedAt).toLocaleString() : "date unavailable"}</span></div><Badge tone="warning">Pending</Badge></div>)}</div> : <p className="empty-copy">No role applications are waiting for review.</p>}</Card></>;
+  return <><section className="hero-banner"><div><span className="eyebrow light">{t("Administrator workspace")}</span><h2>{t("Review platform queues")}</h2><p>{t("Every decision below is sent to the server and audited; no administrator action changes only this browser.")}</p><div className="button-row"><Button onClick={() => navigate("/admin/applications")}>{t("Review applications ")}<ArrowRight size={16} /></Button><Button variant="glass" onClick={refresh} disabled={loading}>{loading ? t("Refreshing…") : t("Refresh queues")}</Button></div></div><ShieldCheck size={54} /></section>{queueError && <p className="form-error" role="alert">{t(queueError)}</p>}<div className="metric-grid three"><Metric label={t("Pending role applications")} value={pendingRoles} detail={t("Open Role Applications to review each applicant")} icon={Users} /><Metric label={t("Pending refunds")} value={pendingRefunds} detail={t("Policy-evaluated requests")} icon={ClipboardCheck} /><Metric label={t("Catalogue reviews")} value={t("Open catalogue page")} detail={t("Submitted courses and content")} icon={BookOpen} /></div><Card><div className="card-heading"><div><span className="eyebrow">{t("Role governance")}</span><h3>{t("Pending applicants")}</h3><p>{t("See who is waiting for Creator or Trainer access before opening the full review.")}</p></div><Button variant="secondary" onClick={() => navigate("/admin/applications")}>{t("Open review queue ")}<ArrowRight size={15} /></Button></div>{pendingRoleApplications.length ? <div className="queue-list">{pendingRoleApplications.slice(0, 4).map((application) => <div key={application.id}><span className="admin-user-avatar">{displayValue(application.user).slice(0, 1).toUpperCase()}</span><div><b>{displayValue(application.user)}</b><small>{t(application.type)}{t(" application")}</small><span className="queue-detail">{t("Submitted ")}{application.submittedAt ? new Date(application.submittedAt).toLocaleString(getFormatLocale()) : t("date unavailable")}</span></div><Badge tone="warning">{t("Pending")}</Badge></div>)}</div> : <p className="empty-copy">{t("No role applications are waiting for review.")}</p>}</Card></>;
 }
 
 const accountStatusTone = (status) => status === "active" ? "success" : status === "suspended" ? "warning" : "danger";
@@ -212,6 +215,7 @@ const applicationStatusTone = (status) => status === "Approved" ? "success" : st
 const displayValue = (value) => String(value || "").trim() || "Not supplied";
 
 export function AdminRoleApplicationsPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedId = searchParams.get("application");
   const { refresh: refreshInbox } = useAdminInbox();
@@ -315,55 +319,56 @@ export function AdminRoleApplicationsPage() {
   return <div className="stack">
     <Card>
       <div className="card-heading">
-        <div><span className="eyebrow">Role governance</span><h2>Applicant review queue</h2><p>Review the applicant identity and submitted evidence before granting Creator or Trainer access.</p></div>
-        <div className="button-row"><Badge tone={statusFilter === "Pending" ? "warning" : "neutral"}>{filteredApplications.length} {statusFilter.toLowerCase()}</Badge><Button variant="secondary" onClick={refresh} disabled={loading || Boolean(busy)}>{loading ? "Refreshing…" : "Refresh"}</Button></div>
+        <div><span className="eyebrow">{t("Role governance")}</span><h2>{t("Applicant review queue")}</h2><p>{t("Review the applicant identity and submitted evidence before granting Creator or Trainer access.")}</p></div>
+        <div className="button-row"><Badge tone={statusFilter === "Pending" ? "warning" : "neutral"}>{filteredApplications.length} {statusFilter.toLowerCase()}</Badge><Button variant="secondary" onClick={refresh} disabled={loading || Boolean(busy)}>{loading ? t("Refreshing…") : t("Refresh")}</Button></div>
       </div>
       <div className="role-application-toolbar">
-        <label><span>Status</span><select aria-label="Filter role applications" value={statusFilter} disabled={loading || Boolean(busy)} onChange={(event) => { setSearchParams({}); setStatusFilter(event.target.value); setSelectedId(""); setDecisionReason(""); }}><option>Pending</option><option>Approved</option><option>Rejected</option><option>All</option></select></label>
-        <small>Decision comments are recorded and visible to the applicant.</small>
+        <label><span>{t("Status")}</span><select aria-label={t("Filter role applications")} value={statusFilter} disabled={loading || Boolean(busy)} onChange={(event) => { setSearchParams({}); setStatusFilter(event.target.value); setSelectedId(""); setDecisionReason(""); }}><option value="Pending">{t("Pending")}</option><option value="Approved">{t("Approved")}</option><option value="Rejected">{t("Rejected")}</option><option value="All">{t("All")}</option></select></label>
+        <small>{t("Decision comments are recorded and visible to the applicant.")}</small>
       </div>
-      {error && <p className="form-error" role="alert">{error}</p>}
-      {linkedId && !loading && !selectedApplication && <p role="status">This application is unavailable. Select another application or refresh the queue.</p>}
+      {error && <p className="form-error" role="alert">{t(error)}</p>}
+      {linkedId && !loading && !selectedApplication && <p role="status">{t("This application is unavailable. Select another application or refresh the queue.")}</p>}
     </Card>
 
     <div className="admin-application-layout">
       <Card className="admin-application-list-card">
-        <div className="card-heading"><div><span className="eyebrow">Applications</span><h3>{statusFilter} requests</h3></div><Badge>{filteredApplications.length}</Badge></div>
-        {loading ? <p className="empty-copy">Loading applications…</p> : filteredApplications.length ? <div className="role-application-list">{filteredApplications.map((application) => <button type="button" disabled={Boolean(busy)} key={application.id} className={`role-application-row ${selectedApplication?.id === application.id ? "selected" : ""}`} aria-pressed={selectedApplication?.id === application.id} onClick={() => selectApplication(application.id)}><span className="admin-user-avatar">{displayValue(application.user).slice(0, 1).toUpperCase()}</span><span><b>{displayValue(application.user)}</b><small>{application.type} application</small><em>Submitted {application.submittedAt ? new Date(application.submittedAt).toLocaleString() : "date unavailable"}</em></span><Badge tone={applicationStatusTone(application.status)}>{application.status}</Badge></button>)}</div> : <EmptyState icon={Users} title={`No ${statusFilter.toLowerCase()} applications`} description="New Creator and Trainer applications will appear here after submission." />}
+        <div className="card-heading"><div><span className="eyebrow">{t("Applications")}</span><h3>{t(statusFilter)}{t(" requests")}</h3></div><Badge>{filteredApplications.length}</Badge></div>
+        {loading ? <p className="empty-copy">{t("Loading applications…")}</p> : filteredApplications.length ? <div className="role-application-list">{filteredApplications.map((application) => <button type="button" disabled={Boolean(busy)} key={application.id} className={`role-application-row ${selectedApplication?.id === application.id ? "selected" : ""}`} aria-pressed={selectedApplication?.id === application.id} onClick={() => selectApplication(application.id)}><span className="admin-user-avatar">{displayValue(application.user).slice(0, 1).toUpperCase()}</span><span><b>{displayValue(application.user)}</b><small>{t(application.type)}{t(" application")}</small><em>{t("Submitted ")}{application.submittedAt ? new Date(application.submittedAt).toLocaleString(getFormatLocale()) : t("date unavailable")}</em></span><Badge tone={applicationStatusTone(application.status)}>{t(application.status)}</Badge></button>)}</div> : <EmptyState icon={Users} title={t("No {0} applications", { 0: t(statusFilter) })} description={t("New Creator and Trainer applications will appear here after submission.")} />}
       </Card>
 
       {selectedApplication ? <div className="stack">
         <Card>
-          <div className="card-heading"><div><span className="eyebrow">Applicant identity</span><h3>{displayValue(selectedApplication.user)}</h3><p>{profileError ? "Profile unavailable" : profileLoading || !profileMatchesSelection ? "Loading the audited account profile…" : displayValue(displayedApplicant?.email)}</p></div>{displayedApplicant && <Badge tone={accountStatusTone(displayedApplicant.status)}>{titleCase(displayedApplicant.status)}</Badge>}</div>
-          {profileError && <p className="form-error" role="alert">Profile could not be loaded: {profileError}</p>}
+          <div className="card-heading"><div><span className="eyebrow">{t("Applicant identity")}</span><h3>{displayValue(selectedApplication.user)}</h3><p>{profileError ? t("Profile unavailable") : profileLoading || !profileMatchesSelection ? t("Loading the audited account profile…") : displayValue(displayedApplicant?.email)}</p></div>{displayedApplicant && <Badge tone={accountStatusTone(displayedApplicant.status)}>{t(titleCase(displayedApplicant.status))}</Badge>}</div>
+          {profileError && <p className="form-error" role="alert">{t("Profile could not be loaded: ")}{t(profileError)}</p>}
           <dl className="detail-list applicant-profile-list">
-            <div><dt>Full name</dt><dd>{displayValue(displayedApplicant?.profile?.fullName || selectedApplication.user)}</dd></div>
-            <div><dt>Email</dt><dd>{profileValue(displayedApplicant?.email)}</dd></div>
-            <div><dt>Current roles</dt><dd>{profileError ? "Unavailable" : displayedApplicant?.roles?.length ? displayedApplicant.roles.map(titleCase).join(", ") : profileMatchesSelection ? "Member" : "Loading…"}</dd></div>
-            <div><dt>Phone</dt><dd>{profileValue(displayedApplicant?.profile?.phone)}</dd></div>
-            <div><dt>Location</dt><dd>{profileValue(displayedApplicant?.profile?.location)}</dd></div>
-            <div><dt>Bio</dt><dd>{profileValue(displayedApplicant?.profile?.bio)}</dd></div>
+            <div><dt>{t("Full name")}</dt><dd>{displayValue(displayedApplicant?.profile?.fullName || selectedApplication.user)}</dd></div>
+            <div><dt>{t("Email")}</dt><dd>{profileValue(displayedApplicant?.email)}</dd></div>
+            <div><dt>{t("Current roles")}</dt><dd>{profileError ? t("Unavailable") : displayedApplicant?.roles?.length ? displayedApplicant.roles.map(titleCase).join(", ") : profileMatchesSelection ? t("Member") : t("Loading…")}</dd></div>
+            <div><dt>{t("Phone")}</dt><dd>{profileValue(displayedApplicant?.profile?.phone)}</dd></div>
+            <div><dt>{t("Location")}</dt><dd>{profileValue(displayedApplicant?.profile?.location)}</dd></div>
+            <div><dt>{t("Bio")}</dt><dd>{profileValue(displayedApplicant?.profile?.bio)}</dd></div>
           </dl>
-          {selectedApplication.userId && <div className="button-row profile-review-actions"><Button variant="secondary" size="sm" disabled={Boolean(busy)} onClick={() => navigate(`/admin/users/${selectedApplication.userId}`)}>Open full account <ArrowRight size={15} /></Button></div>}
+          {selectedApplication.userId && <div className="button-row profile-review-actions"><Button variant="secondary" size="sm" disabled={Boolean(busy)} onClick={() => navigate(`/admin/users/${selectedApplication.userId}`)}>{t("Open full account ")}<ArrowRight size={15} /></Button></div>}
         </Card>
 
         <Card>
-          <div className="card-heading"><div><span className="eyebrow">Submitted application</span><h3>{selectedApplication.type} access</h3><p>Submitted {selectedApplication.submittedAt ? new Date(selectedApplication.submittedAt).toLocaleString() : "date unavailable"}</p></div><Badge tone={applicationStatusTone(selectedApplication.status)}>{selectedApplication.status}</Badge></div>
+          <div className="card-heading"><div><span className="eyebrow">{t("Submitted application")}</span><h3>{t(selectedApplication.type)}{t(" access")}</h3><p>{t("Submitted ")}{selectedApplication.submittedAt ? new Date(selectedApplication.submittedAt).toLocaleString(getFormatLocale()) : t("date unavailable")}</p></div><Badge tone={applicationStatusTone(selectedApplication.status)}>{t(selectedApplication.status)}</Badge></div>
           <dl className="detail-list role-application-detail-list">
-            <div><dt>Subject category</dt><dd>{displayValue(selectedApplication.category)}</dd></div>
-            <div><dt>Relevant experience</dt><dd>{displayValue(selectedApplication.experience)}</dd></div>
-            <div><dt>Portfolio</dt><dd>{selectedApplication.portfolioUrl ? <a href={selectedApplication.portfolioUrl} target="_blank" rel="noreferrer">{selectedApplication.portfolio}<ExternalLink size={13} /></a> : displayValue(selectedApplication.portfolio)}</dd></div>
-            <div><dt>Why they are applying</dt><dd>{displayValue(selectedApplication.reason)}</dd></div>
+            <div><dt>{t("Subject category")}</dt><dd>{displayValue(selectedApplication.category)}</dd></div>
+            <div><dt>{t("Relevant experience")}</dt><dd>{displayValue(selectedApplication.experience)}</dd></div>
+            <div><dt>{t("Portfolio")}</dt><dd>{selectedApplication.portfolioUrl ? <a href={selectedApplication.portfolioUrl} target="_blank" rel="noreferrer">{selectedApplication.portfolio}<ExternalLink size={13} /></a> : displayValue(selectedApplication.portfolio)}</dd></div>
+            <div><dt>{t("Why they are applying")}</dt><dd>{displayValue(selectedApplication.reason)}</dd></div>
           </dl>
-          {inactiveApplicant && <div className="warning-box compact"><ShieldCheck size={16} /><div><b>Approval unavailable</b><p>This account is {displayedApplicant.status}. It may be rejected, but a role cannot be granted until the account is active.</p></div></div>}
-          {selectedApplication.status === "Pending" ? <div className="application-review"><FormField label="Decision reason" hint="Required, at least 3 characters. The applicant can see this comment."><textarea disabled={profileUnavailable || Boolean(busy)} aria-label={`Decision reason for ${selectedApplication.user} ${selectedApplication.type} application`} value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} placeholder="Record the evidence reviewed and why access should be granted or declined" /></FormField><div className="button-row"><Button disabled={profileUnavailable || Boolean(inactiveApplicant) || Boolean(busy) || decisionReason.trim().length < 3} onClick={() => decide("Approved")}><CheckCircle2 size={15} /> {busy === selectedApplication.id ? "Saving…" : "Approve application"}</Button><Button variant="danger" disabled={profileUnavailable || Boolean(busy) || decisionReason.trim().length < 3} onClick={() => decide("Rejected")}><XCircle size={15} /> Reject application</Button></div></div> : <div className="application-review"><span className="eyebrow">Decision comment</span><p className="application-copy">{displayValue(selectedApplication.decisionReason)}</p></div>}
+          {inactiveApplicant && <div className="warning-box compact"><ShieldCheck size={16} /><div><b>{t("Approval unavailable")}</b><p>{t("This account is ")}{t(displayedApplicant.status)}{t(". It may be rejected, but a role cannot be granted until the account is active.")}</p></div></div>}
+          {selectedApplication.status === "Pending" ? <div className="application-review"><FormField label={t("Decision reason")} hint={t("Required, at least 3 characters. The applicant can see this comment.")}><textarea disabled={profileUnavailable || Boolean(busy)} aria-label={t("Decision reason for {0} {1} application", { 0: selectedApplication.user, 1: selectedApplication.type })} value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} placeholder={t("Record the evidence reviewed and why access should be granted or declined")} /></FormField><div className="button-row"><Button disabled={profileUnavailable || Boolean(inactiveApplicant) || Boolean(busy) || decisionReason.trim().length < 3} onClick={() => decide("Approved")}><CheckCircle2 size={15} /> {busy === selectedApplication.id ? t("Saving…") : t("Approve application")}</Button><Button variant="danger" disabled={profileUnavailable || Boolean(busy) || decisionReason.trim().length < 3} onClick={() => decide("Rejected")}><XCircle size={15} />{t(" Reject application")}</Button></div></div> : <div className="application-review"><span className="eyebrow">{t("Decision comment")}</span><p className="application-copy">{displayValue(selectedApplication.decisionReason)}</p></div>}
         </Card>
-      </div> : <EmptyState icon={Users} title="Select an application" description="Choose an application from the queue to review the applicant and supporting information." />}
+      </div> : <EmptyState icon={Users} title={t("Select an application")} description={t("Choose an application from the queue to review the applicant and supporting information.")} />}
     </div>
   </div>;
 }
 
 export function AdminRefundPage() {
+  const { t } = useTranslation();
   const { refundRequests, decideRefund, refreshAdminQueues } = usePlatform();
   const [params, setParams] = useSearchParams();
   const linkedId = params.get("request");
@@ -376,11 +381,12 @@ export function AdminRefundPage() {
     try { setError(""); await decideRefund(request.id, titleCase(decision), reason); void refreshInbox(); } catch (error) { setError(error.message); } finally { setBusy(""); }
   };
   useEffect(() => { refreshAdminQueues().catch(error => setError(error.message)); }, [refreshAdminQueues]);
-  if (!refundRequests.length && !error) return <EmptyState icon={ClipboardCheck} title="No refund requests" description="Server-submitted refund requests will appear here for review." />;
-  return <Card><div className="card-heading"><div><span className="eyebrow">Refund review</span><h2>Policy-evaluated requests</h2></div>{linkedId && <Button variant="secondary" onClick={() => setParams({})}>All refund requests</Button>}</div>{linkedId && !visibleRequests.length && <p role="status">This refund request is unavailable. Return to all requests.</p>}{error && <p role="alert" className="form-error">{error}</p>}<div className="queue-list">{visibleRequests.map((request) => <div key={request.id}><ClipboardCheck size={18} /><div><b>{request.course}</b><small>{request.user} · {request.paid} points · {request.basis}</small><span className="queue-detail">{request.reason}</span><VideoEvidence evidence={request.evidence} /></div>{request.status === "Pending" ? <DecisionButtons busy={busy === request.id} approvalDisabled={request.serverEligible !== true} onDecision={(decision, reason) => decide(request, decision, reason)} /> : <Status value={request.status} />}</div>)}</div></Card>;
+  if (!refundRequests.length && !error) return <EmptyState icon={ClipboardCheck} title={t("No refund requests")} description={t("Server-submitted refund requests will appear here for review.")} />;
+  return <Card><div className="card-heading"><div><span className="eyebrow">{t("Refund review")}</span><h2>{t("Policy-evaluated requests")}</h2></div>{linkedId && <Button variant="secondary" onClick={() => setParams({})}>{t("All refund requests")}</Button>}</div>{linkedId && !visibleRequests.length && <p role="status">{t("This refund request is unavailable. Return to all requests.")}</p>}{error && <p role="alert" className="form-error">{t(error)}</p>}<div className="queue-list">{visibleRequests.map((request) => <div key={request.id}><ClipboardCheck size={18} /><div><b>{request.course}</b><small>{request.user} · {request.paid}{t(" points · ")}{t(request.basis)}</small><span className="queue-detail">{request.reason}</span><VideoEvidence evidence={request.evidence} /></div>{request.status === "Pending" ? <DecisionButtons busy={busy === request.id} approvalDisabled={request.serverEligible !== true} onDecision={(decision, reason) => decide(request, decision, reason)} /> : <Status value={request.status} />}</div>)}</div></Card>;
 }
 
 export function AdminUsersPage() {
+  const { t } = useTranslation();
   const { roleApplications, decideRoleApplication, refreshAdminQueues } = usePlatform();
   const [certifications, setCertifications] = useState([]);
   const [users, setUsers] = useState([]);
@@ -412,7 +418,7 @@ export function AdminUsersPage() {
   const actOnUser = async (user, action) => {
     const reason = userReasons[user.id]?.trim();
     if (!reason || reason.length < 3) { setUserError("A reason of at least 3 characters is required for every account action."); return; }
-    if (action === "delete" && !window.confirm(`Permanently disable ${user.email}? Their records remain retained for audit.`)) return;
+    if (action === "delete" && !window.confirm(t("Permanently disable {email}? Their records remain retained for audit.", { email: user.email }))) return;
     setBusy(`user-${user.id}`); setUserError("");
     try {
       if (action === "suspend") await suspendAdminUser(user.id, reason);
@@ -421,10 +427,11 @@ export function AdminUsersPage() {
       await refreshUsers();
     } catch (error) { setUserError(error.message); } finally { setBusy(""); }
   };
-  return <div className="stack"><Card><div className="card-heading"><div><span className="eyebrow">User administration</span><h2>View and control accounts</h2></div><Button variant="secondary" onClick={refreshUsers}>Refresh users</Button></div><p className="muted">Suspending or deleting an account immediately revokes its sessions. Delete is a permanent access removal; financial and moderation records are retained for audit.</p><div className="queue-actions"><input aria-label="Search users" placeholder="Search name or email" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} /><select aria-label="Filter account status" value={userStatus} onChange={(event) => setUserStatus(event.target.value)}><option value="">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="deleted">Deleted</option></select><Button className="sm" onClick={refreshUsers}>Apply filter</Button></div>{userError && <p className="form-error">{userError}</p>}{users.length ? <div className="queue-list">{users.map((user) => { const reason = userReasons[user.id] || ""; const actionBusy = busy === `user-${user.id}`; const isProtectedAdmin = user.roles.includes("admin"); return <div key={user.id}><Users size={18} /><div><b>{user.displayName}</b><small>{user.email} · {user.roles.length ? user.roles.join(", ") : "no active role"}</small><span className="queue-detail">Created {user.createdAt ? new Date(user.createdAt).toLocaleString() : "—"}</span></div><Status value={user.status} />{isProtectedAdmin ? <Badge tone="info">Admin protected</Badge> : user.status === "deleted" ? <Badge tone="neutral">Access removed</Badge> : <div className="queue-actions"><input aria-label={`Reason for ${user.email}`} placeholder="Action reason" value={reason} onChange={(event) => setReason(user.id, event.target.value)} />{user.status === "active" ? <><Button className="sm" disabled={actionBusy} onClick={() => actOnUser(user, "suspend")}>Freeze</Button><Button className="sm danger" disabled={actionBusy} onClick={() => actOnUser(user, "delete")}>Delete</Button></> : <><Button className="sm" disabled={actionBusy} onClick={() => actOnUser(user, "reinstate")}>Reinstate</Button><Button className="sm danger" disabled={actionBusy} onClick={() => actOnUser(user, "delete")}>Delete</Button></>}</div>}</div>; })}</div> : <p className="empty-copy">No accounts match the selected filter.</p>}</Card><Card><div className="card-heading"><div><span className="eyebrow">Role applications</span><h2>Access approvals</h2></div><Button variant="secondary" onClick={refresh}>Refresh</Button></div>{roleApplications.length ? <div className="queue-list">{roleApplications.map((item) => <div key={item.id}><Users size={18} /><div><b>{item.user}</b><small>{item.type} · submitted {item.submittedAt ? new Date(item.submittedAt).toLocaleString() : "—"}</small><span className="queue-detail">{item.reason}</span></div>{item.status === "Pending" ? <DecisionButtons busy={busy === item.id} onDecision={(decision, reason) => decideRole(item.id, decision, reason)} /> : <Status value={item.status} />}</div>)}</div> : <p className="empty-copy">No role applications.</p>}</Card><Card><div className="card-heading"><div><span className="eyebrow">Trainer certification</span><h2>Certification review</h2></div></div>{certifications.length ? <div className="queue-list">{certifications.map((item) => <div key={item.id}><ShieldCheck size={18} /><div><b>{item.trainer?.displayName || "Trainer"}</b><small>{item.certificationName} · {item.certificationReference || "No reference"}</small></div>{item.status === "pending" ? <DecisionButtons busy={busy === item.id} onDecision={(decision, reason) => decideCertification(item.id, decision, reason)} /> : <Status value={item.status} />}</div>)}</div> : <p className="empty-copy">No trainer certifications.</p>}</Card></div>;
+  return <div className="stack"><Card><div className="card-heading"><div><span className="eyebrow">{t("User administration")}</span><h2>{t("View and control accounts")}</h2></div><Button variant="secondary" onClick={refreshUsers}>{t("Refresh users")}</Button></div><p className="muted">{t("Suspending or deleting an account immediately revokes its sessions. Delete is a permanent access removal; financial and moderation records are retained for audit.")}</p><div className="queue-actions"><input aria-label={t("Search users")} placeholder={t("Search name or email")} value={userSearch} onChange={(event) => setUserSearch(event.target.value)} /><select aria-label={t("Filter account status")} value={userStatus} onChange={(event) => setUserStatus(event.target.value)}><option value="">{t("All statuses")}</option><option value="active">{t("Active")}</option><option value="suspended">{t("Suspended")}</option><option value="deleted">{t("Deleted")}</option></select><Button className="sm" onClick={refreshUsers}>{t("Apply filter")}</Button></div>{userError && <p className="form-error">{t(userError)}</p>}{users.length ? <div className="queue-list">{users.map((user) => { const reason = userReasons[user.id] || ""; const actionBusy = busy === `user-${user.id}`; const isProtectedAdmin = user.roles.includes("admin"); return <div key={user.id}><Users size={18} /><div><b>{user.displayName}</b><small>{user.email} · {user.roles.length ? user.roles.map(role => t(role)).join(", ") : t("no active role")}</small><span className="queue-detail">{t("Created ")}{user.createdAt ? new Date(user.createdAt).toLocaleString(getFormatLocale()) : "—"}</span></div><Status value={user.status} />{isProtectedAdmin ? <Badge tone="info">{t("Admin protected")}</Badge> : user.status === "deleted" ? <Badge tone="neutral">{t("Access removed")}</Badge> : <div className="queue-actions"><input aria-label={t("Reason for {0}", { 0: user.email })} placeholder={t("Action reason")} value={reason} onChange={(event) => setReason(user.id, event.target.value)} />{user.status === "active" ? <><Button className="sm" disabled={actionBusy} onClick={() => actOnUser(user, "suspend")}>{t("Freeze")}</Button><Button className="sm danger" disabled={actionBusy} onClick={() => actOnUser(user, "delete")}>{t("Delete")}</Button></> : <><Button className="sm" disabled={actionBusy} onClick={() => actOnUser(user, "reinstate")}>{t("Reinstate")}</Button><Button className="sm danger" disabled={actionBusy} onClick={() => actOnUser(user, "delete")}>{t("Delete")}</Button></>}</div>}</div>; })}</div> : <p className="empty-copy">{t("No accounts match the selected filter.")}</p>}</Card><Card><div className="card-heading"><div><span className="eyebrow">{t("Role applications")}</span><h2>{t("Access approvals")}</h2></div><Button variant="secondary" onClick={refresh}>{t("Refresh")}</Button></div>{roleApplications.length ? <div className="queue-list">{roleApplications.map((item) => <div key={item.id}><Users size={18} /><div><b>{item.user}</b><small>{t(item.type)}{t(" · submitted ")}{item.submittedAt ? new Date(item.submittedAt).toLocaleString(getFormatLocale()) : "—"}</small><span className="queue-detail">{item.reason}</span></div>{item.status === "Pending" ? <DecisionButtons busy={busy === item.id} onDecision={(decision, reason) => decideRole(item.id, decision, reason)} /> : <Status value={item.status} />}</div>)}</div> : <p className="empty-copy">{t("No role applications.")}</p>}</Card><Card><div className="card-heading"><div><span className="eyebrow">{t("Trainer certification")}</span><h2>{t("Certification review")}</h2></div></div>{certifications.length ? <div className="queue-list">{certifications.map((item) => <div key={item.id}><ShieldCheck size={18} /><div><b>{item.trainer?.displayName || t("Trainer")}</b><small>{item.certificationName} · {item.certificationReference || t("No reference")}</small></div>{item.status === "pending" ? <DecisionButtons busy={busy === item.id} onDecision={(decision, reason) => decideCertification(item.id, decision, reason)} /> : <Status value={item.status} />}</div>)}</div> : <p className="empty-copy">{t("No trainer certifications.")}</p>}</Card></div>;
 }
 
 export function AdminCatalogPage() {
+  const { t } = useTranslation();
   const { refreshCatalog } = usePlatform();
   const [courses, setCourses] = useState([]);
   const [contents, setContents] = useState([]);
@@ -459,7 +466,7 @@ export function AdminCatalogPage() {
         marketplaceRefresh.status === "rejected" ? "the marketplace" : "",
       ].filter(Boolean);
       if (refreshFailures.length) {
-        setError(`Decision saved, but ${refreshFailures.join(" and ")} could not refresh automatically.`);
+        setError(queueRefresh.status === "rejected" && marketplaceRefresh.status === "rejected" ? "Decision saved, but the review queue and the marketplace could not refresh automatically." : queueRefresh.status === "rejected" ? "Decision saved, but the review queue could not refresh automatically." : "Decision saved, but the marketplace could not refresh automatically.");
       }
     } catch (decisionError) {
       setError(decisionError.message);
@@ -474,22 +481,22 @@ export function AdminCatalogPage() {
   ];
 
   if (!queue.length && !error) {
-    return <EmptyState icon={BookOpen} title="No catalogue submissions" description="Submitted trainer courses and creator content will appear here." action={<Button onClick={refresh}>Refresh</Button>} />;
+    return <EmptyState icon={BookOpen} title={t("No catalogue submissions")} description={t("Submitted trainer courses and creator content will appear here.")} action={<Button onClick={refresh}>{t("Refresh")}</Button>} />;
   }
 
   return <Card>
     <div className="card-heading">
-      <div><span className="eyebrow">Catalogue control</span><h2>Publication review</h2><p>Content must be privately previewed before it can be published.</p></div>
-      <Button variant="secondary" onClick={refresh} disabled={Boolean(busy)}>Refresh</Button>
+      <div><span className="eyebrow">{t("Catalogue control")}</span><h2>{t("Publication review")}</h2><p>{t("Content must be privately previewed before it can be published.")}</p></div>
+      <Button variant="secondary" onClick={refresh} disabled={Boolean(busy)}>{t("Refresh")}</Button>
     </div>
-    {error && <p className="form-error" role="alert">{error}</p>}
+    {error && <p className="form-error" role="alert">{t(error)}</p>}
     <div className="queue-list catalogue-review-list">
       {queue.map((item) => <div className={`catalogue-review-item ${item.kind}`} key={`${item.kind}-${item.id}`}>
         <span>{item.kind === "course" ? <BookOpen size={18} /> : <FileText size={18} />}</span>
         <div>
           <b>{item.title}</b>
-          <small>{item.owner?.displayName || "Owner"} · {item.pricePoints} points · {item.kind === "course" ? item.deliveryModes?.join(", ") : item.contentType}</small>
-          {item.kind === "content" && <span className="queue-detail">Private attachments: {Math.max(Number(item.assetCount || 0), item.assets?.length || 0, item.storageUrlPresent ? 1 : 0)}</span>}
+          <small>{item.owner?.displayName || t("Owner")} · {item.pricePoints}{t(" points · ")}{item.kind === "course" ? item.deliveryModes?.join(", ") : item.contentType}</small>
+          {item.kind === "content" && <span className="queue-detail">{t("Private attachments: ")}{Math.max(Number(item.assetCount || 0), item.assets?.length || 0, item.storageUrlPresent ? 1 : 0)}</span>}
         </div>
         {item.kind === "content"
           ? <ContentReviewActions item={item} busy={busy === `${item.kind}-${item.id}`} onDecision={(decision, reason) => decide(item.kind, item.id, decision, reason)} />

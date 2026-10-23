@@ -1,0 +1,41 @@
+.topup-checkout { width: 100%; max-width: 960px; margin: 0 auto; }
+.topup-checkout .back-link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-bottom: 16px; }
+.topup-checkout-surface { display: grid; grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.topup-checkout-summary { padding: 32px; background: var(--soft); }
+.topup-sandbox-label { display: inline-block; padding: 4px 8px; margin-bottom: 24px; border-radius: 4px; color: #765600; background: #fff0bd; font-size: 12px; font-weight: 600; }
+.topup-checkout h2 { font-size: 18px; line-height: 1.4; margin: 0 0 16px; }
+.topup-points { display: block; margin-bottom: 32px; font-size: 32px; line-height: 1.25; overflow-wrap: anywhere; }
+.topup-points span { font-size: 16px; font-weight: 500; }
+.topup-checkout dl { margin: 0; }
+.topup-checkout-summary dl { padding-top: 20px; border-top: 1px solid var(--line); }
+.topup-checkout-summary dl > div { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+.topup-checkout-summary dd { font-weight: 600; }
+.topup-checkout dd { margin: 0; overflow-wrap: anywhere; }
+.topup-checkout-summary > p { display: flex; align-items: flex-start; gap: 8px; margin: 24px 0 0; font-size: 13px; line-height: 1.7; color: #536077; }
+.topup-checkout-summary > p svg { flex-shrink: 0; margin-top: 3px; }
+.topup-checkout-payment { min-width: 0; padding: 32px; }
+.topup-contact { margin-bottom: 32px; }
+.topup-contact dl { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #f8f9fc; font-size: 14px; }
+.topup-contact dt { color: #536077; }
+.topup-contact dd { flex: 1; min-width: 0; }
+.topup-express { margin-top: 24px; }
+.topup-express[hidden] { display: none; }
+.topup-payment-divider { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; color: #536077; font-size: 13px; }
+.topup-payment-divider::before, .topup-payment-divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+.topup-pay-button { min-height: 48px; margin-top: 24px; }
+.topup-checkout .form-error { margin: 16px 0 0; }
+.topup-payment-footer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 16px; margin-top: 20px; color: #536077; font-size: 12px; }
+.topup-payment-footer nav { display: flex; gap: 16px; }
+.topup-payment-footer a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; text-underline-offset: 3px; }
+.topup-checkout-state { padding: 48px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; text-align: center; }
+.topup-checkout-state .session-spinner { display: inline-block; margin-bottom: 16px; }
+@media (max-width: 900px) {
+  .topup-checkout-surface { grid-template-columns: minmax(0, 1fr); }
+  .topup-checkout-summary, .topup-checkout-payment { padding: 24px; }
+  .topup-sandbox-label { margin-bottom: 16px; }
+  .topup-points { margin-bottom: 20px; }
+}
+@media (max-width: 480px) {
+  .topup-checkout-summary, .topup-checkout-payment { padding: 20px 16px; }
+  .topup-contact dl { flex-direction: column; }
+}

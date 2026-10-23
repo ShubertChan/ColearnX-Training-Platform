@@ -32,6 +32,7 @@ function exactOrigins(value) {
 }
 
 export function securityHeaders(env) {
+  const paymentsOn = String(env.VITE_PAYMENTS_API_ENABLED).toLowerCase() === "true";
   const videoOn = String(env.VITE_ENABLE_HOSTED_VIDEO).toLowerCase() === "true";
   const media = videoOn ? exactOrigins(env.VITE_MEDIA_ORIGINS) : [];
   const upload = exactOrigins(env.VITE_UPLOAD_ORIGINS);
@@ -43,14 +44,22 @@ export function securityHeaders(env) {
   }
   const api = env.VITE_API_BASE_URL?.startsWith("http") ? [new URL(env.VITE_API_BASE_URL).origin] : [];
 
-  const connect = [...new Set(["'self'", ...api, ...media, ...upload])].join(" ");
-  const img = ["'self'", "data:", ...media].join(" ");
+  // Stripe's documented origins support Elements, 3DS and Link authentication.
+  const stripeScripts = paymentsOn ? ["https://js.stripe.com", "https://*.js.stripe.com", "https://checkout.stripe.com"] : [];
+  const stripeFrames = paymentsOn ? [...stripeScripts, "https://hooks.stripe.com", "https://link.com", "https://*.link.com"] : [];
+  const stripeConnect = paymentsOn ? ["https://api.stripe.com", "https://checkout.stripe.com", "https://link.com", "https://*.link.com"] : [];
+  // Google is enabled at API runtime; its narrowly scoped SDK origins must be
+  // present in the tested artifact before deployment (no build-time secrets).
+  const googleBase = "https://accounts.google.com/gsi/";
+  const connect = [...new Set(["'self'", ...api, ...media, ...upload, ...stripeConnect, googleBase])].join(" ");
+  const img = ["'self'", "data:", ...media, ...(paymentsOn ? ["https://*.stripe.com", "https://*.link.com"] : [])].join(" ");
   const mediaSrc = ["'self'", "blob:", ...media].join(" ");
 
   const csp = [
     "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
+    ["script-src 'self'", ...stripeScripts, `${googleBase}client`].join(" "),
+    ["frame-src 'self'", ...stripeFrames, googleBase].join(" "),
+    `style-src 'self' 'unsafe-inline' ${googleBase}style`,
     "img-src " + img,
     "font-src 'self'",
     "connect-src " + connect,
@@ -68,9 +77,13 @@ export function securityHeaders(env) {
     "  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload",
     "  X-Content-Type-Options: nosniff",
     "  X-Frame-Options: DENY",
-    "  Referrer-Policy: no-referrer",
-    "  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
-    "  Cross-Origin-Opener-Policy: same-origin",
+    // Google's generated button iframe inherits the document policy, not the
+    // SDK script's policy. Send only the public origin (never paths or query
+    // parameters), including same-origin requests, and omit HTTPS downgrades.
+    // API response policies and private-media access controls are unaffected.
+    "  Referrer-Policy: strict-origin",
+    `  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=${paymentsOn ? '(self "https://js.stripe.com" "https://*.js.stripe.com")' : '()'}, usb=(), interest-cohort=()`,
+    "  Cross-Origin-Opener-Policy: same-origin-allow-popups",
     "",
   ].join("\n");
 }

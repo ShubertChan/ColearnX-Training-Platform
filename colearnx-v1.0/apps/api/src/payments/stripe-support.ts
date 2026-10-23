@@ -9,6 +9,13 @@ export function requireStripeSandboxSecret(secretKey: string) {
   return secretKey;
 }
 
+export function requireStripeSandboxPublishableKey(key: string) {
+  if (!key.startsWith('pk_test_')) {
+    throw new ApiError(503, 'STRIPE_NOT_CONFIGURED', 'Stripe test mode is not configured.');
+  }
+  return key;
+}
+
 export function stripeCheckoutError(error: unknown) {
   if (error instanceof ApiError) return error;
   return new ApiError(502, 'STRIPE_CHECKOUT_CREATION_FAILED', 'Unable to create the Stripe checkout session.');

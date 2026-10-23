@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { getFormatLocale, useTranslation } from "../i18n/LanguageContext";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -35,11 +36,15 @@ import {
 } from "../components/ui";
 
 export function WalletPage() {
+  const { t } = useTranslation();
   const { balance, walletBalances, transactions, refreshWallet, notify } = usePlatform();
   const navigate = useNavigate();
   const location = useLocation();
   const [topup, setTopup] = useState(false);
   const [paymentNotice, setPaymentNotice] = useState("");
+  const [paymentRefreshFailed, setPaymentRefreshFailed] = useState(false);
+  const [refreshingPayment, setRefreshingPayment] = useState(false);
+  const [confirmedPayment, setConfirmedPayment] = useState(null);
 
   useEffect(() => {
     if (!paymentsApiEnabled) return undefined;
@@ -56,10 +61,25 @@ export function WalletPage() {
         const payment = await getTopUpStatus(paymentTransactionId);
         if (cancelled) return;
         if (payment.status === "paid") {
-          await refreshWallet();
-          if (cancelled) return;
-          notify(`${payment.points} points have been added to your wallet.`);
-          setPaymentNotice("Payment confirmed. Your wallet has been refreshed.");
+          setConfirmedPayment(payment);
+          try {
+            await refreshWallet();
+            if (cancelled) return;
+            notify({ key: "{points} points have been added to your wallet.", values: { points: payment.points } });
+            setPaymentNotice("Payment confirmed. Your wallet has been refreshed.");
+            setPaymentRefreshFailed(false);
+          } catch {
+            if (cancelled) return;
+            setPaymentNotice("Payment confirmed, but your wallet could not refresh. Please retry the wallet refresh; do not pay again.");
+            setPaymentRefreshFailed(true);
+          }
+          // A confirmed payment must not be reconciled repeatedly when the
+          // secondary balance request fails. Retrying only refreshes the wallet.
+          navigate("/wallet", { replace: true });
+          return;
+        }
+        if (["cancelled", "canceled", "failed", "expired"].includes(payment.status)) {
+          setPaymentNotice(payment.status === "failed" ? "Payment failed. No points were added." : "Payment was cancelled. No points were added.");
           navigate("/wallet", { replace: true });
           return;
         }
@@ -81,64 +101,70 @@ export function WalletPage() {
     };
   }, [location.search, navigate, notify, refreshWallet]);
 
+  const retryPaymentRefresh = async () => {
+    setRefreshingPayment(true);
+    try {
+      await refreshWallet();
+      setPaymentRefreshFailed(false);
+      setPaymentNotice("Payment confirmed. Your wallet has been refreshed.");
+      if (confirmedPayment) notify({ key: "{points} points have been added to your wallet.", values: { points: confirmedPayment.points } });
+    } catch {
+      setPaymentNotice("Payment confirmed, but your wallet could not refresh. Please retry the wallet refresh; do not pay again.");
+    } finally { setRefreshingPayment(false); }
+  };
+
   return (
     <>
       <section className="wallet-hero">
         <div>
-          <span className="eyebrow light">Unified points balance</span>
+          <span className="eyebrow light">{t("Unified points balance")}</span>
           <strong>{balance}</strong>
-          <p>
-            Use one balance for course purchases, creator content, trainer
-            income, creator income and approved refunds.
-          </p>
+          <p>{t("Use one balance for course purchases, creator content, trainer income, creator income and approved refunds.")}</p>
           <div className="button-row">
             <Button
               disabled={!paymentsApiEnabled}
               onClick={() => setTopup(true)}
             >
-              {paymentsApiEnabled ? "Add points" : "Top-up unavailable"}
+              {paymentsApiEnabled ? t("Add points") : t("Top-up unavailable")}
             </Button>
-            <Button variant="glass" onClick={() => navigate("/transactions")}>
-              View transaction history
-            </Button>
+            <Button variant="glass" onClick={() => navigate("/transactions")}>{t("View transaction history")}</Button>
           </div>
         </div>
         <WalletCards size={72} />
       </section>
       <div className="metric-grid four">
         <Metric
-          label="Available"
-          value={`${walletBalances.available} pts`}
-          detail="Spendable now"
+          label={t("Available")}
+          value={t("{0} points", { 0: walletBalances.available })}
+          detail={t("Spendable now")}
           icon={WalletCards}
         />
         <Metric
-          label="Frozen"
-          value={`${walletBalances.frozen} pts`}
-          detail="Reserved until a Live course starts"
+          label={t("Frozen")}
+          value={t("{0} points", { 0: walletBalances.frozen })}
+          detail={t("Reserved until a Live course starts")}
           icon={ShieldCheck}
         />
         <Metric
-          label="Expired"
-          value={`${walletBalances.expired} pts`}
-          detail="No longer spendable"
+          label={t("Expired")}
+          value={t("{0} points", { 0: walletBalances.expired })}
+          detail={t("No longer spendable")}
           icon={RotateCcw}
         />
         <Metric
-          label="Admin hold"
-          value={`${walletBalances.blocked} pts`}
-          detail="Blocked pending review"
+          label={t("Admin hold")}
+          value={t("{0} points", { 0: walletBalances.blocked })}
+          detail={t("Blocked pending review")}
           icon={X}
         />
       </div>
       <Card>
         <div className="card-heading">
           <div>
-            <span className="eyebrow">Recent activity</span>
-            <h3>Latest transactions</h3>
+            <span className="eyebrow">{t("Recent activity")}</span>
+            <h3>{t("Latest transactions")}</h3>
           </div>
-          <Button variant="secondary" onClick={() => navigate("/transactions")}>
-            View all <ArrowRight size={16} />
+          <Button variant="secondary" onClick={() => navigate("/transactions")}>{t("View all ")}<ArrowRight size={16} />
           </Button>
         </div>
         <TransactionTable transactions={transactions.slice(0, 4)} />
@@ -147,16 +173,12 @@ export function WalletPage() {
         <div className="feature-status" role="status">
           <AlertCircle size={18} />
           <div>
-            <b>Sandbox top-ups are not enabled for this deployment.</b>
-            <span>
-              Wallet balances and transaction history remain available. An
-              administrator must enable the Stripe sandbox integration before
-              test payments can be created.
-            </span>
+            <b>{t("Sandbox top-ups are not enabled for this deployment.")}</b>
+            <span>{t("Wallet balances and transaction history remain available. An administrator must enable the Stripe sandbox integration before test payments can be created.")}</span>
           </div>
         </div>
       )}
-      {paymentNotice && <div className="success-note" role="status">{paymentNotice}</div>}
+      {paymentNotice && <div className="payment-reconciliation-notice success-note" role="status"><p>{t(paymentNotice)}</p>{paymentRefreshFailed && <Button variant="secondary" size="sm" disabled={refreshingPayment} onClick={() => void retryPaymentRefresh()}>{refreshingPayment ? t("Refreshing…") : t("Retry wallet refresh")}</Button>}</div>}
       {paymentsApiEnabled && topup && (
         <TopUpModal
           onClose={() => setTopup(false)}
@@ -167,6 +189,10 @@ export function WalletPage() {
 }
 
 function TopUpModal({ onClose }) {
+  const { t, language } = useTranslation();
+  const navigate = useNavigate();
+  const pendingCheckout = useRef(null);
+  const submitting = useRef(false);
   const [step, setStep] = useState(1);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -191,39 +217,45 @@ function TopUpModal({ onClose }) {
 
   const selectedPlan = packages.find((plan) => plan.id === selectedPackageId);
   const startCheckout = async () => {
+    if (submitting.current) return;
     if (!selectedPlan) {
       setError("No top-up package is available. Please try again shortly.");
       return;
     }
+    submitting.current = true;
     setLoading(true);
     setError("");
-    const idempotencyKey = crypto.randomUUID();
+    const locale = language === "zh-CN" ? "zh" : "en";
+    const signature = `${selectedPlan.id}:${locale}`;
+    if (pendingCheckout.current?.signature !== signature) {
+      pendingCheckout.current = { signature, key: crypto.randomUUID() };
+    }
     try {
       const session = await createTopUpCheckoutSession({
         topUpPackageId: selectedPlan.id,
-        idempotencyKey,
+        idempotencyKey: pendingCheckout.current.key,
+        locale,
       });
-      const checkoutUrl = new URL(session.checkoutUrl);
-      if (checkoutUrl.protocol !== "https:")
-        throw new Error("The payment provider returned an unsafe checkout URL.");
-      window.location.assign(checkoutUrl.toString());
+      navigate(`/wallet/checkout/${encodeURIComponent(session.paymentTransactionId)}`);
     } catch (checkoutError) {
       setError(checkoutError.message);
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
   return (
     <Modal
-      title="Add points to your wallet"
-      onClose={onClose}
+      title={t("Add points to your wallet")}
+      onClose={() => !submitting.current && onClose()}
       footer={
         <>
           <Button
             variant="secondary"
+            disabled={loading}
             onClick={() => (step === 1 ? onClose() : setStep(step - 1))}
           >
-            {step === 1 ? "Cancel" : "Back"}
+            {step === 1 ? t("Cancel") : t("Back")}
           </Button>
           <Button
             disabled={loading || packageStatus !== "ready" || !selectedPlan}
@@ -231,11 +263,10 @@ function TopUpModal({ onClose }) {
           >
             {loading ? (
               <>
-                <LoaderCircle className="spin" size={16} /> Connecting…
-              </>
+                <LoaderCircle className="spin" size={16} />{t(" Connecting…")}</>
             ) : (
               <>
-                {step === 2 ? "Continue to secure checkout" : "Continue"}
+                {step === 2 ? t("Continue to secure checkout") : t("Continue")}
                 <ArrowRight size={16} />
               </>
             )}
@@ -245,10 +276,10 @@ function TopUpModal({ onClose }) {
     >
       <div className="stepper">
         <span className={step >= 1 ? "active" : ""}>
-          1<b>Package</b>
+          1<b>{t("Package")}</b>
         </span>
         <span className={step >= 2 ? "active" : ""}>
-          2<b>Payment</b>
+          2<b>{t("Payment")}</b>
         </span>
       </div>
       {step === 1 && (
@@ -260,33 +291,31 @@ function TopUpModal({ onClose }) {
               onClick={() => setSelectedPackageId(plan.id)}
             >
               <span>{plan.points}</span>
-              <small>{plan.displayName}</small>
-              <b>S${(plan.amountMinor / 100).toFixed(2)}</b>
+              <small>{plan.displayName === `${plan.points} points` ? t("{0} points", { 0: plan.points }) : t(plan.displayName)}</small>
+              <b>{t("S$")}{(plan.amountMinor / 100).toFixed(2)}</b>
             </button>
           ))}
           {packageStatus === "loading" && (
             <div className="topup-package-status" role="status">
               <LoaderCircle className="spin" size={24} aria-hidden="true" />
-              <p>Loading secure top-up packages…</p>
+              <p>{t("Loading secure top-up packages…")}</p>
             </div>
           )}
           {packageStatus === "error" && (
             <div className="topup-package-status">
               <div className="form-error" role="alert">
                 <AlertCircle size={18} aria-hidden="true" />
-                <span>{packageState.error}</span>
+                <span>{t(packageState.error)}</span>
               </div>
               <Button variant="secondary" onClick={() => void packageLoader.load()}>
-                <RotateCcw size={16} aria-hidden="true" /> Retry loading packages
-              </Button>
+                <RotateCcw size={16} aria-hidden="true" />{t(" Retry loading packages")}</Button>
             </div>
           )}
           {packageStatus === "empty" && (
             <div className="topup-package-status">
-              <p role="status">No top-up packages are available right now. Please try again later.</p>
+              <p role="status">{t("No top-up packages are available right now. Please try again later.")}</p>
               <Button variant="secondary" onClick={() => void packageLoader.load()}>
-                <RotateCcw size={16} aria-hidden="true" /> Retry loading packages
-              </Button>
+                <RotateCcw size={16} aria-hidden="true" />{t(" Retry loading packages")}</Button>
             </div>
           )}
         </div>
@@ -294,25 +323,19 @@ function TopUpModal({ onClose }) {
       {step === 2 && selectedPlan && (
         <div className="payment-preview">
           <ShieldCheck size={30} />
-          <h3>Secure external checkout</h3>
-          <p>
-            CoLearnX creates a top-up order, then the external payment provider
-            collects payment details. Raw card data never enters CoLearnX.
-          </p>
+          <h3>{t("Secure payment")}</h3>
+          <p>{t("Choose your payment method on the next page. Your payment details are securely collected by Stripe.")}</p>
           <div className="integration-note">
-            <b>Stripe sandbox checkout</b>
-            <span>
-              Points are credited only after the Express webhook verifies the
-              provider event and idempotency key.
-            </span>
+            <b>{t("Stripe sandbox checkout")}</b>
+            <span>{t("Your points will be added once payment is confirmed.")}</span>
           </div>
           <div className="summary-row total">
-            <span>Amount</span>
-            <b>S${(selectedPlan.amountMinor / 100).toFixed(2)}</b>
+            <span>{t("Amount")}</span>
+            <b>{t("S$")}{(selectedPlan.amountMinor / 100).toFixed(2)}</b>
           </div>
           {error && (
             <div className="form-error" role="alert">
-              <AlertCircle size={17} /> {error}
+              <AlertCircle size={17} /> {t(error)}
             </div>
           )}
         </div>
@@ -322,19 +345,20 @@ function TopUpModal({ onClose }) {
 }
 
 function TransactionTable({ transactions }) {
-  const bucketLines = (values = {}) => Object.entries(values).filter(([, value]) => Number(value) !== 0).map(([bucket, value]) => `${bucket}: ${Number(value) > 0 ? "+" : ""}${value}`);
-  const balanceLines = (values = {}) => Object.entries(values).filter(([, value]) => value !== null && value !== undefined).map(([bucket, value]) => `${bucket}: ${value}`);
+  const { t } = useTranslation();
+  const bucketLines = (values = {}) => Object.entries(values).filter(([, value]) => Number(value) !== 0).map(([bucket, value]) => `${t(bucket)}: ${Number(value) > 0 ? "+" : ""}${value}`);
+  const balanceLines = (values = {}) => Object.entries(values).filter(([, value]) => value !== null && value !== undefined).map(([bucket, value]) => `${t(bucket)}: ${value}`);
   return (
     <div className="responsive-table">
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Transaction</th>
-            <th>Category</th>
-            <th>Bucket changes</th>
-            <th>Balances after</th>
-            <th>Status</th>
+            <th>{t("Date")}</th>
+            <th>{t("Transaction")}</th>
+            <th>{t("Category")}</th>
+            <th>{t("Bucket changes")}</th>
+            <th>{t("Balances after")}</th>
+            <th>{t("Status")}</th>
           </tr>
         </thead>
         <tbody>
@@ -342,16 +366,16 @@ function TransactionTable({ transactions }) {
             <tr key={tx.id}>
               <td>
                 {tx.createdAt
-                  ? new Date(tx.createdAt).toLocaleString("en-SG", {
+                  ? new Date(tx.createdAt).toLocaleString(getFormatLocale(), {
                       dateStyle: "medium",
                       timeStyle: "short",
                     })
                   : tx.date}
               </td>
               <td>
-                <b>{tx.type}</b>
-                <small className="table-subtitle">{tx.item}</small>
-                {(tx.orderReference || tx.refundReference) && <small className="table-subtitle">{tx.orderReference && `Order: ${tx.orderReference}`}{tx.orderReference && tx.refundReference ? " · " : ""}{tx.refundReference && `Refund: ${tx.refundReference}`}</small>}
+                <b>{t(tx.type)}</b>
+                <small className="table-subtitle">{tx.itemTranslationKey ? t(tx.itemTranslationKey) : tx.item}</small>
+                {(tx.orderReference || tx.refundReference) && <small className="table-subtitle">{tx.orderReference && t("Order: {0}", { 0: tx.orderReference })}{tx.orderReference && tx.refundReference ? " · " : ""}{tx.refundReference && t("Refund: {0}", { 0: tx.refundReference })}</small>}
               </td>
               <td>
                 <Badge
@@ -367,14 +391,14 @@ function TransactionTable({ transactions }) {
                           : "neutral"
                   }
                 >
-                  {tx.category}
+                  {t(tx.category)}
                 </Badge>
               </td>
-              <td><div className="ledger-buckets">{bucketLines(tx.deltas).map((line) => <span key={line}>{line}</span>)}{!bucketLines(tx.deltas).length && <span>No point change</span>}</div></td>
-              <td><div className="ledger-buckets">{balanceLines(tx.balancesAfter).map((line) => <span key={line}>{line}</span>)}{!balanceLines(tx.balancesAfter).length && <span>Not supplied</span>}</div></td>
+              <td><div className="ledger-buckets">{bucketLines(tx.deltas).map((line) => <span key={line}>{line}</span>)}{!bucketLines(tx.deltas).length && <span>{t("No point change")}</span>}</div></td>
+              <td><div className="ledger-buckets">{balanceLines(tx.balancesAfter).map((line) => <span key={line}>{line}</span>)}{!balanceLines(tx.balancesAfter).length && <span>{t("Not supplied")}</span>}</div></td>
               <td>
                 <span className="status-text">
-                  <CheckCircle2 size={14} /> {tx.status}
+                  <CheckCircle2 size={14} /> {t(tx.status)}
                 </span>
               </td>
             </tr>
@@ -386,6 +410,7 @@ function TransactionTable({ transactions }) {
 }
 
 export function TransactionHistoryPage() {
+  const { t } = useTranslation();
   const { transactions } = usePlatform();
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
@@ -426,7 +451,7 @@ export function TransactionHistoryPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search transactions"
+            placeholder={t("Search transactions")}
           />
         </div>
       </div>
@@ -436,6 +461,7 @@ export function TransactionHistoryPage() {
 }
 
 export function AdminDashboardPage() {
+  const { t } = useTranslation();
   const {
     roleApplications,
     adminTrainerCertifications,
@@ -498,18 +524,18 @@ export function AdminDashboardPage() {
     <>
       <div className="metric-grid four">
         <Metric
-          label="Pending role applications"
+          label={t("Pending role applications")}
           value={pendingRoles.length}
           icon={UserCheck}
         />
         <Metric
-          label="Refund requests"
+          label={t("Refund requests")}
           value={pendingRefunds.length}
           icon={RotateCcw}
         />
-        <Metric label="Active courses" value={courses.filter((item) => item.isPublished !== false).length} icon={BookOpen} />
+        <Metric label={t("Active courses")} value={courses.filter((item) => item.isPublished !== false).length} icon={BookOpen} />
         <Metric
-          label="Trainer certifications"
+          label={t("Trainer certifications")}
           value={pendingCertifications.length}
           icon={ShieldCheck}
         />
@@ -518,10 +544,10 @@ export function AdminDashboardPage() {
         <Card>
           <div className="card-heading">
             <div>
-              <span className="eyebrow">Priority queue</span>
-              <h3>Role application review</h3>
+              <span className="eyebrow">{t("Priority queue")}</span>
+              <h3>{t("Role application review")}</h3>
             </div>
-            <Badge tone="warning">{pendingRoles.length} pending</Badge>
+            <Badge tone="warning">{pendingRoles.length}{t(" pending")}</Badge>
           </div>
           {pendingRoles.length ? (
             <div className="queue-list">
@@ -537,7 +563,7 @@ export function AdminDashboardPage() {
                   <div>
                     <b>{application.user}</b>
                     <small>
-                      {application.type} · {application.category}
+                      {t(application.type)} · {application.category}
                     </small>
                     <span className="queue-detail">
                       {application.portfolio}
@@ -550,39 +576,33 @@ export function AdminDashboardPage() {
                       setSelectedRoleId(application.id);
                       setRoleDecisionReason("");
                     }}
-                  >
-                    Review
-                  </Button>
+                  >{t("Review")}</Button>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="empty-copy">No pending role applications.</p>
+            <p className="empty-copy">{t("No pending role applications.")}</p>
           )}
           {selectedRole && (
             <div className="application-review">
               <h4>{selectedRole.user} · {selectedRole.type}</h4>
               <dl className="detail-list">
-                <div><dt>Category</dt><dd>{selectedRole.category}</dd></div>
-                <div><dt>Experience</dt><dd>{selectedRole.experience}</dd></div>
-                <div><dt>Portfolio</dt><dd>{selectedRole.portfolio}</dd></div>
-                 <div><dt>Reason</dt><dd>{selectedRole.reason}</dd></div>
-                 <div><dt>Declaration</dt><dd>{selectedRole.declarationAccepted ? "Accepted" : "Missing"}</dd></div>
+                <div><dt>{t("Category")}</dt><dd>{selectedRole.category}</dd></div>
+                <div><dt>{t("Experience")}</dt><dd>{selectedRole.experience}</dd></div>
+                <div><dt>{t("Portfolio")}</dt><dd>{selectedRole.portfolio}</dd></div>
+                 <div><dt>{t("Reason")}</dt><dd>{selectedRole.reason}</dd></div>
+                 <div><dt>{t("Declaration")}</dt><dd>{selectedRole.declarationAccepted ? t("Accepted") : t("Missing")}</dd></div>
               </dl>
-              <FormField label="Decision reason">
+              <FormField label={t("Decision reason")}>
                 <textarea
                   value={roleDecisionReason}
                   onChange={(event) => setRoleDecisionReason(event.target.value)}
-                  placeholder="Record why this application is approved or rejected"
+                  placeholder={t("Record why this application is approved or rejected")}
                 />
               </FormField>
               <div className="button-row">
-                <Button disabled={roleDecisionReason.trim().length < 5} onClick={() => decideRole("Approved")}>
-                  Approve
-                </Button>
-                <Button variant="danger" disabled={roleDecisionReason.trim().length < 5} onClick={() => decideRole("Rejected")}>
-                  Reject
-                </Button>
+                <Button disabled={roleDecisionReason.trim().length < 5} onClick={() => decideRole("Approved")}>{t("Approve")}</Button>
+                <Button variant="danger" disabled={roleDecisionReason.trim().length < 5} onClick={() => decideRole("Rejected")}>{t("Reject")}</Button>
               </div>
             </div>
           )}
@@ -590,35 +610,28 @@ export function AdminDashboardPage() {
         <Card>
           <div className="card-heading">
             <div>
-              <span className="eyebrow">Policy workflow</span>
-              <h3>Refund management</h3>
+              <span className="eyebrow">{t("Policy workflow")}</span>
+              <h3>{t("Refund management")}</h3>
             </div>
-            <Badge tone="danger">{pendingRefunds.length} requests</Badge>
+            <Badge tone="danger">{pendingRefunds.length}{t(" requests")}</Badge>
           </div>
-          <p>
-            Review the course format, cancellation deadline, viewing percentage
-            and video download evidence before making a decision.
-          </p>
-          <Button onClick={() => navigate("/admin/refunds")}>
-            Open refund review <ArrowRight size={16} />
+          <p>{t("Review the course format, cancellation deadline, viewing percentage and video download evidence before making a decision.")}</p>
+          <Button onClick={() => navigate("/admin/refunds")}>{t("Open refund review ")}<ArrowRight size={16} />
           </Button>
         </Card>
       </div>
       <Card>
         <div className="card-heading">
           <div>
-            <span className="eyebrow">Separate P0 gate</span>
-            <h3>Trainer certification review</h3>
+            <span className="eyebrow">{t("Separate P0 gate")}</span>
+            <h3>{t("Trainer certification review")}</h3>
           </div>
-          <Badge tone="warning">{pendingCertifications.length} pending</Badge>
+          <Badge tone="warning">{pendingCertifications.length}{t(" pending")}</Badge>
         </div>
-        <p>
-          Approving a Trainer application does not grant the operational role.
-          Certification evidence and a second recorded decision are required.
-        </p>
+        <p>{t("Approving a Trainer application does not grant the operational role. Certification evidence and a second recorded decision are required.")}</p>
         {pendingCertifications.length ? (
           <div className="application-review">
-            <FormField label="Trainer certification record">
+            <FormField label={t("Trainer certification record")}>
               <select
                 value={selectedCertification?.id || ""}
                 onChange={(event) => {
@@ -629,62 +642,58 @@ export function AdminDashboardPage() {
               >
                 {pendingCertifications.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.trainer?.displayName || "Trainer"} · {item.certificationName}{item.certificationReference ? ` · ${item.certificationReference}` : ""}
+                    {item.trainer?.displayName || t("Trainer")} · {item.certificationName}{item.certificationReference ? ` · ${item.certificationReference}` : ""}
                   </option>
                 ))}
               </select>
             </FormField>
-            {certificationError && <p role="alert" className="form-error">{certificationError}</p>}
-            <FormField label="Certification decision reason">
+            {certificationError && <p role="alert" className="form-error">{t(certificationError)}</p>}
+            <FormField label={t("Certification decision reason")}>
               <textarea
                 value={certificationReason}
                 onChange={(event) => setCertificationReason(event.target.value)}
-                placeholder="Record the reviewed evidence and decision"
+                placeholder={t("Record the reviewed evidence and decision")}
               />
             </FormField>
             <div className="button-row">
               <Button
                 disabled={certificationReason.trim().length < 5}
                 onClick={() => decideCertification("Approved")}
-              >
-                Approve certification
-              </Button>
+              >{t("Approve certification")}</Button>
               <Button
                 variant="danger"
                 disabled={certificationReason.trim().length < 5}
                 onClick={() => decideCertification("Rejected")}
-              >
-                Reject certification
-              </Button>
+              >{t("Reject certification")}</Button>
             </div>
           </div>
         ) : (
-          <p className="empty-copy">No Trainer certifications await review.</p>
+          <p className="empty-copy">{t("No Trainer certifications await review.")}</p>
         )}
       </Card>
       <Card>
-        <span className="eyebrow">Platform control</span>
-        <h3>Management overview</h3>
+        <span className="eyebrow">{t("Platform control")}</span>
+        <h3>{t("Management overview")}</h3>
         <div className="admin-actions">
           <button onClick={() => navigate("/admin/users")}>
             <UserCheck size={19} />
             <span>
-              <b>Users and roles</b>
-              <small>Profiles, permissions and applications</small>
+              <b>{t("Users and roles")}</b>
+              <small>{t("Profiles, permissions and applications")}</small>
             </span>
           </button>
           <button onClick={() => navigate("/admin/catalog")}>
             <BookOpen size={19} />
             <span>
-              <b>Courses and contents</b>
-              <small>Listings, publication and reports</small>
+              <b>{t("Courses and contents")}</b>
+              <small>{t("Listings, publication and reports")}</small>
             </span>
           </button>
           <button onClick={() => navigate("/transactions")}>
             <CircleDollarSign size={19} />
             <span>
-              <b>Transactions</b>
-              <small>Points, income and refund records</small>
+              <b>{t("Transactions")}</b>
+              <small>{t("Points, income and refund records")}</small>
             </span>
           </button>
         </div>
@@ -694,6 +703,7 @@ export function AdminDashboardPage() {
 }
 
 export function AdminRefundPage() {
+  const { t } = useTranslation();
   const { refundRequests, decideRefund } = usePlatform();
   const [selectedId, setSelectedId] = useState(refundRequests[0]?.id || null);
   const [decisionReason, setDecisionReason] = useState("");
@@ -702,8 +712,8 @@ export function AdminRefundPage() {
   if (!selected)
     return (
       <Card>
-        <h3>No refund requests</h3>
-        <p>New member requests will appear here.</p>
+        <h3>{t("No refund requests")}</h3>
+        <p>{t("New member requests will appear here.")}</p>
       </Card>
     );
   const canApprove = selected.eligibility === "Eligible";
@@ -717,23 +727,21 @@ export function AdminRefundPage() {
       <Card className="table-card">
         <div className="card-heading">
           <div>
-            <span className="eyebrow">Course refund requests</span>
-            <h3>Review queue</h3>
+            <span className="eyebrow">{t("Course refund requests")}</span>
+            <h3>{t("Review queue")}</h3>
           </div>
           <Badge tone="warning">
-            {refundRequests.filter((r) => r.status === "Pending").length}{" "}
-            pending
-          </Badge>
+            {refundRequests.filter((r) => r.status === "Pending").length}{" "}{t("pending")}</Badge>
         </div>
         <div className="responsive-table">
           <table>
             <thead>
               <tr>
-                <th>User</th>
-                <th>Course</th>
-                <th>Policy basis</th>
-                <th>Eligibility</th>
-                <th>Status</th>
+                <th>{t("User")}</th>
+                <th>{t("Course")}</th>
+                <th>{t("Policy basis")}</th>
+                <th>{t("Eligibility")}</th>
+                <th>{t("Status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -777,7 +785,7 @@ export function AdminRefundPage() {
                       {currentEligibility}
                     </Badge>
                   </td>
-                  <td>{request.status}</td>
+                  <td>{t(request.status)}</td>
                 </tr>
                 );
               })}
@@ -786,50 +794,50 @@ export function AdminRefundPage() {
         </div>
       </Card>
       <Card className="review-panel">
-        <span className="eyebrow">Selected request</span>
+        <span className="eyebrow">{t("Selected request")}</span>
         <h3>
           {selected.user} · {selected.course}
         </h3>
         <dl className="detail-list">
           <div>
-            <dt>Member reason</dt>
+            <dt>{t("Member reason")}</dt>
             <dd>{selected.reason}</dd>
           </div>
           <div>
-            <dt>Policy evidence</dt>
+            <dt>{t("Policy evidence")}</dt>
             <dd>{selected.basis}</dd>
           </div>
           <div>
-            <dt>Points paid</dt>
+            <dt>{t("Points paid")}</dt>
             <dd>{selected.paid}</dd>
           </div>
           <div>
-            <dt>Eligibility</dt>
+            <dt>{t("Eligibility")}</dt>
             <dd>
               {selected.status === "Pending"
                 ? canApprove
-                  ? "Eligible"
-                  : "Not eligible"
+                  ? t("Eligible")
+                  : t("Not eligible")
                 : selected.eligibility}
             </dd>
           </div>
           <div>
-            <dt>Current policy check</dt>
+            <dt>{t("Current policy check")}</dt>
             <dd>
               {selected.eligibilityAtDecision || selected.basis}
             </dd>
           </div>
           <div>
-            <dt>Current status</dt>
-            <dd>{selected.status}</dd>
+            <dt>{t("Current status")}</dt>
+            <dd>{t(selected.status)}</dd>
           </div>
         </dl>
-        <FormField label="Decision reason">
+        <FormField label={t("Decision reason")}>
           <textarea
             disabled={selected.status !== "Pending"}
             value={decisionReason}
             onChange={(event) => setDecisionReason(event.target.value)}
-            placeholder="Explain the approval or rejection"
+            placeholder={t("Explain the approval or rejection")}
           />
         </FormField>
         <div className="button-row">
@@ -841,8 +849,7 @@ export function AdminRefundPage() {
             }
             onClick={() => decide("Approved")}
           >
-            <Check size={16} /> Approve
-          </Button>
+            <Check size={16} />{t(" Approve")}</Button>
           <Button
             variant="danger"
             disabled={
@@ -850,54 +857,52 @@ export function AdminRefundPage() {
             }
             onClick={() => decide("Rejected")}
           >
-            <X size={16} /> Reject
-          </Button>
+            <X size={16} />{t(" Reject")}</Button>
         </div>
         <p className="policy-note">
-          <ShieldCheck size={17} /> Approval returns points to the learner.
-          Rejection keeps the original transaction.
-        </p>
+          <ShieldCheck size={17} />{t(" Approval returns points to the learner. Rejection keeps the original transaction.")}</p>
       </Card>
     </div>
   );
 }
 
 export function AdminUsersPage() {
+  const { t } = useTranslation();
   const { profile, approvedRoles, applications, roleApplications } =
     usePlatform();
   return (
     <div className="stack">
       <Card>
-        <span className="eyebrow">Account overview</span>
+        <span className="eyebrow">{t("Account overview")}</span>
         <h3>{profile.name}</h3>
         <div className="badge-row">
           {approvedRoles.map((role) => (
-            <Badge key={role} tone="success">{role}</Badge>
+            <Badge key={role} tone="success">{t(role)}</Badge>
           ))}
         </div>
         <dl className="detail-list">
-          <div><dt>Email</dt><dd>{profile.email}</dd></div>
-          <div><dt>Trainer application</dt><dd>{applications.Trainer}</dd></div>
-          <div><dt>Creator application</dt><dd>{applications.Creator}</dd></div>
+          <div><dt>{t("Email")}</dt><dd>{profile.email}</dd></div>
+          <div><dt>{t("Trainer application")}</dt><dd>{applications.Trainer}</dd></div>
+          <div><dt>{t("Creator application")}</dt><dd>{applications.Creator}</dd></div>
         </dl>
       </Card>
       <Card className="table-card">
         <div className="card-heading">
-          <div><span className="eyebrow">Role records</span><h3>Application history</h3></div>
-          <Badge>{roleApplications.length} records</Badge>
+          <div><span className="eyebrow">{t("Role records")}</span><h3>{t("Application history")}</h3></div>
+          <Badge>{roleApplications.length}{t(" records")}</Badge>
         </div>
         <div className="responsive-table">
           <table>
-            <thead><tr><th>User</th><th>Role</th><th>Category</th><th>Status</th><th>Certification</th><th>Decision</th></tr></thead>
+            <thead><tr><th>{t("User")}</th><th>{t("Role")}</th><th>{t("Category")}</th><th>{t("Status")}</th><th>{t("Certification")}</th><th>{t("Decision")}</th></tr></thead>
             <tbody>
               {roleApplications.map((item) => (
                 <tr key={item.id}>
                   <td><b>{item.user}</b></td>
                   <td>{item.type}</td>
                   <td>{item.category}</td>
-                  <td><Badge tone={item.status === "Approved" ? "success" : item.status === "Rejected" ? "danger" : "warning"}>{item.status}</Badge></td>
-                  <td>{item.type === "Trainer" ? item.certificationStatus || "Not started" : "Not required"}</td>
-                  <td>{item.decisionReason || "Pending review"}</td>
+                  <td><Badge tone={item.status === "Approved" ? "success" : item.status === "Rejected" ? "danger" : "warning"}>{t(item.status)}</Badge></td>
+                  <td>{item.type === "Trainer" ? item.certificationStatus || t("Not started") : t("Not required")}</td>
+                  <td>{item.decisionReason || t("Pending review")}</td>
                 </tr>
               ))}
             </tbody>
@@ -909,27 +914,28 @@ export function AdminUsersPage() {
 }
 
 export function AdminCatalogPage() {
+  const { t } = useTranslation();
   const { courses, contents } = usePlatform();
   const [tab, setTab] = useState("Courses");
   const items = tab === "Courses" ? courses : contents;
   return (
     <Card className="table-card">
       <div className="card-heading">
-        <div><span className="eyebrow">Marketplace control</span><h3>Courses and contents</h3></div>
+        <div><span className="eyebrow">{t("Marketplace control")}</span><h3>{t("Courses and contents")}</h3></div>
         <Segmented options={["Courses", "Contents"]} value={tab} onChange={setTab} />
       </div>
       <div className="responsive-table">
         <table>
-          <thead><tr><th>Title</th><th>Owner</th><th>Category</th><th>Price</th><th>Publication</th><th>Purchases</th></tr></thead>
+          <thead><tr><th>{t("Title")}</th><th>{t("Owner")}</th><th>{t("Category")}</th><th>{t("Price")}</th><th>{t("Publication")}</th><th>{t("Purchases")}</th></tr></thead>
           <tbody>
             {items.map((item) => (
               <tr key={item.id}>
                 <td><b>{item.title}</b></td>
                 <td>{item.trainer || item.creator}</td>
                 <td>{item.category}</td>
-                <td>{item.price} points</td>
-                <td><Badge tone={item.isPublished === false ? "warning" : "success"}>{item.isPublished === false ? "Hidden / Draft" : "Published"}</Badge></td>
-                <td>{item.purchased ? "Purchased" : "Available"}</td>
+                <td>{item.price}{t(" points")}</td>
+                <td><Badge tone={item.isPublished === false ? "warning" : "success"}>{item.isPublished === false ? t("Hidden / Draft") : t("Published")}</Badge></td>
+                <td>{item.purchased ? t("Purchased") : t("Available")}</td>
               </tr>
             ))}
           </tbody>

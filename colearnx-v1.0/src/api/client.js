@@ -1,6 +1,7 @@
 import axios from "axios";
 import { readSessionValue, writeSessionValue } from "../utils/sessionStorage.js";
 import { clearStepUpAuthorization, withStepUp } from "./stepUp.js";
+import { readSessionResource } from "./sessionRecovery.js";
 
 const accessTokenKey = "colearnx-api-access-token";
 const csrfTokenKey = "colearnx-api-csrf-token";
@@ -36,16 +37,23 @@ async function refreshAccess(generation) {
   refresh.promise = (async () => {
     try {
       const options = { _skipAuthRefresh: true, _skipAccessToken: true, _sessionGeneration: generation };
-      const csrf = (await apiClient.get("/auth/csrf", options)).data.data;
+      const csrf = await readSessionResource(async (readOptions) => {
+        const data = (await apiClient.get("/auth/csrf", { ...readOptions, ...options })).data?.data;
+        if (!data || !(data.csrfToken === null || (typeof data.csrfToken === "string" && data.csrfToken.length > 0))) {
+          throw Object.assign(new Error("The session service is still connecting. Please try again."), { code: "AUTH_CSRF_INVALID", status: 502 });
+        }
+        return data;
+      });
       if (generation !== sessionGeneration) throw sessionChanged();
       if (!csrf?.csrfToken) throw Object.assign(new Error("Please sign in again."), { code: "AUTH_SESSION_EXPIRED", status: 401 });
       setCsrfToken(csrf.csrfToken);
-      const result = (await apiClient.post("/auth/refresh", {}, options)).data.data;
+      const result = (await apiClient.post("/auth/refresh", {}, { ...options, timeout: 20000 })).data?.data;
       if (generation !== sessionGeneration) throw sessionChanged();
       if (!result?.accessToken || !result.csrfToken) throw Object.assign(new Error("The session service returned an incomplete response."), { code: "AUTH_REFRESH_INVALID", status: 502 });
       // Rotation keeps the same account generation; explicit sign-in/out invalidates queued work.
       accessToken = result.accessToken; writeSessionValue(accessTokenKey, accessToken);
       setCsrfToken(result.csrfToken);
+      return result;
     } catch (error) {
       if (generation === sessionGeneration && [401, 403].includes(error.status)) { setAccessToken(""); setCsrfToken(""); }
       throw error;
@@ -54,6 +62,10 @@ async function refreshAccess(generation) {
   refreshInFlight = refresh;
   return refresh.promise;
 }
+
+// Bootstrap and expired-token requests must share the same rotation. Sending
+// two refresh POSTs with one cookie can otherwise trigger reuse protection.
+export const restoreClientSession = () => refreshAccess(sessionGeneration);
 
 apiClient.interceptors.response.use((response) => response, async (error) => {
   const config = error.config, code = error.response?.data?.error?.code;

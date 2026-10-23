@@ -1,3 +1,4 @@
+import { getFormatLocale, useTranslation } from "../i18n/LanguageContext";
 import { useCallback, useEffect, useState } from "react";
 import {
   BadgeCheck,
@@ -38,11 +39,13 @@ function normalizeWebUrl(value) {
 }
 
 function ServerStatus({ value }) {
+  const { t } = useTranslation();
   const tone = value === "Approved" || value === "Published" ? "success" : value === "Rejected" ? "danger" : "warning";
-  return <Badge tone={tone}>{value}</Badge>;
+  return <Badge tone={tone}>{t(value)}</Badge>;
 }
 
 function RoleApplicationCard({ type, status, onSubmit }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ category: "", portfolio: "", experience: "", reason: "" });
   const [busy, setBusy] = useState(false);
@@ -73,33 +76,33 @@ function RoleApplicationCard({ type, status, onSubmit }) {
         </span>
         <div>
           <div className="badge-row"><ServerStatus value={status} /></div>
-          <h3>{type}</h3>
-          <p>{roleCopy[type].description}</p>
+          <h3>{t(type)}</h3>
+          <p>{t(roleCopy[type].description)}</p>
         </div>
       </header>
       {status === "Not applied" || status === "Rejected" ? (
         <Button variant="secondary" onClick={() => setOpen((value) => !value)}>
-          {open ? "Cancel" : `Apply for ${type}`}
+          {open ? t("Cancel") : t("Apply for {0}", { 0: t(type) })}
         </Button>
       ) : null}
       {open && (
         <form className="application-form" onSubmit={submit}>
-          <p className="muted">Complete the three required fields below. A portfolio link is optional and accepts either a full URL or a www. address.</p>
-          <FormField label="Subject category *">
+          <p className="muted">{t("Complete the three required fields below. A portfolio link is optional and accepts either a full URL or a www. address.")}</p>
+          <FormField label={t("Subject category *")}>
             <input required value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} />
           </FormField>
-          <FormField label="Portfolio or professional profile URL (optional)">
-            <input type="text" inputMode="url" autoComplete="url" placeholder="https://example.com or www.example.com" value={form.portfolio} onChange={(event) => setForm({ ...form, portfolio: event.target.value })} />
+          <FormField label={t("Portfolio or professional profile URL (optional)")}>
+            <input type="text" inputMode="url" autoComplete="url" placeholder={t("https://example.com or www.example.com")} value={form.portfolio} onChange={(event) => setForm({ ...form, portfolio: event.target.value })} />
           </FormField>
-          <FormField label="Relevant experience *">
+          <FormField label={t("Relevant experience *")}>
             <textarea required value={form.experience} onChange={(event) => setForm({ ...form, experience: event.target.value })} />
           </FormField>
-          <FormField label="Why are you applying? *">
+          <FormField label={t("Why are you applying? *")}>
             <textarea required value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
           </FormField>
-          {error && <p className="form-error">{error}</p>}
+          {error && <p className="form-error">{t(error)}</p>}
           <Button disabled={busy} type="submit">
-            <Send size={16} /> {busy ? "Submitting…" : "Submit application"}
+            <Send size={16} /> {busy ? t("Submitting…") : t("Submit application")}
           </Button>
         </form>
       )}
@@ -108,6 +111,7 @@ function RoleApplicationCard({ type, status, onSubmit }) {
 }
 
 export function RoleApplicationPage() {
+  const { t } = useTranslation();
   const {
     applications,
     approvedRoles,
@@ -119,9 +123,9 @@ export function RoleApplicationPage() {
     <>
       <section className="role-intro">
         <div>
-          <span className="eyebrow">Platform roles</span>
-          <h2>Apply to contribute</h2>
-          <p>Applications are stored in CoLearnX and reviewed by an administrator.</p>
+          <span className="eyebrow">{t("Platform roles")}</span>
+          <h2>{t("Apply to contribute")}</h2>
+          <p>{t("Applications are stored in CoLearnX and reviewed by an administrator.")}</p>
         </div>
         <ShieldCheck size={38} />
       </section>
@@ -146,6 +150,7 @@ export function RoleApplicationPage() {
 }
 
 function TrainerCertificationCard({ certifications, onSubmit }) {
+  const { t } = useTranslation();
   const latest = certifications[0];
   const [form, setForm] = useState({ certificationName: "", certificationReference: "", evidenceUrl: "" });
   const [busy, setBusy] = useState(false);
@@ -176,33 +181,33 @@ function TrainerCertificationCard({ certifications, onSubmit }) {
     <Card className="application-card">
       <div className="card-heading">
         <div>
-          <span className="eyebrow">Trainer prerequisite</span>
-          <h3>Certification review</h3>
-          <p>Course creation is enabled only after an administrator approves this certification record.</p>
+          <span className="eyebrow">{t("Trainer prerequisite")}</span>
+          <h3>{t("Certification review")}</h3>
+          <p>{t("Course creation is enabled only after an administrator approves this certification record.")}</p>
         </div>
         {latest && <ServerStatus value={latest.status === "pending" ? "Pending" : latest.status === "approved" ? "Approved" : "Rejected"} />}
       </div>
       {latest?.status === "approved" ? (
-        <p className="success-note">Your trainer certification is approved. You may create a course for review.</p>
+        <p className="success-note">{t("Your trainer certification is approved. You may create a course for review.")}</p>
       ) : (
         <form className="application-form" onSubmit={submit}>
-          <FormField label="Certification name"><input required value={form.certificationName} onChange={(event) => setForm({ ...form, certificationName: event.target.value })} /></FormField>
-          <FormField label="Reference number (optional)"><input value={form.certificationReference} onChange={(event) => setForm({ ...form, certificationReference: event.target.value })} /></FormField>
+          <FormField label={t("Certification name")}><input required value={form.certificationName} onChange={(event) => setForm({ ...form, certificationName: event.target.value })} /></FormField>
+          <FormField label={t("Reference number (optional)")}><input value={form.certificationReference} onChange={(event) => setForm({ ...form, certificationReference: event.target.value })} /></FormField>
           <FormField
-            label="Evidence URL (optional)"
-            hint="Paste a public link, or enter a domain such as example.com."
+            label={t("Evidence URL (optional)")}
+            hint={t("Paste a public link, or enter a domain such as example.com.")}
           >
             <input
               type="text"
               inputMode="url"
               autoComplete="url"
-              placeholder="https://example.com or www.example.com"
+              placeholder={t("https://example.com or www.example.com")}
               value={form.evidenceUrl}
               onChange={(event) => setForm({ ...form, evidenceUrl: event.target.value })}
             />
           </FormField>
-          {error && <p className="form-error">{error}</p>}
-          <Button disabled={busy || latest?.status === "pending"} type="submit"><BadgeCheck size={16} /> {busy ? "Submitting…" : latest?.status === "pending" ? "Certification pending" : "Submit certification"}</Button>
+          {error && <p className="form-error">{t(error)}</p>}
+          <Button disabled={busy || latest?.status === "pending"} type="submit"><BadgeCheck size={16} /> {busy ? t("Submitting…") : latest?.status === "pending" ? t("Certification pending") : t("Submit certification")}</Button>
         </form>
       )}
     </Card>
@@ -210,6 +215,7 @@ function TrainerCertificationCard({ certifications, onSubmit }) {
 }
 
 function ContentListingEditor() {
+  const { t } = useTranslation();
   const { refreshMyListings, notify } = usePlatform();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedDraftId = searchParams.get("draft");
@@ -304,39 +310,40 @@ function ContentListingEditor() {
   return (
     <form className="content-grid editor-layout" onSubmit={createDraft}>
       <Card className="stack">
-        <div><span className="eyebrow">Content details</span><h2>Create content</h2></div>
-        <FormField label="Content title"><input required disabled={Boolean(draft)} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></FormField>
-        <FormField label="Public description"><textarea required disabled={Boolean(draft)} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FormField>
-        <FormField label="Price in points"><input required min="0" disabled={Boolean(draft)} type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
-        <FormField label="Content type"><input required disabled={Boolean(draft)} value={form.contentType} onChange={(event) => setForm({ ...form, contentType: event.target.value })} /></FormField>
+        <div><span className="eyebrow">{t("Content details")}</span><h2>{t("Create content")}</h2></div>
+        <FormField label={t("Content title")}><input required disabled={Boolean(draft)} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></FormField>
+        <FormField label={t("Public description")}><textarea required disabled={Boolean(draft)} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FormField>
+        <FormField label={t("Price in points")}><input required min="0" disabled={Boolean(draft)} type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
+        <FormField label={t("Content type")}><input required disabled={Boolean(draft)} value={form.contentType} onChange={(event) => setForm({ ...form, contentType: event.target.value })} /></FormField>
         <PrivateAssetUploader
           contentVersionId={draft?.contentVersionId}
           onAssetsChange={handleAssetsChange}
           disabled={submitted || busy}
         />
-        {!draft && <p className="policy-note">Choose or drop files now. They upload automatically immediately after you create the content.</p>}
-        {draft && <p className="policy-note">Files upload one at a time and are checked by the server. You can remove any file with the × button.</p>}
-        {error && <p className="form-error" role="alert">{error}</p>}
+        {!draft && <p className="policy-note">{t("Choose or drop files now. They upload automatically immediately after you create the content.")}</p>}
+        {draft && <p className="policy-note">{t("Files upload one at a time and are checked by the server. You can remove any file with the × button.")}</p>}
+        {error && <p className="form-error" role="alert">{t(error)}</p>}
         {!draft ? (
-          <Button type="submit" disabled={busy}><Send size={16} /> {busy ? "Creating content…" : "Create content"}</Button>
+          <Button type="submit" disabled={busy}><Send size={16} /> {busy ? t("Creating content…") : t("Create content")}</Button>
         ) : (
           <Button type="button" onClick={submitForReview} disabled={busy || submitted || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0 || uploadSummary.unresolvedCount > 0 || uploadSummary.loading || Boolean(uploadSummary.error)}>
-            <Send size={16} /> {submitted ? "Submitted for administrator review" : busy ? "Submitting…" : "Submit for administrator review"}
+            <Send size={16} /> {submitted ? t("Submitted for administrator review") : busy ? t("Submitting…") : t("Submit for administrator review")}
           </Button>
         )}
       </Card>
       <Card className="editor-summary">
-        <span className="eyebrow">Content upload</span>
-        <h3>{submitted ? "Submitted for review" : uploadSummary.activeCount ? "Uploading files" : uploadSummary.readyCount ? `${uploadSummary.readyCount} file${uploadSummary.readyCount === 1 ? "" : "s"} ready` : draft ? "Add files" : "Add files"}</h3>
-        <p>{submitted ? "Your content is waiting for an administrator review." : uploadSummary.activeCount ? "Your files are uploading automatically. Keep this page open until each row has a green check." : "Add one or more files, then submit the completed content for review."}</p>
+        <span className="eyebrow">{t("Content upload")}</span>
+        <h3>{submitted ? t("Submitted for review") : uploadSummary.activeCount ? t("Uploading files") : uploadSummary.readyCount ? t("{0} file{1} ready", { 0: uploadSummary.readyCount, 1: uploadSummary.readyCount === 1 ? "" : "s" }) : draft ? t("Add files") : t("Add files")}</h3>
+        <p>{submitted ? t("Your content is waiting for an administrator review.") : uploadSummary.activeCount ? t("Your files are uploading automatically. Keep this page open until each row has a green check.") : t("Add one or more files, then submit the completed content for review.")}</p>
       </Card>
     </form>
   );
 }
 export { default as CourseEditorPage } from "./CourseEditorPage";
-export const ContentEditorPage = () => <ContentListingEditor />;
+export const ContentEditorPage = () => {  return (<ContentListingEditor />); };
 
 export function PublishedPage() {
+  const { t } = useTranslation();
   const { publishedItems, refreshMyListings, role, deleteDraftListing, notify } = usePlatform();
   const [loading, setLoading] = useState(false);
   const [confirmingId, setConfirmingId] = useState(null);
@@ -370,9 +377,9 @@ export function PublishedPage() {
     return (
       <EmptyState
         icon={BookOpen}
-        title={copy.emptyTitle}
-        description={copy.emptyDescription}
-        action={<Button onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>}
+        title={t(copy.emptyTitle)}
+        description={t(copy.emptyDescription)}
+        action={<Button onClick={refresh} disabled={loading}>{loading ? t("Refreshing…") : t("Refresh")}</Button>}
       />
     );
   }
@@ -380,8 +387,8 @@ export function PublishedPage() {
   return (
     <Card>
       <div className="card-heading">
-        <div><span className="eyebrow">{role} workspace</span><h2>{copy.title}</h2></div>
-        <Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button>
+        <div><span className="eyebrow">{t(role)}{t(" workspace")}</span><h2>{t(copy.title)}</h2></div>
+        <Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? t("Refreshing…") : t("Refresh")}</Button>
       </div>
       <div className="queue-list">
         {listings.map((item) => {
@@ -396,30 +403,29 @@ export function PublishedPage() {
               {item.kind === "course" ? <GraduationCap size={19} /> : <FileText size={19} />}
               <div>
                 <b>{item.title}</b>
-                <small>{item.format} · {item.price} points · last updated {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "—"}</small>
-                {item.kind === "content" && <span className="queue-detail">{item.asset?.status === "ready" ? `Verified file: ${item.asset.filename}` : "File status: missing"}</span>}
+                <small>{t(item.format)} · {item.price}{t(" points · last updated ")}{item.updatedAt ? new Date(item.updatedAt).toLocaleString(getFormatLocale()) : "—"}</small>
+                {item.kind === "content" && <span className="queue-detail">{item.asset?.status === "ready" ? t("Verified file: {0}", { 0: item.asset.filename }) : t("File status: missing")}</span>}
               </div>
               {isDraft ? (
                 confirming ? (
-                  <div className="queue-actions draft-delete-confirmation" role="group" aria-label={`Delete draft ${item.title}`}>
-                    <span>Delete this draft?</span>
-                    <Button variant="ghost" size="sm" type="button" onClick={() => setConfirmingId(null)} disabled={deleting}>Keep</Button>
+                  <div className="queue-actions draft-delete-confirmation" role="group" aria-label={t("Delete draft {0}", { 0: item.title })}>
+                    <span>{t("Delete this draft?")}</span>
+                    <Button variant="ghost" size="sm" type="button" onClick={() => setConfirmingId(null)} disabled={deleting}>{t("Keep")}</Button>
                     <Button variant="danger" size="sm" type="button" onClick={() => void deleteDraft(item)} disabled={deleting}>
-                      <Trash2 size={14} /> {deleting ? "Deleting…" : "Delete"}
+                      <Trash2 size={14} /> {deleting ? t("Deleting…") : t("Delete")}
                     </Button>
                   </div>
                 ) : (
                   <div className="queue-actions">
                     {missingContentFile ? (
-                      <Button variant="secondary" size="sm" type="button" onClick={() => notify("File missing. Delete this incomplete draft or create a new content draft.")}>File missing</Button>
+                      <Button variant="secondary" size="sm" type="button" onClick={() => notify("File missing. Delete this incomplete draft or create a new content draft.")}>{t("File missing")}</Button>
                     ) : isContentDraft ? (
-                      <Link className="button secondary sm" to={`/creator/content-editor?draft=${encodeURIComponent(item.id)}`}>Continue draft</Link>
+                      <Link className="button secondary sm" to={`/creator/content-editor?draft=${encodeURIComponent(item.id)}`}>{t("Continue draft")}</Link>
                     ) : (
-                      <Link className="button secondary sm" to={`/trainer/course-editor?draft=${encodeURIComponent(item.id)}`}>Continue draft</Link>
+                      <Link className="button secondary sm" to={`/trainer/course-editor?draft=${encodeURIComponent(item.id)}`}>{t("Continue draft")}</Link>
                     )}
-                    <Button variant="ghost" size="sm" type="button" onClick={() => setConfirmingId(itemKey)} aria-label={`Delete draft ${item.title}`}>
-                      <Trash2 size={14} /> Delete draft
-                    </Button>
+                    <Button variant="ghost" size="sm" type="button" onClick={() => setConfirmingId(itemKey)} aria-label={t("Delete draft {0}", { 0: item.title })}>
+                      <Trash2 size={14} />{t(" Delete draft")}</Button>
                   </div>
                 )
               ) : (

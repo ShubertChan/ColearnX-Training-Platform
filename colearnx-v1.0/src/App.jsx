@@ -1,8 +1,10 @@
+import { useTranslation } from "./i18n/LanguageContext";
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, Link, useLocation } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 import Layout from "./components/Layout";
 const VideoLearningPage = lazy(() => import("./pages/VideoLearningPage"));
+const TopUpCheckoutPage = lazy(() => import("./pages/TopUpCheckoutPage"));
 import PublicLayout from "./components/PublicLayout";
 import AdminMfaGate from "./components/AdminMfaGate";
 import { EmptyState } from "./components/ui";
@@ -63,10 +65,11 @@ function Protected({ roles, children }) {
 }
 
 function Workspace({ children }) {
+  const { t } = useTranslation();
   const { authenticated, accountLoading, accountError, retrySession, dataStates, retryAccountData, orders, courseCatalogState, contentCatalogState } = usePlatform();
   const location = useLocation();
-  if (accountLoading) return <div className="session-loading" role="status"><span className="session-spinner" /><b>Restoring your secure session…</b></div>;
-  if (accountError) return <EmptyState title="Session temporarily unavailable" description={accountError} action={<button className="button primary" onClick={() => void retrySession()}>Retry session</button>} />;
+  if (accountLoading) return <div className="session-loading" role="status"><span className="session-spinner" /><b>{t("Restoring your secure session…")}</b></div>;
+  if (accountError) return <EmptyState title={t("Session temporarily unavailable")} description={t(accountError)} action={<button className="button primary" onClick={() => void retrySession()}>{t("Retry session")}</button>} />;
   const required = location.pathname === "/home" ? ["wallet", "orders", "applications"]
     : ["/wallet", "/transactions"].includes(location.pathname) ? ["wallet"]
     : ["/orders", "/purchases"].includes(location.pathname) || location.pathname.startsWith("/purchases/") || location.pathname.startsWith("/refund/") ? ["orders"]
@@ -77,7 +80,7 @@ function Workspace({ children }) {
   const loading = required.some((name) => states[name] === "loading");
   const failed = required.some((name) => states[name] === "error");
   return authenticated ? (
-    <Layout>{loading ? <p role="status">Loading account data…</p> : failed ? <EmptyState title="Account data unavailable" description="We could not load this section. Your session is still active." action={<button className="button primary" onClick={() => void retryAccountData()}>Retry account data</button>} /> : children}</Layout>
+    <Layout>{loading ? <p role="status">{t("Loading account data…")}</p> : failed ? <EmptyState title={t("Account data unavailable")} description={t("We could not load this section. Your session is still active.")} action={<button className="button primary" onClick={() => void retryAccountData()}>{t("Retry account data")}</button>} /> : children}</Layout>
   ) : (
     <Navigate to="/login" replace state={{ from: location }} />
   );
@@ -89,11 +92,11 @@ function MarketplaceShell({ children }) {
 }
 
 function AnonymousOnly({ children }) {
-  const { authenticated, accountLoading, accountError, retrySession, role } = usePlatform();
+  const { authenticated, accountLoading, accountError, role } = usePlatform();
   const location = useLocation();
-  if (accountLoading) return <div className="session-loading" role="status"><span className="session-spinner" /><b>Checking your session…</b></div>;
-  if (accountError) return <EmptyState title="Session temporarily unavailable" description={accountError} action={<button className="button primary" onClick={() => void retrySession()}>Retry session</button>} />;
-  if (!authenticated) return children;
+  // Public entry must not disappear because an optional session check is slow.
+  // Workspace still requires a server-confirmed session above.
+  if (accountLoading || accountError || !authenticated) return children;
   return <Navigate to={intendedPath(location.state?.from, role === "Admin" ? "/admin" : "/home")} replace />;
 }
 
@@ -103,13 +106,16 @@ function BuyerOnly({ children }) {
 }
 
 function TrainerOperational({ children }) {
+  const { t } = useTranslation();
   const { trainerOperational } = usePlatform();
-  return trainerOperational ? children : <EmptyState icon={ShieldCheck} title="Trainer certification required" description="Your Trainer role is not operational until an administrator approves the certification prerequisite." action={<Link className="button primary" to="/role-application">View certification status</Link>} />;
+  return trainerOperational ? children : <EmptyState icon={ShieldCheck} title={t("Trainer certification required")} description={t("Your Trainer role is not operational until an administrator approves the certification prerequisite.")} action={<Link className="button primary" to="/role-application">{t("View certification status")}</Link>} />;
 }
 
 export default function App() {
+  const { t } = useTranslation();
   return (
     <Routes>
+      <Route path="/wallet/checkout/:paymentTransactionId" element={<Workspace><Suspense fallback={<p role="status">{t("Loading secure payment…")}</p>}><TopUpCheckoutPage /></Suspense></Workspace>} />
       <Route path="/admin/inbox" element={<Workspace><Protected roles={["Admin"]}><AdminInboxPage /></Protected></Workspace>} />
       <Route path="/admin/certifications" element={<Workspace><Protected roles={["Admin"]}><AdminCertificationsPage /></Protected></Workspace>} />
       <Route path="/login" element={<AnonymousOnly><AuthPage /></AnonymousOnly>} />
@@ -225,7 +231,7 @@ export default function App() {
       />
       <Route
         path="/purchases/:orderItemId/watch"
-        element={<Workspace><BuyerOnly><Suspense fallback={<p role="status">Loading course…</p>}><VideoLearningPage /></Suspense></BuyerOnly></Workspace>}
+        element={<Workspace><BuyerOnly><Suspense fallback={<p role="status">{t("Loading course…")}</p>}><VideoLearningPage /></Suspense></BuyerOnly></Workspace>}
       />
       <Route
         path="/refund/:id"

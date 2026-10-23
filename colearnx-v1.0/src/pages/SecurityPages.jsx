@@ -1,3 +1,4 @@
+import { getFormatLocale, useTranslation } from "../i18n/LanguageContext";
 import { useCallback, useEffect, useState } from "react";
 import { Copy, LaptopMinimal, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { Button, FormField } from "../components/ui";
@@ -16,6 +17,7 @@ import {
  * them later is a user who will be locked out.
  */
 function RecoveryCodePanel({ codes, onDone }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -27,24 +29,22 @@ function RecoveryCodePanel({ codes, onDone }) {
   };
   return (
     <div className="security-panel highlight">
-      <h3>Save your recovery codes</h3>
-      <p>
-        Each code works once. Store them somewhere you can reach without your
-        phone — a password manager or paper. <strong>They will not be shown
-        again.</strong>
+      <h3>{t("Save your recovery codes")}</h3>
+      <p>{t("Each code works once. Store them somewhere you can reach without your phone — a password manager or paper. ")}<strong>{t("They will not be shown again.")}</strong>
       </p>
       <ul className="recovery-codes">
         {codes.map((code) => <li key={code}><code>{code}</code></li>)}
       </ul>
       <div className="security-actions">
-        <Button type="button" onClick={copy}><Copy size={16} />{copied ? "Copied" : "Copy all"}</Button>
-        <Button type="button" onClick={onDone}>I have saved them</Button>
+        <Button type="button" onClick={copy}><Copy size={16} />{copied ? t("Copied") : t("Copy all")}</Button>
+        <Button type="button" onClick={onDone}>{t("I have saved them")}</Button>
       </div>
     </div>
   );
 }
 
 function MfaSection({ status, onChanged }) {
+  const { t } = useTranslation();
   const [enrolment, setEnrolment] = useState(null);
   const [code, setCode] = useState("");
   const [codes, setCodes] = useState(null);
@@ -61,31 +61,28 @@ function MfaSection({ status, onChanged }) {
   if (enrolment) {
     return (
       <div className="security-panel">
-        <h3>Finish setting up two-factor authentication</h3>
-        <p>Scan this QR code with your authenticator app, then enter the code it shows to confirm it works.</p>
+        <h3>{t("Finish setting up two-factor authentication")}</h3>
+        <p>{t("Scan this QR code with your authenticator app, then enter the code it shows to confirm it works.")}</p>
         {enrolment.otpauthUri && (
           <div className="mfa-qr">
             <QRCodeSVG value={enrolment.otpauthUri} size={184} />
           </div>
         )}
-        <p className="security-hint">
-          On a phone you can <a href={enrolment.otpauthUri}>open it directly</a>.
-          If you cannot scan, add the account manually with the key below.
-        </p>
-        <FormField label="Setup key">
+        <p className="security-hint">{t("On a phone you can ")}<a href={enrolment.otpauthUri}>{t("open it directly")}</a>{t(". If you cannot scan, add the account manually with the key below.")}</p>
+        <FormField label={t("Setup key")}>
           <input readOnly value={enrolment.secret} onFocus={(event) => event.target.select()} />
         </FormField>
         <form onSubmit={(event) => { event.preventDefault(); void run(async () => {
           const result = await confirmMfaEnrolment({ code });
           setEnrolment(null); setCode(""); setCodes(result.recoveryCodes);
         }); }}>
-          <FormField label="Code from your app">
+          <FormField label={t("Code from your app")}>
             <input required autoFocus inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} placeholder="123456" />
           </FormField>
-          {error && <div className="form-error" role="alert">{error}</div>}
+          {error && <div className="form-error" role="alert">{t(error)}</div>}
           <div className="security-actions">
-            <Button type="submit" disabled={busy}>{busy ? "Confirming…" : "Confirm and enable"}</Button>
-            <Button type="button" onClick={() => { setEnrolment(null); setError(""); }}>Cancel</Button>
+            <Button type="submit" disabled={busy}>{busy ? t("Confirming…") : t("Confirm and enable")}</Button>
+            <Button type="button" onClick={() => { setEnrolment(null); setError(""); }}>{t("Cancel")}</Button>
           </div>
         </form>
       </div>
@@ -95,14 +92,11 @@ function MfaSection({ status, onChanged }) {
   if (!status.enrolled) {
     return (
       <div className="security-panel">
-        <h3><ShieldOff size={18} /> Two-factor authentication is off</h3>
-        <p>
-          With it on, your password alone is not enough to sign in. Administrator
-          accounts are required to enable it.
-        </p>
-        {error && <div className="form-error" role="alert">{error}</div>}
+        <h3><ShieldOff size={18} />{t(" Two-factor authentication is off")}</h3>
+        <p>{t("With it on, your password alone is not enough to sign in. Administrator accounts are required to enable it.")}</p>
+        {error && <div className="form-error" role="alert">{t(error)}</div>}
         <Button type="button" disabled={busy} onClick={() => void run(async () => setEnrolment(await startMfaEnrolment()))}>
-          {busy ? "Preparing…" : "Turn on two-factor authentication"}
+          {busy ? t("Preparing…") : t("Turn on two-factor authentication")}
         </Button>
       </div>
     );
@@ -110,26 +104,25 @@ function MfaSection({ status, onChanged }) {
 
   return (
     <div className="security-panel">
-      <h3><ShieldCheck size={18} /> Two-factor authentication is on</h3>
+      <h3><ShieldCheck size={18} />{t(" Two-factor authentication is on")}</h3>
       <p>
-        {status.recoveryCodesRemaining} recovery code{status.recoveryCodesRemaining === 1 ? "" : "s"} remaining.
-        {status.recoveryCodesRemaining <= 2 && " Generate a new set soon — running out means a lost phone locks you out."}
+        {status.recoveryCodesRemaining}{t(" recovery code")}{status.recoveryCodesRemaining === 1 ? "" : t("s")}{t(" remaining.")}{status.recoveryCodesRemaining <= 2 && t(" Generate a new set soon — running out means a lost phone locks you out.")}
       </p>
       {/* Both actions require a current code. A stolen session must not be able
           to remove the protection or mint itself a fresh set of codes. */}
       <form onSubmit={(event) => { event.preventDefault(); }}>
-        <FormField label="Current code or recovery code">
-          <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="123456 or a recovery code" />
+        <FormField label={t("Current code or recovery code")}>
+          <input value={code} onChange={(event) => setCode(event.target.value)} placeholder={t("123456 or a recovery code")} />
         </FormField>
-        {error && <div className="form-error" role="alert">{error}</div>}
+        {error && <div className="form-error" role="alert">{t(error)}</div>}
         <div className="security-actions">
           <Button type="button" disabled={busy || !code} onClick={() => void run(async () => {
             const result = await rotateRecoveryCodes({ code });
             setCode(""); setCodes(result.recoveryCodes);
-          })}>New recovery codes</Button>
+          })}>{t("New recovery codes")}</Button>
           <Button type="button" disabled={busy || !code} onClick={() => void run(async () => {
             await disableMfa({ code }); setCode(""); onChanged();
-          })}>Turn off</Button>
+          })}>{t("Turn off")}</Button>
         </div>
       </form>
     </div>
@@ -137,6 +130,7 @@ function MfaSection({ status, onChanged }) {
 }
 
 function SessionSection() {
+  const { t } = useTranslation();
   const [sessions, setSessions] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -152,25 +146,21 @@ function SessionSection() {
     try { await action(); await load(); } catch (actionError) { setError(actionError.message); } finally { setBusy(false); }
   };
 
-  if (!sessions) return <div className="security-panel"><h3>Active sessions</h3>{error ? <><p className="form-error" role="alert">{error}</p><Button onClick={load}>Retry sessions</Button></> : <p role="status">Loading…</p>}</div>;
+  if (!sessions) return <div className="security-panel"><h3>{t("Active sessions")}</h3>{error ? <><p className="form-error" role="alert">{t(error)}</p><Button onClick={load}>{t("Retry sessions")}</Button></> : <p role="status">{t("Loading…")}</p>}</div>;
 
   return (
     <div className="security-panel">
-      <h3>Active sessions</h3>
-      <p>
-        Every browser currently signed in to this account. If you see one you do
-        not recognise, end it and then change your password.
-      </p>
-      {error && <div className="form-error" role="alert">{error}</div>}
+      <h3>{t("Active sessions")}</h3>
+      <p>{t("Every browser currently signed in to this account. If you see one you do not recognise, end it and then change your password.")}</p>
+      {error && <div className="form-error" role="alert">{t(error)}</div>}
       <ul className="session-list">
         {sessions.map((session) => (
           <li key={session.id}>
             <LaptopMinimal size={18} />
             <div>
-              <strong>{session.device}{session.current && " · this browser"}</strong>
-              <span>
-                Started {new Date(session.createdAt).toLocaleString()}
-                {session.lastUsedAt && ` · last active ${new Date(session.lastUsedAt).toLocaleString()}`}
+              <strong>{session.device}{session.current && t(" · this browser")}</strong>
+              <span>{t("Started ")}{new Date(session.createdAt).toLocaleString(getFormatLocale())}
+                {session.lastUsedAt && t(" · last active {0}", { 0: new Date(session.lastUsedAt).toLocaleString(getFormatLocale()) })}
               </span>
             </div>
             {/* The current session has no end button: signing yourself out from
@@ -179,22 +169,20 @@ function SessionSection() {
             {!session.current && (
               <button type="button" className="link-button" disabled={busy}
                 onClick={() => void run(() => revokeSession(session.id))}>
-                <Trash2 size={15} /> End
-              </button>
+                <Trash2 size={15} />{t(" End")}</button>
             )}
           </li>
         ))}
       </ul>
       {sessions.length > 1 && (
-        <Button type="button" disabled={busy} onClick={() => void run(revokeOtherSessions)}>
-          End all other sessions
-        </Button>
+        <Button type="button" disabled={busy} onClick={() => void run(revokeOtherSessions)}>{t("End all other sessions")}</Button>
       )}
     </div>
   );
 }
 
 export function SecuritySettingsPage() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState(null);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
@@ -206,12 +194,12 @@ export function SecuritySettingsPage() {
   return (
     <div className="page-shell">
       <header className="page-header">
-        <span className="eyebrow">Account</span>
-        <h1>Security</h1>
-        <p>Two-factor authentication and the devices signed in to your account.</p>
+        <span className="eyebrow">{t("Account")}</span>
+        <h1>{t("Security")}</h1>
+        <p>{t("Two-factor authentication and the devices signed in to your account.")}</p>
       </header>
-      {error && <div className="security-panel"><p className="form-error" role="alert">{error}</p><Button onClick={load}>Retry security settings</Button></div>}
-      {status ? <MfaSection status={status} onChanged={load} /> : !error && <div className="security-panel"><p role="status">Loading…</p></div>}
+      {error && <div className="security-panel"><p className="form-error" role="alert">{t(error)}</p><Button onClick={load}>{t("Retry security settings")}</Button></div>}
+      {status ? <MfaSection status={status} onChanged={load} /> : !error && <div className="security-panel"><p role="status">{t("Loading…")}</p></div>}
       <SessionSection />
     </div>
   );
