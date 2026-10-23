@@ -56,6 +56,7 @@ async function scan(file) {
     }
     if (node.type === "ObjectProperty" && node.key.name === "key" && node.value.type === "StringLiteral" && /[\s{}]/.test(node.value.value)) checkKey(node, node.value.value);
     if (node.type === "JSXText" && humanText(node.value.trim())) report(node, `Untranslated JSX text: ${node.value.trim()}`);
+    if (node.type === "JSXOpeningElement" && node.name.name === "input" && node.attributes.some(attribute => attribute.name?.name === "type" && ["date", "datetime-local"].includes(attribute.value?.value))) report(node, "Use DateInput so calendar text follows the selected site language.");
     if (node.type === "JSXAttribute") {
       const name = node.name.name;
       if (presentationAttributes.has(name) && node.value?.type === "StringLiteral" && humanText(node.value.value)) report(node, `Untranslated ${name}: ${node.value.value}`);
