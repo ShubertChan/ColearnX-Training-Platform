@@ -1,3 +1,4 @@
+import { useTranslation } from "../i18n/LanguageContext";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCurrentUser,
@@ -53,6 +54,8 @@ import { loadCatalogSection } from "../utils/catalogState";
 import { cartItemKey } from "../utils/purchaseDisclosure";
 import { cartStorageKey, readAccountCart, mergeConfirmedOrders } from "../utils/frontendState";
 import { getCourseTypeLabel } from "../utils/coursePresentation";
+import { Link } from "react-router-dom";
+import { Button, Modal } from "../components/ui";
 
 const PlatformContext = createContext(null);
 
@@ -258,6 +261,7 @@ const mapPublishedItem = (listing) => ({
 });
 
 export function PlatformProvider({ children }) {
+  const { t } = useTranslation();
   // A stored bearer token is only a hint until the server confirms identity.
   const [authenticated, setAuthenticated] = useState(false);
   const sessionRestore = useRef(null);
@@ -295,6 +299,7 @@ export function PlatformProvider({ children }) {
   const [accountError, setAccountError] = useState("");
   const [purchaseSyncWarning, setPurchaseSyncWarning] = useState("");
   const [toast, setToast] = useState("");
+  const [successDialog, setSuccessDialog] = useState(null);
   const adminRoleRequestRevision = useRef(0);
   const ordersRequestRevision = useRef(0);
 
@@ -461,6 +466,7 @@ export function PlatformProvider({ children }) {
       accountId.current = user.id;
       confirmedOrders.current = [];
       pendingCheckout.current = null;
+      setSuccessDialog(null);
       setOrders([]); setTransactions([]); setBalance(0);
       setPublishedItems([]); setTrainerCertifications([]); setAdminTrainerCertifications([]); setRoleApplications([]); setRefundRequests([]);
       setApplications({ Trainer: "Not applied", Creator: "Not applied" });
@@ -639,6 +645,7 @@ export function PlatformProvider({ children }) {
   const resendRegistrationEmail = async (input) => resendVerificationEmail(input);
 
   const signOut = async () => {
+    setSuccessDialog(null);
     authRequestRevision.current += 1;
     await sessionRestore.current;
     setAccountLoading(false);
@@ -694,7 +701,12 @@ export function PlatformProvider({ children }) {
       return false;
     }
     setCart((current) => [...current, nextItem]);
-    notify(kind === "content" ? "Resource added to cart." : "Course added to cart.");
+    setSuccessDialog({
+      title: `${kind === "content" ? "Resource" : "Course"} added to cart`,
+      message: { key: "“{title}” has been added to your shopping cart.", values: { title: item.title } },
+      action: { to: "/cart", label: "View cart" },
+      closeLabel: "Continue browsing",
+    });
     return true;
   };
 
@@ -749,17 +761,27 @@ export function PlatformProvider({ children }) {
     if (!course?.orderItemId) {
       throw new Error("The server record for this purchase is not available yet. Refresh and try again.");
     }
+    const revision = sessionRevision.current;
     const result = await createRefundRequest({ orderItemId: course.orderItemId, reason }, requestKey);
     if (!result?.id) throw new Error("The service did not confirm the refund request. Retry to check its status.");
-    try { await refreshOrders(); notify("Refund request submitted for administrator review."); }
+    if (revision !== sessionRevision.current) return result;
+    setSuccessDialog({ title: "Refund request submitted", message: { key: "Your refund request for “{title}” has been submitted for administrator review. You can check its status in Order History.", values: { title: course.title } } });
+    try { await refreshOrders(); }
     catch { notify("Refund request submitted. Order history could not refresh; refresh it later."); }
     return result;
   };
 
   const decideRefund = async (refundRequestId, status, decisionReason) => {
+    const revision = sessionRevision.current;
     await decideRefundRequest(refundRequestId, { decision: String(status).toLowerCase(), reason: decisionReason });
-    await Promise.all([refreshAdminQueues(), refreshWallet(), refreshOrders()]);
-    notify({ key: "Refund request {status}.", values: { status: { key: String(status).toLowerCase() } } });
+    if (revision !== sessionRevision.current) return true;
+    if (String(status).toLowerCase() === "approved") {
+      setSuccessDialog({ title: "Refund successful", message: "The refund has been approved and the points have been returned to the member's wallet." });
+    } else {
+      notify({ key: "Refund request {status}.", values: { status: { key: String(status).toLowerCase() } } });
+    }
+    const updates = await Promise.allSettled([refreshAdminQueues(), refreshWallet(), refreshOrders()]);
+    if (updates.some((update) => update.status === "rejected" || update.value === false)) notify("Refund decision recorded. Some account data could not refresh; refresh it later.");
     return true;
   };
 
@@ -955,7 +977,13 @@ export function PlatformProvider({ children }) {
     purchaseSyncWarning, purchasedContents, purchasedCourses, toast, trainerCertifications, adminTrainerCertifications, trainerOperational, transactions,
   ]);
 
-  return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;
+  return <PlatformContext.Provider value={value}>
+    {children}
+    {successDialog && <Modal title={t(successDialog.title)} onClose={() => setSuccessDialog(null)} footer={<>
+      <Button variant={successDialog.action ? "secondary" : "primary"} onClick={() => setSuccessDialog(null)}>{t(successDialog.closeLabel || "OK")}</Button>
+      {successDialog.action && <Link className="button primary" to={successDialog.action.to} onClick={() => setSuccessDialog(null)}>{t(successDialog.action.label)}</Link>}
+    </>}><p className="action-success-message">{typeof successDialog.message === "string" ? t(successDialog.message) : t(successDialog.message.key, successDialog.message.values)}</p></Modal>}
+  </PlatformContext.Provider>;
 }
 
 export const usePlatform = () => useContext(PlatformContext);

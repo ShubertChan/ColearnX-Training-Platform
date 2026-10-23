@@ -24,8 +24,13 @@ for (const width of [390, 1440]) test(`Chinese catalogue, cart and application l
   await expect(page.getByText("Original course description", { exact: true })).toBeVisible();
   await expect(page.locator(".course-instructor").getByText("Trainer", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "加入购物车", exact: true }).click();
-  await expect(page.locator(".toast")).toContainText("课程已加入购物车。");
-  await page.goto("/#/cart");
+  const confirmation = page.getByRole("dialog", { name: "课程已加入购物车", exact: true });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation.getByText("“Home”已加入你的购物车。", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await confirmation.getByRole("link", { name: "查看购物车", exact: true }).click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/cart$/);
   await page.getByRole("button", { name: "确认最终订单" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText(/讲师授课.*线下安排/)).toBeVisible();
