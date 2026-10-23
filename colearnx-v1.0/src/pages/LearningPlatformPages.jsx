@@ -7,6 +7,8 @@ import { listContentAssets, requestContentDownloadUrl } from "../api/uploads";
 import { getCourseDelivery, requestCourseDownloadUrl } from "../api/courseDelivery";
 import { isVideoAsset } from "../utils/videoContract";
 import { refundPurchase, refundReasonError } from "../utils/refundPurchase";
+import { refundStatus } from "../utils/refundStatus";
+import RefundStatusBar from "../components/RefundStatusBar";
 import VideoEvidence from "../components/video/VideoEvidence";
 import { cartItemKey, deliveryDisclosures, hasPurchasePolicy, refundDisclosure } from "../utils/purchaseDisclosure";
 import { getCourseTypeLabel, isVideoCourse } from "../utils/coursePresentation";
@@ -62,13 +64,13 @@ export function CartPage() {
 
 function RefundLink({ item }) {
   const { t } = useTranslation();
-  return item.kind === "course" && ["paid", "reserved", "fulfilled"].includes(item.fulfilmentStatus)
+  return item.kind === "course" && ["paid", "reserved", "fulfilled"].includes(item.fulfilmentStatus) && !refundStatus(item)?.blocksRequest
     ? <Link className="button secondary sm" to={`/refund/${encodeURIComponent(item.productId)}?orderItem=${encodeURIComponent(item.id)}`}>{t("Request refund")}</Link> : null;
 }
 
 function ReceiptItems({ order }) {
   const { t } = useTranslation();
-  return order.items.map((item) => <article className="receipt-item" key={item.id}><div className="summary-row"><span>{item.title}</span><b>{item.price}{t(" points")}</b></div><dl className="receipt-details"><div><dt>{t("Seller")}</dt><dd>{item.seller}</dd></div><div><dt>{t("Delivery")}</dt><dd>{item.kind === "content" ? t("Authorised digital download") : t(item.delivery)}</dd></div><div><dt>{t("Fulfilment")}</dt><dd>{t(item.fulfilmentStatus || "Recorded")}</dd></div><div><dt>{t("Refund snapshot")}</dt><dd>{t(item.refundPolicy)}</dd></div>{item.refundDeadlineAt && <div><dt>{t("Refund deadline")}</dt><dd>{new Date(item.refundDeadlineAt).toLocaleString(getFormatLocale())}</dd></div>}<div><dt>{t("Refund record")}</dt><dd>{item.refundRecords.length ? item.refundRecords.map((record) => `${record.reference || record.id}: ${t(record.status)}`).join(", ") : t("None")}</dd></div></dl><RefundLink item={item} /></article>);
+  return order.items.map((item) => <article className="receipt-item" key={item.id}><div className="summary-row"><span>{item.title}</span><b>{item.price}{t(" points")}</b></div><RefundStatusBar item={item} /><dl className="receipt-details"><div><dt>{t("Seller")}</dt><dd>{item.seller}</dd></div><div><dt>{t("Delivery")}</dt><dd>{item.kind === "content" ? t("Authorised digital download") : t(item.delivery)}</dd></div><div><dt>{t("Fulfilment")}</dt><dd>{t(item.fulfilmentStatus || "Recorded")}</dd></div><div><dt>{t("Refund snapshot")}</dt><dd>{t(item.refundPolicy)}</dd></div>{item.refundDeadlineAt && <div><dt>{t("Refund deadline")}</dt><dd>{new Date(item.refundDeadlineAt).toLocaleString(getFormatLocale())}</dd></div>}<div><dt>{t("Refund record")}</dt><dd>{item.refundRecords.length ? item.refundRecords.map((record) => `${record.reference || record.id}: ${t(record.status)}`).join(", ") : t("None")}</dd></div></dl><RefundLink item={item} /></article>);
 }
 
 export function CheckoutSuccessPage() {
@@ -86,7 +88,7 @@ export function OrderHistoryPage() {
   const { orders, refreshOrders } = usePlatform(); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
   const refresh = async () => { setLoading(true); setError(""); try { await refreshOrders(); } catch (refreshError) { setError(refreshError.message); } finally { setLoading(false); } };
   if (!orders.length) return <EmptyState icon={ReceiptText} title={t("No orders yet")} description={error || t("Completed purchases are recorded here.")} action={<Button onClick={refresh} disabled={loading}>{loading ? t("Refreshing…") : t("Refresh orders")}</Button>} />;
-  return <Card><div className="card-heading"><div><span className="eyebrow">{t("Order history")}</span><h2>{t("Server-issued receipts")}</h2></div><Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? t("Refreshing…") : t("Refresh")}</Button></div>{error && <p className="form-error">{t(error)}</p>}<div className="order-history-list">{orders.map((order) => <article key={order.id} className="order-history-card"><header><div><b>{purchaseSummaryLabel(order.items, t)}</b><small>{order.paidAt ? new Date(order.paidAt).toLocaleString(getFormatLocale()) : t("Payment time unavailable")}</small></div><Badge tone={order.status === "Paid" ? "success" : "warning"}>{t(order.status)}</Badge></header><div className="order-history-items">{order.items.map((item) => <div key={item.id}>{item.kind === "content" ? <FileArchive size={16} /> : <GraduationCap size={16} />}<span>{item.title}</span><b>{item.price}{t(" points")}</b></div>)}</div><footer><span>{t("Total ")}<b>{order.total}{t(" points")}</b></span><Link className="button secondary sm" to={`/checkout-success/${order.id}`}>{t("View receipt")}</Link></footer></article>)}</div></Card>;
+  return <Card><div className="card-heading"><div><span className="eyebrow">{t("Order history")}</span><h2>{t("Server-issued receipts")}</h2></div><Button variant="secondary" onClick={refresh} disabled={loading}>{loading ? t("Refreshing…") : t("Refresh")}</Button></div>{error && <p className="form-error">{t(error)}</p>}<div className="order-history-list">{orders.map((order) => <article key={order.id} className="order-history-card"><header><div><b>{purchaseSummaryLabel(order.items, t)}</b><small>{order.paidAt ? new Date(order.paidAt).toLocaleString(getFormatLocale()) : t("Payment time unavailable")}</small></div><Badge tone={order.status === "Paid" ? "success" : "warning"}>{t(order.status)}</Badge></header><div className="order-history-items">{order.items.map((item) => <div key={item.id}>{item.kind === "content" ? <FileArchive size={16} /> : <GraduationCap size={16} />}<span>{item.title}</span><b>{item.price}{t(" points")}</b><RefundStatusBar item={item} /></div>)}</div><footer><span>{t("Total ")}<b>{order.total}{t(" points")}</b></span><Link className="button secondary sm" to={`/checkout-success/${order.id}`}>{t("View receipt")}</Link></footer></article>)}</div></Card>;
 }
 
 function ContentDownloadButton({ contentVersionId }) {
@@ -161,21 +163,23 @@ export function PurchasesPage() {
   const { orders } = usePlatform();
   const items = useMemo(() => orders.flatMap((order) => order.items.map((item) => ({ ...item, order }))).filter((item) => ["paid", "reserved", "fulfilled"].includes(item.fulfilmentStatus)), [orders]);
   if (!items.length) return <EmptyState icon={BookOpen} title={t("No purchases yet")} description={t("Purchased courses and resources appear here after checkout.")} action={<Link className="button primary" to="/courses">{t("Explore courses")}</Link>} />;
-  return <div className="stack">{items.map((item) => <Card key={item.id} className="learning-row"><span className="list-icon">{item.kind === "course" ? <GraduationCap size={18} /> : <FileArchive size={18} />}</span><div><b>{item.title}</b><small>{item.kind === "course" ? getCourseTypeLabel(item) : t("Digital content")} · {item.price}{t(" points")}</small><p className="learning-policy">{item.kind === "content" ? t("Request a short-lived, purchase-authorised download link.") : deliveryDisclosures(item).join(" ")}</p></div>{item.kind === "content" ? <ContentDownloadButton contentVersionId={item.productId} /> : isVideoCourse(item) || item.courseVideoVersionId ? <Link className="button primary sm" to={`/purchases/${encodeURIComponent(item.id)}/watch`}>{t("Watch course ")}<ArrowRight size={15} /></Link> : <CourseDeliveryPanel item={item} />}<RefundLink item={item} /><Link className="button secondary sm" to={`/checkout-success/${item.order.id}`}>{t("View receipt")}</Link></Card>)}</div>;
+  return <div className="stack">{items.map((item) => <Card key={item.id} className="learning-row"><span className="list-icon">{item.kind === "course" ? <GraduationCap size={18} /> : <FileArchive size={18} />}</span><div><b>{item.title}</b><small>{item.kind === "course" ? getCourseTypeLabel(item) : t("Digital content")} · {item.price}{t(" points")}</small><p className="learning-policy">{item.kind === "content" ? t("Request a short-lived, purchase-authorised download link.") : deliveryDisclosures(item).join(" ")}</p><RefundStatusBar item={item} /></div>{item.kind === "content" ? <ContentDownloadButton contentVersionId={item.productId} /> : isVideoCourse(item) || item.courseVideoVersionId ? <Link className="button primary sm" to={`/purchases/${encodeURIComponent(item.id)}/watch`}>{t("Watch course ")}<ArrowRight size={15} /></Link> : <CourseDeliveryPanel item={item} />}<RefundLink item={item} /><Link className="button secondary sm" to={`/checkout-success/${item.order.id}`}>{t("View receipt")}</Link></Card>)}</div>;
 }
 
 export function RefundPage() {
   const { t } = useTranslation();
   const { id } = useParams(); const [search] = useSearchParams(); const navigate = useNavigate();
-  const { orders, submitRefund } = usePlatform(); const course = refundPurchase(orders, id, search.get("orderItem"));
+  const { orders, submitRefund } = usePlatform(); const course = refundPurchase(orders, id, search.get("orderItem"), { includeRefunded: true });
+  const blocksRequest = refundStatus(course)?.blocksRequest === true;
   const [reason, setReason] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const request = useRef(null);
   const [evidence, setEvidence] = useState(null), [evidenceError, setEvidenceError] = useState("");
-  useEffect(() => { let current = true; setEvidence(null); if (course?.orderItemId) getCourseDelivery(course.orderItemId).then(value => { if (current) { setEvidence(value); setEvidenceError(""); } }).catch(() => { if (current) setEvidenceError("Current refund evidence is unavailable. The service will recheck your request."); }); return () => { current = false; }; }, [course?.orderItemId]);
+  useEffect(() => { let current = true; setEvidence(null); setEvidenceError(""); if (course?.orderItemId && !blocksRequest) getCourseDelivery(course.orderItemId).then(value => { if (current) { setEvidence(value); setEvidenceError(""); } }).catch(() => { if (current) setEvidenceError("Current refund evidence is unavailable. The service will recheck your request."); }); return () => { current = false; }; }, [course?.orderItemId, blocksRequest]);
   if (!course?.purchased) return <EmptyState icon={AlertCircle} title={t("Purchase not found")} description={t("Only a server-recorded purchase can be considered for a refund.")} />;
+  if (blocksRequest) return <Card><span className="eyebrow">{t("Refund request")}</span><h2>{course.title}</h2><RefundStatusBar item={course} /><Link className="button secondary" to="/orders">{t("View order history")}</Link></Card>;
   const submit = async (event) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || blocksRequest) return;
     const validationError = refundReasonError(reason);
     if (validationError) { setError(validationError); return; }
     const normalizedReason = reason.trim();
@@ -185,5 +189,5 @@ export function RefundPage() {
     try { const result = await submitRefund({ course, reason: normalizedReason, requestKey: request.current.key }); if (!result?.id) throw new Error("The service did not confirm the refund request."); navigate("/orders"); }
     catch (refundError) { setError(refundError.message); } finally { setBusy(false); }
   };
-  return <Card><span className="eyebrow">{t("Refund request")}</span><h2>{course.title}</h2><p>{t(refundDisclosure(course))}{t(" The service checks the purchase-time policy, unique viewing progress and protected attachment downloads.")}</p>{evidence && <VideoEvidence evidence={evidence} />}{evidenceError && <p role="status">{t(evidenceError)}</p>}<form onSubmit={submit}><FormField label={t("Reason for request")} hint={t("3–2000 characters, excluding leading and trailing spaces.")}><textarea required minLength="3" maxLength="2000" value={reason} onChange={(event) => setReason(event.target.value)} /></FormField>{error && <p className="form-error" role="alert">{t(error)}</p>}<div className="button-row"><Button variant="secondary" type="button" onClick={() => navigate(-1)}>{t("Cancel")}</Button><Button type="submit" disabled={busy || evidence?.refundEligibility?.eligible === false}>{busy ? t("Submitting…") : t("Submit for review")}</Button></div></form></Card>;
+  return <Card><span className="eyebrow">{t("Refund request")}</span><h2>{course.title}</h2><RefundStatusBar item={course} showEmpty /><p>{t(refundDisclosure(course))}{t(" The service checks the purchase-time policy, unique viewing progress and protected attachment downloads.")}</p>{evidence && <VideoEvidence evidence={evidence} />}{evidenceError && <p role="status">{t(evidenceError)}</p>}<form onSubmit={submit}><FormField label={t("Reason for request")} hint={t("3–2000 characters, excluding leading and trailing spaces.")}><textarea required minLength="3" maxLength="2000" value={reason} onChange={(event) => setReason(event.target.value)} /></FormField>{error && <p className="form-error" role="alert">{t(error)}</p>}<div className="button-row"><Button variant="secondary" type="button" onClick={() => navigate(-1)}>{t("Cancel")}</Button><Button type="submit" disabled={busy || evidence?.refundEligibility?.eligible === false}>{busy ? t("Submitting…") : t("Submit for review")}</Button></div></form></Card>;
 }

@@ -24,16 +24,17 @@ function ready(available = true) {
 }
 beforeEach(() => { vi.clearAllMocks(); setLanguage("en"); mocks.state = "success"; mocks.load.mockResolvedValue(session); mocks.stripe.mockResolvedValue({}); mocks.confirm.mockResolvedValue({ type: "success" }); });
 
-test("contact and standard payment methods precede express wallets in Chinese and English", () => {
+test("contact and payment heading precede wallets, followed by standard methods in both languages", () => {
   mount(); ready();
   const contact = screen.getByRole("heading", { name: "Contact information" });
   const payment = screen.getByTestId("payment-element");
   const express = screen.getByTestId("express-element");
   expect(contact.compareDocumentPosition(payment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(payment.compareDocumentPosition(express) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Payment method" }).compareDocumentPosition(express) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(express.compareDocumentPosition(payment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   act(() => setLanguage("zh-CN"));
   expect(screen.getByRole("heading", { name: "支付方式" })).not.toBeNull();
-  expect(screen.getByText("或使用快捷支付")).not.toBeNull();
+  expect(screen.getByText("或选择其他支付方式")).not.toBeNull();
 });
 
 test("pay requires completed fields and a decline can be retried without recreating the session", async () => {

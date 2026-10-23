@@ -765,6 +765,9 @@ export function PlatformProvider({ children }) {
     const result = await createRefundRequest({ orderItemId: course.orderItemId, reason }, requestKey);
     if (!result?.id) throw new Error("The service did not confirm the refund request. Retry to check its status.");
     if (revision !== sessionRevision.current) return result;
+    setOrders(current => current.map(order => ({ ...order, items: order.items.map(item => item.id === course.orderItemId
+      ? { ...item, refundRecords: [result, ...(item.refundRecords || []).filter(record => record.id !== result.id)] }
+      : item) })));
     setSuccessDialog({ title: "Refund request submitted", message: { key: "Your refund request for “{title}” has been submitted for administrator review. You can check its status in Order History.", values: { title: course.title } } });
     try { await refreshOrders(); }
     catch { notify("Refund request submitted. Order history could not refresh; refresh it later."); }
