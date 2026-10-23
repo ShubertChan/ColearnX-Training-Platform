@@ -20,6 +20,7 @@ test("refund selects the purchased order item without needing the public catalog
   assert.equal(refundPurchase(orders, "course", "missing"), null);
   assert.equal(refundPurchase(orders, "other", "old"), null);
   assert.equal(refundPurchase(orders, "course", "refunded"), null);
+  assert.equal(refundPurchase(orders, "course", "refunded", { includeRefunded: true }).orderItemId, "refunded");
 });
 
 test("admin approval uses the same frozen evidence as the displayed refund decision", () => {

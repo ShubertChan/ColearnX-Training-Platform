@@ -3684,3 +3684,22 @@ tbody tr[role="button"]:focus-visible {
   .sec-type-row .badge { grid-column: 2; }
   .sec-type-count { grid-column: 2; text-align: right; }
 }
+
+.refund-status-bar {
+  min-width: 0;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--muted);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  overflow-wrap: anywhere;
+}
+.refund-status-bar[data-state="pending"] { border-left-color: #b7791f; }
+.refund-status-bar[data-state="approved"] { border-left-color: #2563eb; }
+.refund-status-bar[data-state="refunded"] { border-left-color: #15803d; }
+.refund-status-bar[data-state="rejected"] { border-left-color: #b91c1c; }
+.refund-status-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 600; }
+.refund-status-bar p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.refund-status-bar .badge { white-space: normal; }
+.order-history-items > div > .refund-status-bar { grid-column: 1 / -1; margin: 0 0 8px; }

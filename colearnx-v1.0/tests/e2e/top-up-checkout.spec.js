@@ -25,7 +25,7 @@ async function setup(page, wallets = true) {
 }
 
 for (const width of [1440, 768, 390]) for (const language of ["en", "zh-CN"]) {
-  test(`onsite checkout keeps wallets below payment methods at ${width}px in ${language}`, async ({ page }, testInfo) => {
+  test(`onsite checkout places wallets below the payment heading and above other methods at ${width}px in ${language}`, async ({ page }, testInfo) => {
     const fixture = await setup(page);
     const errors = []; page.on("pageerror", error => errors.push(error.message));
     await page.setViewportSize({ width, height: 1000 });
@@ -41,7 +41,9 @@ for (const width of [1440, 768, 390]) for (const language of ["en", "zh-CN"]) {
     await expect(page.locator(".topup-pay-button")).toBeEnabled();
     await expect(page.locator(".topup-payment-divider")).toBeVisible();
     const paymentBox = await payment.boundingBox(), expressBox = await express.boundingBox();
-    expect(expressBox.y).toBeGreaterThan(paymentBox.y + paymentBox.height);
+    const headingBox = await page.getByRole("heading", { name: language === "en" ? "Payment method" : "支付方式", exact: true }).boundingBox();
+    expect(expressBox.y).toBeGreaterThan(headingBox.y + headingBox.height);
+    expect(paymentBox.y).toBeGreaterThan(expressBox.y + expressBox.height);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`checkout-${width}-${language}.png`), fullPage: true });
     await page.reload();

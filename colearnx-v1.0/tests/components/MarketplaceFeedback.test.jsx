@@ -19,17 +19,22 @@ import { PlatformProvider, usePlatform } from "../../src/context/PlatformContext
 import { CourseDetailPage, ContentDetailPage } from "../../src/pages/MarketplacePlatformPages";
 import { RefundPage } from "../../src/pages/LearningPlatformPages";
 import { setLanguage } from "../../src/i18n/LanguageContext";
+import RefundStatusBar from "../../src/components/RefundStatusBar";
 
 function DecisionHarness() {
   const { decideRefund, refreshOrders, orders } = usePlatform();
   return <><button onClick={() => void decideRefund("refund", "Approved", "Eligible refund").catch(() => {})}>Approve refund</button><button onClick={() => void refreshOrders()}>Refresh orders</button><span>{orders[0]?.items[0]?.fulfilmentStatus}</span></>;
+}
+function OrderStatusHarness() {
+  const { orders } = usePlatform();
+  return <><h1>Order History</h1>{orders[0]?.items[0] && <RefundStatusBar item={orders[0].items[0]} />}</>;
 }
 function mount(path) {
   return render(<MemoryRouter initialEntries={[path]}><PlatformProvider><Routes>
     <Route path="/courses/:id" element={<CourseDetailPage />} />
     <Route path="/contents/:id" element={<ContentDetailPage />} />
     <Route path="/refund/:id" element={<RefundPage />} />
-    <Route path="/orders" element={<h1>Order History</h1>} />
+    <Route path="/orders" element={<OrderStatusHarness />} />
     <Route path="/cart" element={<h1>Shopping Cart</h1>} />
     <Route path="/review" element={<DecisionHarness />} />
   </Routes></PlatformProvider></MemoryRouter>);
@@ -98,6 +103,17 @@ test("a failed refund request shows its error without success feedback", async (
   fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
   expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Refund unavailable");
   expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("confirmed pending status survives a failed order refresh after submitting", async () => {
+  mocks.orders.mockResolvedValue([{ id: "order" }]);
+  mount("/refund/purchased-course?orderItem=order-item");
+  fireEvent.change(await screen.findByLabelText(/Reason for request/), { target: { value: "Changed my mind" } });
+  mocks.orders.mockRejectedValue(new Error("Refresh unavailable"));
+  fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+  await screen.findByRole("heading", { name: "Order History" });
+  expect(screen.getByText("Refund under review")).toBeTruthy();
+  expect(screen.queryByText("Refunded")).toBeNull();
 });
 
 test("approved refund keeps success feedback when the subsequent order refresh fails", async () => {

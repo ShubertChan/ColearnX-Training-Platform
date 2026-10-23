@@ -7,9 +7,9 @@ export function refundReasonError(reason) {
   return "";
 }
 
-export function refundPurchase(orders, productId, orderItemId) {
+export function refundPurchase(orders, productId, orderItemId, { includeRefunded = false } = {}) {
   const items = orders.flatMap(order => order.items || []).filter(item =>
-    item.kind === "course" && item.productId === productId && activeStatuses.has(item.fulfilmentStatus));
+    item.kind === "course" && item.productId === productId && (activeStatuses.has(item.fulfilmentStatus) || (includeRefunded && item.fulfilmentStatus === "refunded")));
   const item = orderItemId ? items.find(item => item.id === orderItemId) : items[0];
   return item ? { ...item, id: item.productId, orderItemId: item.id, purchased: true } : null;
 }

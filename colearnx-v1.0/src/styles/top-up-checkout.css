@@ -18,9 +18,9 @@
 .topup-contact dl { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #f8f9fc; font-size: 14px; }
 .topup-contact dt { color: #536077; }
 .topup-contact dd { flex: 1; min-width: 0; }
-.topup-express { margin-top: 24px; }
+.topup-express { margin-bottom: 16px; }
 .topup-express[hidden] { display: none; }
-.topup-payment-divider { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; color: #536077; font-size: 13px; }
+.topup-payment-divider { display: flex; align-items: center; gap: 12px; margin-top: 16px; color: #536077; font-size: 13px; }
 .topup-payment-divider::before, .topup-payment-divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
 .topup-pay-button { min-height: 48px; margin-top: 24px; }
 .topup-checkout .form-error { margin: 16px 0 0; }

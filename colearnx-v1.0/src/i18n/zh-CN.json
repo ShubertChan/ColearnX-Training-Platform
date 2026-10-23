@@ -1681,5 +1681,18 @@
   "Refund successful": "退款成功",
   "The refund has been approved and the points have been returned to the member's wallet.": "退款已批准，积分已退回会员钱包。",
   "Refund decision recorded. Some account data could not refresh; refresh it later.": "退款决定已记录。部分账户数据暂时无法刷新，请稍后重试。",
-  "OK": "确定"
+  "OK": "确定",
+  "Or use another payment method": "或选择其他支付方式",
+  "Refund status": "退款状态",
+  "Refund under review": "退款审核中",
+  "Your request is waiting for administrator review. No points have been refunded yet.": "申请正在等待管理员审核，积分尚未退回。",
+  "Your request was approved. Refresh your order to confirm the completed refund.": "申请已获批准，请刷新订单确认退款完成情况。",
+  "The refund is complete. The points have been returned to your wallet.": "退款已完成，积分已退回你的钱包。",
+  "Your request was not approved. No points were refunded.": "申请未获批准，积分未退回。",
+  "Refund request cancelled": "退款申请已取消",
+  "This refund request was cancelled. No points were refunded.": "该退款申请已取消，积分未退回。",
+  "Refund status unavailable": "退款状态暂不可用",
+  "Refresh your order to check the latest refund status before submitting another request.": "请刷新订单查看最新退款状态后再尝试申请。",
+  "No refund requested": "未申请退款",
+  "No refund request has been submitted for this purchase.": "此购买项尚未提交退款申请。"
 }
