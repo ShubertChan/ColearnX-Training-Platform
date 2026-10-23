@@ -9,6 +9,9 @@ const session = { status: "open", email: "learner@example.test", amountMinor: 50
 async function setup(page, wallets = true) {
   const state = await mockVideoApi(page, "member");
   await mockStripe(page, wallets);
+  // The app polls in the background; include its query-string requests so
+  // slower browser runs cannot fall through to a nonexistent local API.
+  await page.route("**/api/v1/notifications/refunds*", route => route.fulfill(json([])));
   let creates = 0;
   await page.route("**/api/v1/wallet/top-up-packages", route => route.fulfill(json([{ id: "package", displayName: "500 points", points: 500, amountMinor: 500 }])));
   await page.route("**/api/v1/wallet/top-ups/checkout-session", route => {
