@@ -103,6 +103,9 @@ test("closing by Escape acknowledges once while an acknowledgement is in flight"
   mocks.read.mockReturnValueOnce(pending.promise);
   render(ui());
   await screen.findByRole("dialog");
+  // The asynchronous notice can enter the DOM before Modal's focus/keyboard
+  // effect runs. Wait for its observable ready state before sending Escape.
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close dialog" })));
   fireEvent.keyDown(document, { key: "Escape" });
   fireEvent.keyDown(document, { key: "Escape" });
   expect(mocks.read).toHaveBeenCalledTimes(1);

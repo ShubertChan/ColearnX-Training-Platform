@@ -1,3 +1,4 @@
+import DateInput from "../components/DateInput";
 import { useTranslation } from "../i18n/LanguageContext";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -94,7 +95,7 @@ export default function CourseEditorPage() {
         <FormField label={t("Course announcement for purchasers")}><textarea required value={form.fulfilmentInstructions} onChange={(e) => change("fulfilmentInstructions", e.target.value)} /></FormField><FormField label={t("Trainer contact for purchasers")}><input required value={form.trainerContact} onChange={(e) => change("trainerContact", e.target.value)} /></FormField>{teachingMode === "live" && <FormField label={t("Live-session link (optional)")}><input type="url" value={form.joinUrl} onChange={(e) => change("joinUrl", e.target.value)} /></FormField>}
       </>}
       <FormField label={t("Capacity (optional)")}><input min={1} type="number" value={form.capacity || ""} onChange={(e) => change("capacity", e.target.value)} /></FormField>
-      <div className="form-grid two"><FormField label={t("Start time (required)")}><input type="datetime-local" required value={form.startsAt || ""} onChange={(e) => change("startsAt", e.target.value)} /></FormField><FormField label={t("End time (optional)")}><input type="datetime-local" value={form.endsAt || ""} onChange={(e) => change("endsAt", e.target.value)} /></FormField></div>
+      <div className="form-grid two"><FormField label={t("Start time (required)")}><DateInput aria-label={t("Start time (required)")} type="datetime-local" required value={form.startsAt || ""} onChange={(e) => change("startsAt", e.target.value)} /></FormField><FormField label={t("End time (optional)")}><DateInput aria-label={t("End time (optional)")} type="datetime-local" value={form.endsAt || ""} onChange={(e) => change("endsAt", e.target.value)} /></FormField></div>
       {videoCourse && <p className="editor-policy-note">{t("Set when learners can start watching. Video playback remains locked until this time; dates use your device’s local time.")}</p>}
       {coordination && <p className="editor-policy-note">{t("Confirm the start time before saving an instructor-led course. It determines the 72-hour refund deadline for both online and offline sessions.")}</p>}
     </fieldset>{!draft && <Button type="submit" disabled={busy || Boolean(requested)}>{busy ? t("Saving…") : t("Create draft")}</Button>}</form>
