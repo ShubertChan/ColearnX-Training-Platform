@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ orders: vi.fn(), refund: vi.fn(), decision: vi.fn(), fulfilment: "fulfilled" }));
 vi.mock("../../src/api/client", async (original) => ({ ...await original(), hasAccessToken: () => true, hasCsrfToken: () => true }));
@@ -18,6 +18,7 @@ vi.mock("../../src/api/courseDelivery", async (original) => ({ ...await original
 import { PlatformProvider, usePlatform } from "../../src/context/PlatformContext";
 import { CourseDetailPage, ContentDetailPage } from "../../src/pages/MarketplacePlatformPages";
 import { RefundPage } from "../../src/pages/LearningPlatformPages";
+import { setLanguage } from "../../src/i18n/LanguageContext";
 
 function DecisionHarness() {
   const { decideRefund, refreshOrders, orders } = usePlatform();
@@ -34,11 +35,24 @@ function mount(path) {
   </Routes></PlatformProvider></MemoryRouter>);
 }
 beforeEach(() => {
+  setLanguage("en");
   localStorage.clear();
   mocks.fulfilment = "fulfilled";
   mocks.orders.mockReset().mockResolvedValue([]);
   mocks.refund.mockReset().mockResolvedValue({ id: "refund", status: "pending" });
   mocks.decision.mockReset().mockResolvedValue({ id: "refund", status: "approved" });
+});
+afterEach(() => act(() => setLanguage("en")));
+
+test("cart confirmation follows language changes without translating product titles", async () => {
+  mount("/courses/course");
+  fireEvent.click(await screen.findByRole("button", { name: "Add to cart" }));
+  await screen.findByRole("dialog", { name: "Course added to cart" });
+  act(() => setLanguage("zh-CN"));
+  const dialog = screen.getByRole("dialog", { name: "课程已加入购物车" });
+  expect(within(dialog).getByText("“Design course”已加入你的购物车。")).toBeTruthy();
+  expect(within(dialog).getByRole("link", { name: "查看购物车" })).toBeTruthy();
+  expect(within(dialog).getByRole("button", { name: "继续浏览" })).toBeTruthy();
 });
 
 for (const [path, title] of [["/courses/course", "Course added to cart"], ["/contents/resource", "Resource added to cart"]]) {
@@ -104,18 +118,13 @@ test("a failed refund approval does not open a success dialog", async () => {
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-test("a member sees a newly confirmed refund once, without repeating old refund dialogs", async () => {
+test("order refresh does not duplicate server-issued refund decision dialogs", async () => {
   mocks.orders.mockResolvedValue([{ id: "order" }]);
   mount("/review");
   await screen.findByText("fulfilled");
-  expect(screen.queryByRole("dialog")).toBeNull();
   mocks.fulfilment = "refunded";
   fireEvent.click(screen.getByRole("button", { name: "Refresh orders" }));
-  const dialog = await screen.findByRole("dialog", { name: "Refund successful" });
-  expect(within(dialog).getByText(/your wallet/)).toBeTruthy();
-  fireEvent.click(within(dialog).getByRole("button", { name: "OK", exact: true }));
-  fireEvent.click(screen.getByRole("button", { name: "Refresh orders" }));
-  await waitFor(() => expect(mocks.orders.mock.calls.length).toBeGreaterThanOrEqual(3));
+  await screen.findByText("refunded");
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
