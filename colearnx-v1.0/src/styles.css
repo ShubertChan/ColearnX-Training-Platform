@@ -839,6 +839,10 @@ main {
   grid-template-columns: minmax(0, 1.45fr) minmax(270px, 0.55fr);
   margin-top: 18px;
 }
+.profile-columns > .card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .form-grid {
   display: grid;
   gap: 13px;
@@ -902,7 +906,7 @@ select:disabled {
   border: 1px solid var(--line);
   border-radius: 11px;
 }
-.role-list > div > span {
+.role-list > div > span:first-child {
   display: grid;
   place-items: center;
   width: 34px;
@@ -914,6 +918,16 @@ select:disabled {
 .role-list b,
 .role-list small {
   display: block;
+  overflow-wrap: anywhere;
+}
+.role-list > div > div { min-width: 0; }
+.role-list > div > .badge {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  padding: 4px 8px;
+  white-space: normal;
+  text-align: center;
 }
 .role-list small {
   color: var(--muted);
@@ -2600,6 +2614,8 @@ tbody tr[role="button"]:focus-visible {
 .modal-body {
   padding: 20px;
 }
+.action-success-message { margin: 0; overflow-wrap: anywhere; }
+.modal > footer { flex-wrap: wrap; }
 .toast {
   position: fixed;
   right: 24px;
