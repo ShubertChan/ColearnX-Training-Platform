@@ -1,3 +1,4 @@
+import DateInput from "../components/DateInput";
 import { useTranslation } from "../i18n/LanguageContext";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -33,7 +34,7 @@ function Records({ rows, columns }) {
 }
 function DateRange({ value, onChange }) {
   const { t } = useTranslation();
-  return <div className="form-grid two"><FormField label={t("From date")}><input type="date" value={value.from} max={value.to || undefined} onChange={(e) => onChange({ ...value, from: e.target.value })} /></FormField><FormField label={t("To date")}><input type="date" value={value.to} min={value.from || undefined} onChange={(e) => onChange({ ...value, to: e.target.value })} /></FormField></div>;
+  return <div className="form-grid two"><FormField label={t("From date")}><DateInput aria-label={t("From date")} type="date" value={value.from} max={value.to || undefined} onChange={(e) => onChange({ ...value, from: e.target.value })} /></FormField><FormField label={t("To date")}><DateInput aria-label={t("To date")} type="date" value={value.to} min={value.from || undefined} onChange={(e) => onChange({ ...value, to: e.target.value })} /></FormField></div>;
 }
 function VersionHistory({ kind, id }) {
   const { t } = useTranslation();
@@ -69,10 +70,11 @@ function ListingManagement({ item }) {
   const { refreshMyListings } = usePlatform();
   const [form, setForm] = useState({ title: item.title, description: item.description || "", pricePoints: item.price, startsAt: localDateTime(item.startsAt), endsAt: localDateTime(item.endsAt), fulfilmentInstructions: item.fulfilmentInstructions || "", trainerContact: item.trainerContact || "", joinUrl: item.joinUrl || "" });
   const [reason, setReason] = useState(""), [action, setAction] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState(""), [success, setSuccess] = useState("");
+  const [startDateValid, setStartDateValid] = useState(true), [endDateValid, setEndDateValid] = useState(true);
   const coordination = item.kind === "course" && item.deliveryModes.some((mode) => ["live", "local"].includes(mode));
   const videoCourse = item.onlineVideo || item.progressTrackingType === "online_video";
   const startRequired = coordination || videoCourse;
-  const valid = form.title.trim() && Number.isInteger(Number(form.pricePoints)) && Number(form.pricePoints) >= 0 && (!coordination || (form.fulfilmentInstructions.trim() && form.trainerContact.trim()));
+  const valid = startDateValid && endDateValid && form.title.trim() && Number.isInteger(Number(form.pricePoints)) && Number(form.pricePoints) >= 0 && (!coordination || (form.fulfilmentInstructions.trim() && form.trainerContact.trim()));
   const mutate = async () => {
     setBusy(true); setError("");
     try {
@@ -89,7 +91,7 @@ function ListingManagement({ item }) {
   return <div className="stack"><Card><div className="card-heading"><h3>{t("Manage ")}{item.title}</h3><Badge>{t(item.status)}</Badge></div>
     <fieldset disabled={busy} className="editor-fields"><FormField label={t("Title")}><input value={form.title} maxLength={200} onChange={(e) => setForm({ ...form, title: e.target.value })} /></FormField><FormField label={t("Public description")}><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></FormField><FormField label={t("Price in points")}><input type="number" min={0} step={1} value={form.pricePoints} onChange={(e) => setForm({ ...form, pricePoints: e.target.value })} /></FormField>
     {coordination && <><FormField label={t("Buyer-only fulfilment instructions")}><textarea value={form.fulfilmentInstructions} onChange={(e) => setForm({ ...form, fulfilmentInstructions: e.target.value })} /></FormField><FormField label={t("Trainer contact")}><input value={form.trainerContact} onChange={(e) => setForm({ ...form, trainerContact: e.target.value })} /></FormField><FormField label={t("Meeting or group URL")}><input type="url" value={form.joinUrl} onChange={(e) => setForm({ ...form, joinUrl: e.target.value })} /></FormField></>}
-    {item.kind === "course" && <><div className="form-grid two"><FormField label={startRequired ? t("Start time (required)") : t("Start time (optional)")}><input type="datetime-local" required={startRequired} disabled={item.status !== "Draft"} value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} /></FormField><FormField label={t("End time (optional)")}><input type="datetime-local" disabled={item.status !== "Draft"} value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} /></FormField></div><small>{item.status === "Draft" ? videoCourse ? t("Dates use your device’s local time. Video playback stays locked until the confirmed start time.") : t("Dates use your device’s local time. Instructor-led start times determine the refund deadline.") : t("Published course times cannot be changed directly. Contact the Administrator to review a schedule change.")}</small></>}
+    {item.kind === "course" && <><div className="form-grid two"><FormField label={startRequired ? t("Start time (required)") : t("Start time (optional)")}><DateInput aria-label={startRequired ? t("Start time (required)") : t("Start time (optional)")} type="datetime-local" onValidityChange={setStartDateValid} required={startRequired} disabled={item.status !== "Draft"} value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} /></FormField><FormField label={t("End time (optional)")}><DateInput aria-label={t("End time (optional)")} type="datetime-local" onValidityChange={setEndDateValid} disabled={item.status !== "Draft"} value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} /></FormField></div><small>{item.status === "Draft" ? videoCourse ? t("Dates use your device’s local time. Video playback stays locked until the confirmed start time.") : t("Dates use your device’s local time. Instructor-led start times determine the refund deadline.") : t("Published course times cannot be changed directly. Contact the Administrator to review a schedule change.")}</small></>}
     <FormField label={t("Reason or change summary (at least 5 characters)")}><textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={4000} /></FormField></fieldset>
     <p>{t("Major changes create a new version for review. The server decides which changes are permitted and preserves existing purchase records.")}</p>
     {success && <p role="status">{t(success)}</p>}

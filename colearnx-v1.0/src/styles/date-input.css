@@ -1,0 +1,29 @@
+.date-input { display: grid; gap: 6px; min-width: 0; width: 100%; }
+.form-field > .date-input { font-size: inherit; font-weight: 400; color: inherit; }
+.date-input-control { display: flex; align-items: stretch; min-width: 0; position: relative; }
+.date-input-control > input { width: 100%; min-width: 0; padding-right: 44px; font-variant-numeric: tabular-nums; }
+.date-input-toggle { position: absolute; inset: 1px 1px 1px auto; display: grid; place-items: center; width: 40px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: #667085; cursor: pointer; }
+.date-input-toggle:hover { color: #4057d6; background: #eef0ff; }
+.date-input-toggle:disabled { cursor: default; opacity: .5; }
+.date-input-toggle:focus-visible { outline: 2px solid #4057d6; outline-offset: -4px; }
+.date-input-error { color: #b42318; line-height: 1.4; }
+.calendar-overlay .modal { width: min(410px, calc(100vw - 24px)); }
+.calendar-overlay .modal-body { padding: 20px; }
+.calendar-overlay .modal > header, .calendar-overlay .modal > footer { padding: 16px 20px; }
+.calendar-month { display: grid; grid-template-columns: 36px minmax(0, 1fr) 88px 36px; gap: 6px; align-items: center; margin-bottom: 18px; }
+.calendar-month > select, .calendar-month > input { width: 100%; min-width: 0; padding: 8px; }
+.calendar-month > .icon-button { width: 36px; height: 38px; }
+.calendar-weekdays, .calendar-grid > [role="row"] { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.calendar-weekdays { text-align: center; color: #667085; font-size: 12px; margin-bottom: 6px; }
+.calendar-grid [role="gridcell"] { display: grid; min-width: 0; }
+.calendar-grid button { min-height: 42px; padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #172033; cursor: pointer; font-variant-numeric: tabular-nums; }
+.calendar-grid button.outside-month { color: #98a2b3; }
+.calendar-grid button:hover:not(:disabled) { background: #eef0ff; color: #4057d6; }
+.calendar-grid button[aria-current="date"] { border-color: #a5afea; }
+.calendar-grid button.selected, .calendar-grid button.selected:hover { background: #4057d6; color: white; }
+.calendar-grid button:focus-visible { outline: 2px solid #4057d6; outline-offset: 1px; }
+.calendar-grid button:disabled { opacity: .35; cursor: default; }
+.calendar-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; color: #667085; font-size: 13px; }
+.calendar-time { display: grid; grid-template-columns: 1fr 110px; gap: 12px; align-items: center; margin-top: 16px; }
+.calendar-time > input { width: 100%; font-variant-numeric: tabular-nums; }
+@media (max-width: 400px) { .calendar-overlay .modal-body { padding: 14px; } .calendar-month { grid-template-columns: 32px minmax(0, 1fr) 76px 32px; gap: 3px; } }
