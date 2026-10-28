@@ -14,7 +14,7 @@
 | 仓库根目录 `.github/workflows/deploy-staging.yml` | 仅手动发布；同一环境串行运行，先 API 后 Pages，失败停止后续发布。 |
 | `.node-version` | Node.js 22.23.4。 |
 | `deployment/staging.json` | 公开域名、项目、支付/视频开关和媒体/上传来源。 |
-| `deployment/package*.json` | 发布工具独立锁文件，Wrangler 固定 4.151.0、pg 固定 8.23.0，并核对 CLI 安装版本与精确版本声明一致。 |
+| `deployment/package*.json` | 发布工具独立锁文件，Wrangler 固定 4.154.0、pg 固定 8.23.0，并核对 CLI 安装版本与精确版本声明一致。 |
 | `scripts/deployment/source-guard.mjs` | 核对仓库、main、完整 SHA 和迁移确认；拒绝排队期间 main 已变化的旧发布。 |
 | `scripts/deployment/cloud-migrations.mjs` | 独立只读连接实际云库，逐项检查迁移文件、checksum、applied_at 与读取账号权限，发布前后核验。 |
 | `scripts/deployment/release-plan.mjs` | 分别对照 Pages、Render 和人工记录的媒体组件基线，识别发布组件；未知范围不静默跳过。 |
