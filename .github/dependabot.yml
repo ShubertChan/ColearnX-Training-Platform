@@ -1,0 +1,43 @@
+version: 2
+
+# Updates create reviewable PRs. Nothing here merges or deploys them.
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /colearnx-v1.0
+      - /colearnx-v1.0/apps/api
+      - /colearnx-v1.0/apps/video-worker
+      - /colearnx-v1.0/apps/media-gateway
+      - /colearnx-v1.0/deployment
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:17"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    groups:
+      # In particular, update both exact Wrangler pins in the same PR.
+      npm-compatible:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: [minor, patch]
+      # This group takes effect when repository security updates are enabled.
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: chore(deps)
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:47"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 3
+    groups:
+      actions-updates:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore(ci)
