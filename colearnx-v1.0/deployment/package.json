@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "pg": "8.23.0",
+    "pg": "8.23.1",
     "wrangler": "4.154.0"
   },
   "engines": {
