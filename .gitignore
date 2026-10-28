@@ -1,0 +1,24 @@
+# Secrets and machine-local environment configuration
+.env
+.env.*
+!.env.example
+!.env.compose.example
+!.env.staging.example
+
+# Dependencies and generated output
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+coverage/
+release-report/
+test-results/
+playwright-report/
+/colearnx-v1.0/work/e2e-site/
+*.log
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
