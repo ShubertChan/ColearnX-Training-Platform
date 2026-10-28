@@ -2,6 +2,8 @@
 
 更新：2026-10-21。迁移清单从当前提交动态枚举，不固定为某一迁移编号。新增能力与一次性配置详见 [云端迁移实际预检与组件发布计划](STAGING_RELEASE_PREFLIGHT.md)。
 
+2026-10-28 补充：新增 Dependabot 与每日依赖安全审计，配置和处理方法见第 9 节；手动发布、迁移确认和 staging Environment 审批保持不变。
+
 采用 **自动检查 + 人工批准发布**：PR 和 main 更新自动测试、构建；负责人从 main 手动运行发布。需要发布的组件锁定本次测试的完整 Git SHA，Pages 上传该次 CI 已检查的产物，不在发布时重新构建。没有运行时代码变更的组件可以保留旧提交，但必须通过独立在线基线、完整 Git 区间差异和最终身份核验；保留的前端文件必须仍与本次测试产物一致。
 
 本文是仓库代码和操作要求，不是“GitHub Actions 已启用成功”的证明。首次使用仍需合并代码、配置受保护 Environment 和部署令牌、实际运行工作流。现有 Render/Pages 自动部署是另一条触发路径，启用前必须关闭，防止绕过检查。
@@ -223,3 +225,33 @@ Render 与 Pages 不是原子发布。API 更新后 Pages 失败，可能出现�
 不自动回滚代码或数据库。优先修复并通过新 PR 发布；确需恢复先确认旧代码兼容当前 schema，再恢复兼容的前后端组合。数据库修复采用受审 forward migration 或独立恢复计划，不删新列/迁移记录、不改 checksum、不 seed。
 
 Neon 恢复分支不是独立导出的长期备份，也不等于已完成恢复演练；保留和计费需另行管理。
+
+## 9. Dependabot 与每日依赖安全审计
+
+合并到默认分支 main 后生效；本节描述代码配置，不代表定时任务已经实际运行。
+
+- 根目录 `.github/dependabot.yml` 覆盖前端、API、video-worker、media-gateway、deployment 五组 npm 清单，以及 GitHub Actions 的固定 SHA 引用。
+- npm 每周一北京时间 10:17 检查，minor/patch 更新分组提出 PR；两处 Wrangler 使用同一组，更新时仍须通过精确版本一致性检查。major 更新保留单独审查，不忽略安全修复。GitHub Actions 每周一 10:47 检查并提出 PR。
+- npm 安全更新分组需要仓库 Settings → Advanced Security 中启用 Dependabot alerts、security updates 和依赖图；提交配置本身不会启用这些仓库开关。不能假定仅 `allow: all` 就会维护所有 npm 间接依赖。每日审计始终扫描锁文件中的完整直接/间接依赖。
+- 新的 `.github/workflows/security-audit.yml` 每天北京时间 09:37（UTC 01:37）扫描当时 main 的五组锁文件，也可以在 Actions → Dependency security audit → Run workflow 手动运行。相关配置/锁文件 PR 和 main 更新也会触发，供首次配置验收。
+- 使用 Node 文件中的固定版本和 `npm audit --package-lock-only --include=dev --audit-level=high`。不安装依赖、不执行生命周期脚本；只有 npm 公共漏洞库网络查询。开发、构建、测试和发布工具都在范围内。
+- 五组独立执行，某组失败不取消其他组。high/critical 使任务失败；low/moderate 保留报告并排期处理。超时、网络故障、无法识别的响应也失败，不能当成“零漏洞”。只有 registry 请求会按 npm 有限重试，已知漏洞不会靠重试变绿。
+- Actions Summary 显示组件、完整 SHA、状态和严重程度计数；每组 JSON 报告作为 artifact 保存 14 天，失败时也保存。失败通知按个人 GitHub Actions 通知设置发送；本工作流不发送额外邮件或聊天消息。
+- 仅有 `contents: read`，不使用 Environment 或云端 Secrets，不访问 Neon、Render、R2、Stripe，不执行 migration、seed、发布或自动合并。原有 CI 的完整依赖安装、测试、构建与高危阻断保持不变。
+
+本地复现（在 `colearnx-v1.0` 目录，不需要先安装依赖）：
+
+```powershell
+npm run security:audit -- --component frontend
+npm run security:audit -- --component api
+npm run security:audit -- --component video-worker
+npm run security:audit -- --component media-gateway
+npm run security:audit -- --component deployment
+npm run release:test
+```
+
+本地报告默认存放在被 Git 忽略的 `work/security-audit/`。报告只证明该提交在检查时未命中所报告的已知漏洞，不是完整代码安全审查；不会扫描 Docker 系统包或自动更新本机 Node/转码镜像。
+
+维护流程：先看失败步骤及 JSON 报告；registry 故障恢复后可重试同一提交，实际漏洞应通过升级清单/锁文件、回归测试和人工合并修复。旧工作流重跑仍使用旧 SHA，应查看修复提交自己的 CI。依赖 PR 通过不自动发布，仍从 main 手动运行 Deploy staging，单独批准迁移并通过只读云端 ledger 预检。
+
+GitHub 定时任务可能排队延迟；公开仓库连续 60 天无活动可能停用 schedule。负责人应检查最近一次审计时间和 Actions 通知，必要时手动运行并重新启用。安全 PR 如需大版本升级或同步修复多个组件，继续由人工审查，不关闭审计或绕过既有回归检查。
