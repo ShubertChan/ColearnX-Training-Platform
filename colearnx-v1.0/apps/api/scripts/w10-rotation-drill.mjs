@@ -32,10 +32,18 @@ async function rotatedApi(environment) {
 export async function runW10RotationDrill({ owner, app, environment, passed }) {
   const target = new URL(environment.DATABASE_URL);
   assert.ok(environment.NODE_ENV === 'development' && ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname)
-    && /^\/colearnx_release_check_[a-z0-9_]+$/.test(target.pathname), 'Refusing non-fixture session revocation');
-  const actual = (await owner.query('SELECT current_database() AS name, inet_server_addr()::text AS host')).rows[0];
+    && /^\/colearnx_release_check_[a-z0-9_]+$/.test(target.pathname)
+    && target.searchParams.get('options') === '-c role=colearnx_app', 'Refusing non-fixture session revocation');
+  const ownerTarget = new URL(target);
+  ownerTarget.search = '';
+  // Compare without placing a connection string (which includes a password) into assertion output.
+  assert.ok(owner.options.connectionString === ownerTarget.href, 'Owner must use the same guarded loopback endpoint as the API');
+  const actual = (await owner.query('SELECT current_database() AS name, host(inet_server_addr()) AS address')).rows[0];
   assert.equal(actual.name, target.pathname.slice(1));
-  assert.ok(['127.0.0.1/32', '::1/128', '127.0.0.1', '::1'].includes(actual.host), 'Owner connection must also be loopback');
+  // PostgreSQL behind a local Docker port sees its own container interface.
+  const containerAddress = process.env.W10_FIXTURE_POSTGRES_IP;
+  if (containerAddress) assert.equal(actual.address, containerAddress, 'Unexpected PostgreSQL fixture container');
+  else assert.ok(['127.0.0.1', '::1'].includes(actual.address), 'Native PostgreSQL must listen on loopback for this drill');
   const users = await Promise.all(['A', 'B'].map(s => makeUser(owner, 'Rotation fixture ' + s)));
   const trials = [];
   for (let round = 1; round <= 3; round++) {

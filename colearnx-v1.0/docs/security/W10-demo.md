@@ -8,10 +8,13 @@ docker run -d --rm --name colearnx-w10-demo -p 127.0.0.1:55432:5432 \
   -e POSTGRES_DB=colearnx_release_check_demo postgres:16
 # 等 pg_isready 报 accepting connections 后再运行测试。
 docker exec colearnx-w10-demo pg_isready -U week_fixture -d colearnx_release_check_demo
+W10_FIXTURE_POSTGRES_IP="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}' colearnx-w10-demo)" \
 RELEASE_CHECK_DATABASE_URL=postgresql://week_fixture:local-demo-only@127.0.0.1:55432/colearnx_release_check_demo npm run release:database-test
 ```
 
-在 Windows PowerShell 中，把同一个 URL 赋给 `$env:RELEASE_CHECK_DATABASE_URL`，再运行相同的 npm 命令。脚本不会清空已有数据库；再演示时启动新的测试簇。
+Docker 把本机端口转发到容器网卡。演练在吊销会话前，核对数据库报告的地址是否和这一个容器一致。使用原生 PostgreSQL 时，数据库本身应监听回环地址。
+
+在 Windows PowerShell 中，用 `$env:W10_FIXTURE_POSTGRES_IP = docker inspect --format '{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}' colearnx-w10-demo` 读取容器地址，把同一个连接 URL 赋给 `$env:RELEASE_CHECK_DATABASE_URL`，再运行 `npm run release:database-test`。每次演示使用新的测试簇。
 
 | 时间 | 讲解与操作 | 观众应看到什么 |
 |---|---|---|

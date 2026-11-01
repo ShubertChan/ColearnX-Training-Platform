@@ -95,8 +95,12 @@ jobs:
           npm --prefix apps/media-gateway test
       - name: Isolated PostgreSQL 16 migrations, data preservation and permissions
         env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
           RELEASE_CHECK_DATABASE_URL: postgresql://release_owner:ci-local-fixture-only@127.0.0.1:5432/colearnx_release_check_ci
-        run: npm run release:database-test
+        run: |
+          fixture_ip=$(docker inspect --format '{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}' "$POSTGRES_CONTAINER")
+          test -n "$fixture_ip"
+          W10_FIXTURE_POSTGRES_IP="$fixture_ip" npm run release:database-test
       - name: Keep measured recovery times from the isolated key rotation drill
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
