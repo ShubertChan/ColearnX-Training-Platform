@@ -57,8 +57,8 @@ export function securityHeaders(env) {
 
   const csp = [
     "default-src 'self'",
-    ["script-src 'self'", ...stripeScripts, `${googleBase}client`].join(" "),
-    ["frame-src 'self'", ...stripeFrames, googleBase].join(" "),
+    ["script-src 'self'", ...stripeScripts, `${googleBase}client`, "https://challenges.cloudflare.com"].join(" "),
+    ["frame-src 'self'", ...stripeFrames, googleBase, "https://challenges.cloudflare.com"].join(" "),
     `style-src 'self' 'unsafe-inline' ${googleBase}style`,
     "img-src " + img,
     "font-src 'self'",

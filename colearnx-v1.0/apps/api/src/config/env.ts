@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { checkTurnstileSettings } from '../security/turnstile.js';
 
 const booleanFromString = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
 
@@ -24,6 +25,8 @@ const schema = z.object({
   COOKIE_DOMAIN: z.string().optional().default(''),
   // Runtime-only public client ID. Blank disables Google without breaking CI.
   GOOGLE_CLIENT_ID: z.string().trim().regex(/^$|^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/).default(''),
+  TURNSTILE_SITE_KEY: z.string().trim().default(''),
+  TURNSTILE_SECRET_KEY: z.string().trim().default(''),
   STRIPE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_PUBLISHABLE_KEY: z.string().optional().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
@@ -176,6 +179,7 @@ if (parsed.data.ENABLE_HOSTED_VIDEO) {
 // nothing) and costs every contributor a setup step they will eventually skip
 // by weakening the check.
 const deployedEnvironment = parsed.data.NODE_ENV === 'production' || parsed.data.NODE_ENV === 'staging';
+checkTurnstileSettings(parsed.data.TURNSTILE_SITE_KEY, parsed.data.TURNSTILE_SECRET_KEY, deployedEnvironment);
 
 for (const name of ['MFA_SECRET_KEY', 'MFA_CHALLENGE_SECRET'] as const) {
   if (!parsed.data[name]) {

@@ -57,6 +57,12 @@ export const securityEventSeverity = {
 
   // --- password reset (the flow introduced in migration 008) ---------------
   'auth.reset_requested': 1,
+  'auth.human_check_failed': 1,
+  'auth.registration_attempt': 0,
+  'auth.credential_stuffing': 3,
+  'auth.registration_burst': 2,
+  'auth.login_network_changed': 2,
+  'finance.topup_velocity': 3,
   // A request suppressed by the per-account cooldown. Low on its own; the W7
   // rules care about the rate, which is what distinguishes a user clicking
   // twice from an inbox being flooded.

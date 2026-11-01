@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 
 const unwrap = (response) => response.data.data;
+export const getHumanCheckConfig = () => apiClient.get("/auth/human-check").then(unwrap);
 export const registerAccount = (input) => apiClient.post("/auth/register", input).then(unwrap);
 export const verifyEmailAddress = (input) => apiClient.post("/auth/verify-email", input).then(unwrap);
 export const resendVerificationEmail = (input) => apiClient.post("/auth/resend-verification", input).then(unwrap);
