@@ -5,7 +5,7 @@ import { useTranslation } from "../i18n/LanguageContext";
 import { usePlatform } from "../context/PlatformContext";
 import { Button } from "./ui";
 
-export default function GoogleSignIn({ disabled = false, onSignedIn, onBusyChange }) {
+export default function GoogleSignIn({ disabled = false, human, onSignedIn, onBusyChange, onRegistrationChange }) {
   const { language, t } = useTranslation();
   const { signInWithGoogle } = usePlatform();
   const [setup, setSetup] = useState(null);
@@ -21,6 +21,11 @@ export default function GoogleSignIn({ disabled = false, onSignedIn, onBusyChang
   const handler = useRef(null);
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
+
+  useEffect(() => {
+    onRegistrationChange?.(Boolean(pendingCredential));
+    return () => onRegistrationChange?.(false);
+  }, [pendingCredential, onRegistrationChange]);
 
   useEffect(() => {
     active.current = true;
@@ -64,10 +69,12 @@ export default function GoogleSignIn({ disabled = false, onSignedIn, onBusyChang
   }, [setup, language, pendingCredential]);
 
   handler.current = async (credential, consent = false) => {
-    if (!credential || busyRef.current || disabledRef.current) return;
+    if (!credential || busyRef.current || disabledRef.current || !human?.ready || human.action !== (consent ? "register" : "login")) return;
     busyRef.current = true; setBusy(true); onBusyChange?.(true); setError("");
     try {
-      const identity = await signInWithGoogle({ credential, ...(consent ? { acceptedTerms: true, ageAcknowledged: true } : {}) });
+      human.consume();
+      const identity = await signInWithGoogle({ credential, ...(human.token ? { turnstileToken: human.token } : {}),
+        ...(consent ? { acceptedTerms: true, ageAcknowledged: true } : {}) });
       if (!active.current) return;
       if (identity.registrationRequired) { setPendingCredential(credential); return; }
       setPendingCredential("");
@@ -90,9 +97,10 @@ export default function GoogleSignIn({ disabled = false, onSignedIn, onBusyChang
         <label className="check-label"><input type="checkbox" checked={terms} onChange={(event) => setTerms(event.target.checked)} /><span>{t("I accept the ")}<Link to="/terms" target="_blank">{t("Terms")}</Link>{t(" and ")}<Link to="/privacy" target="_blank">{t("Privacy Notice")}</Link>.</span></label>
         <label className="check-label"><input type="checkbox" checked={age} onChange={(event) => setAge(event.target.checked)} /><span>{t("I meet the configured minimum-age policy.")}</span></label>
       </div>
-      <Button type="button" className="wide" disabled={!terms || !age || busy || disabled} onClick={() => handler.current(pendingCredential, true)}>{busy ? t("Connecting…") : t("Create Member account")}</Button>
+      {human?.action === "register" && human.widget}
+      <Button type="button" className="wide" disabled={!terms || !age || busy || disabled || !human?.ready || human.action !== "register"} onClick={() => handler.current(pendingCredential, true)}>{busy ? t("Connecting…") : t("Create Member account")}</Button>
       <button type="button" className="link-button" disabled={busy} onClick={() => { setPendingCredential(""); setTerms(false); setAge(false); setAttempt((value) => value + 1); }}>{t("Use a different account")}</button>
-    </div> : setup?.sdk && <div ref={container} className="google-sign-in-button" inert={busy || disabled} aria-label={t("Sign in with Google")} />}
+    </div> : setup?.sdk && <div ref={container} className="google-sign-in-button" inert={busy || disabled || !human?.ready || human.action !== "login"} aria-label={t("Sign in with Google")} />}
     {busy && <p className="google-sign-in-status" role="status">{t("Connecting…")}</p>}
     {error && <div className="form-error" role="alert">{t(error)} <button className="link-button" type="button" disabled={busy || disabled} onClick={() => setAttempt((value) => value + 1)}>{t("Try again")}</button></div>}
   </div>;

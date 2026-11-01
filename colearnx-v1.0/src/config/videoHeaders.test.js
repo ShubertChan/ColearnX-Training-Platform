@@ -2,6 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { securityHeaders } from "../../build/videoHeaders.js";
 
+test("Turnstile can load its SDK and iframe without weakening script policy", () => {
+  const csp = securityHeaders({});
+  for (const directive of ["script-src", "frame-src"]) {
+    const line = csp.match(new RegExp(directive + "[^;]+"))[0];
+    assert.ok(line.includes("https://challenges.cloudflare.com"));
+    assert.doesNotMatch(line, /unsafe-inline|unsafe-eval|\*/);
+  }
+});
+
 test("runtime Google sign-in permits only its SDK paths and popup communication", () => {
   const headers = securityHeaders({});
   assert.match(headers, /script-src[^;]*https:\/\/accounts.google.com\/gsi\/client/);

@@ -79,14 +79,24 @@ export async function persistSecurityEvent(
   fingerprint: RequestFingerprint,
   input: SecurityEventInput,
 ): Promise<void> {
+  await insertSecurityEvent(fingerprint, input, query);
+  notifySecurityEvent(fingerprint, input);
+}
+
+// Risk rules insert observations and findings on the same database connection
+// under a scope lock. Notify only after its transaction successfully commits.
+export async function insertSecurityEvent(
+  fingerprint: RequestFingerprint, input: SecurityEventInput,
+  execute: (sql: string, values: unknown[]) => Promise<unknown>,
+) {
   const severity = input.severity ?? defaultSeverity(input.type);
   const context = sanitiseContext(input.context ?? {});
-  await query(
+  await execute(
     `INSERT INTO security_events
        (event_type, severity, actor_user_id, target_user_id,
         actor_ip_hash, actor_ua_hash, request_id,
-        risk_score, rule_hits, decision, context_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)`,
+        risk_score, rule_hits, decision, context_json, occurred_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, clock_timestamp())`,
     [
       input.type,
       severity,
@@ -101,7 +111,10 @@ export async function persistSecurityEvent(
       JSON.stringify(context),
     ],
   );
+}
 
+export function notifySecurityEvent(fingerprint: RequestFingerprint, input: SecurityEventInput) {
+  const severity = input.severity ?? defaultSeverity(input.type);
   if (severity >= env.SECURITY_ALERT_MIN_SEVERITY) {
     // Detached on purpose: the alert is best-effort, so its failure is
     // swallowed and never masks or fails the awaited INSERT above.
@@ -110,7 +123,7 @@ export async function persistSecurityEvent(
       severity,
       actorUserId: input.actorUserId ?? null,
       requestId: fingerprint.requestId,
-      context,
+      context: sanitiseContext(input.context ?? {}),
     }).catch(() => { /* best-effort alert; the recorded row is what matters */ });
     pendingAlerts.add(alert);
     void alert.finally(() => pendingAlerts.delete(alert));

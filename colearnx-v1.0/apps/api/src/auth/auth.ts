@@ -13,6 +13,7 @@ import { parse } from '../lib/validation.js';
 import { sendAccountLockedEmail, sendPasswordChangedEmail } from '../email/resend.js';
 import { recordSecurityEvent, securityContext } from '../security/events.js';
 import { emailFingerprint } from '../security/fingerprint.js';
+import { checkLoginSource, observeSource, recordLoginSuccess } from '../security/access-risk.js';
 import { passwordResetUrl } from './password-reset-url.js';
 import { verifyPasswordConstantWork } from './credential-verify.js';
 import { claimLockNotification, clearFailures, lockoutAlertThreshold, readLockState, registerFailure, releaseLockNotification } from './lockout.js';
@@ -239,6 +240,7 @@ const originIsAllowed = (req: Request) => !req.get('origin') || req.get('origin'
 
 export async function register(req: Request, res: Response) {
   const input = parse(registrationSchema, req.body);
+  await observeSource('register', req, res, input.email);
   const fingerprint = securityContext(req, res);
   // Before the account is touched: a rejected password must not leave a
   // half-created user or consume the address.
@@ -351,6 +353,7 @@ export async function verifyEmail(req: Request, res: Response) {
       return ok(res, { verified: true, authenticated: false });
     }
     const session = await createRefreshSession(actor, req, res);
+    await recordLoginSuccess(req, res, actor.id, { method: 'email_verification', mfa: false });
     return ok(res, {
       verified: true,
       authenticated: true,
@@ -633,6 +636,7 @@ export async function notifyAccountLocked(
 
 export async function login(req: Request, res: Response) {
   const input = parse(loginSchema, req.body);
+  await checkLoginSource(req, res);
   const fingerprint = securityContext(req, res);
   const found = await query<{ id: string; password_hash: string }>('SELECT user_id AS id, password_hash FROM users WHERE lower(email::text) = lower($1)', [input.email]);
   const record = found.rows[0] ?? null;
@@ -660,16 +664,15 @@ export async function login(req: Request, res: Response) {
     }, res);
     // Same status, code and message as a wrong password: a distinguishable
     // "locked" response would confirm the address exists.
+    if (!passwordMatches) await observeSource('login', req, res, input.email, { actorUserId: record.id, context: { duringLock: true } });
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
   }
 
   if (!record || !passwordMatches) {
+    let consecutiveFailures;
     if (record) {
       const outcome = await registerFailure(record.id, env.LOGIN_FAILURE_DECAY_HOURS * 3600);
-      await recordSecurityEvent(fingerprint, {
-        type: 'auth.login_failed', actorUserId: record.id,
-        context: { consecutiveFailures: outcome.consecutiveFailures },
-      }, res);
+      consecutiveFailures = outcome.consecutiveFailures;
       if (outcome.newlyLocked) {
         await recordSecurityEvent(fingerprint, {
           type: outcome.consecutiveFailures >= lockoutAlertThreshold ? 'auth.account_lock_escalated' : 'auth.account_locked',
@@ -678,12 +681,9 @@ export async function login(req: Request, res: Response) {
         }, res);
         await notifyAccountLocked(record.id, outcome.lockedUntil, fingerprint, res);
       }
-    } else {
-      await recordSecurityEvent(fingerprint, {
-        type: 'auth.login_failed',
-        context: { subject: emailFingerprint(input.email, env.SECURITY_HASH_PEPPER), accountExists: false },
-      }, res);
     }
+    await observeSource('login', req, res, input.email, { actorUserId: record?.id,
+      context: record ? { consecutiveFailures } : { accountExists: false } });
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
   }
 
@@ -734,10 +734,7 @@ export async function completePrimarySignIn(userId: string, req: Request, res: R
   // Only a completed authentication clears the shared password/MFA ladder.
   await clearFailures(actor.id);
   const session = await createRefreshSession(actor, req, res);
-  await recordSecurityEvent(fingerprint, {
-    type: 'auth.login_succeeded', actorUserId: actor.id,
-    context: { clearedFailures: lock?.consecutiveFailures ?? 0, mfa: false, method },
-  }, res);
+  await recordLoginSuccess(req, res, actor.id, { clearedFailures: lock?.consecutiveFailures ?? 0, mfa: false, method });
   return ok(res, { user: actor, accessToken: signAccessToken(actor, session.sessionId), csrfToken: createCsrfToken(session.token) });
 }
 
@@ -809,10 +806,7 @@ export async function verifyMfaLogin(req: Request, res: Response) {
 
   await clearFailures(actor.id);
   const session = await createRefreshSession(actor, req, res);
-  await recordSecurityEvent(fingerprint, {
-    type: 'auth.login_succeeded', actorUserId: actor.id,
-    context: { mfa: true, viaRecoveryCode: factor.usedRecoveryCode },
-  }, res);
+  await recordLoginSuccess(req, res, actor.id, { mfa: true, viaRecoveryCode: factor.usedRecoveryCode });
   // Surfaced so the client can warn a user who is running low; a user down to
   // their last code and unaware of it is one lost phone from a lockout.
   return ok(res, {

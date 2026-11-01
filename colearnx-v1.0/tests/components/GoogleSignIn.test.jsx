@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { setLanguage } from '../../src/i18n/LanguageContext';
+import { useState } from 'react';
 
 const mocks = vi.hoisted(() => ({ config: vi.fn(), challenge: vi.fn(), load: vi.fn(), signIn: vi.fn(), initialize: vi.fn(), renderButton: vi.fn() }));
 vi.mock('../../src/api/googleIdentity', () => ({ getGoogleConfig: mocks.config, createGoogleChallenge: mocks.challenge, loadGoogleIdentity: mocks.load }));
@@ -16,7 +17,13 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => setLanguage('en')); });
 async function setup(props = {}) {
-  const rendered = render(<MemoryRouter><GoogleSignIn {...props} /></MemoryRouter>);
+  function Fixture() {
+    const [registration, setRegistration] = useState(false);
+    return <GoogleSignIn {...props} onRegistrationChange={setRegistration} human={{
+      ready: true, action: registration ? 'register' : 'login', consume: () => {},
+    }} />;
+  }
+  const rendered = render(<MemoryRouter><Fixture /></MemoryRouter>);
   await waitFor(() => expect(mocks.renderButton).toHaveBeenCalled());
   return rendered;
 }

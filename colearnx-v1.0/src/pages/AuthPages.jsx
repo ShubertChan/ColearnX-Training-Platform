@@ -8,6 +8,7 @@ import { requestPasswordReset, resetPassword } from "../api/auth";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import SessionConnectionNotice from "../components/SessionConnectionNotice";
 import GoogleSignIn from "../components/GoogleSignIn";
+import { useHumanCheck } from "../components/HumanCheck";
 import nextLogo from "../../assets/next-logo.jpg";
 import { intendedPath } from "../utils/frontendState";
 import { PASSWORD_MIN_LENGTH, passwordChecklist, passwordChecklistPasses, passwordStrength } from "../utils/passwordPolicy";
@@ -52,6 +53,8 @@ export function AuthPage({ mode = "login" }) {
   const [failures, setFailures] = useState({ email: "", count: 0 });
   const [mfa, setMfa] = useState(null);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleRegistration, setGoogleRegistration] = useState(false);
+  const human = useHumanCheck(register || googleRegistration ? "register" : "login");
   const signedInWithGoogle = (identity) => {
     if (identity.mfaRequired) {
       setMfa({ token: identity.mfaToken, code: "", error: "", busy: false });
@@ -76,17 +79,17 @@ export function AuthPage({ mode = "login" }) {
 
   const submit = async (event) => {
     event.preventDefault();
-    if (googleBusy || submitting) return;
+    if (googleBusy || submitting || (!register && googleRegistration) || !human.ready) return;
     if (register && password !== confirmation) return setError("Passwords do not match.");
     if (register && !passwordChecklistPasses(password, { email, displayName: name })) return setError({ key: "Choose a password of at least {count} characters that meets the requirements listed below.", values: { count: PASSWORD_MIN_LENGTH } });
     if (register && (!acceptedTerms || !ageAcknowledged)) return setError("Accept the terms/privacy notice and confirm the age policy.");
-    setError(""); setSubmitting(true);
+    setError(""); setSubmitting(true); human.consume();
     try {
       if (register) {
-        const pending = await registerMember({ name: name.trim(), email: email.trim(), password, passwordConfirmation: confirmation, acceptedTerms, ageAcknowledged });
+        const pending = await registerMember({ name: name.trim(), email: email.trim(), password, passwordConfirmation: confirmation, acceptedTerms, ageAcknowledged, turnstileToken: human.token });
         navigate(`/verify-email?email=${encodeURIComponent(pending.email)}`, { state: { email: pending.email, expiresAt: pending.expiresAt, resendAvailableAt: pending.resendAvailableAt } });
       } else {
-        const identity = await signIn({ email: email.trim(), password });
+        const identity = await signIn({ email: email.trim(), password, turnstileToken: human.token });
         setFailures({ email: "", count: 0 });
         if (identity.mfaRequired) {
           // The password is proven but no session exists yet. The token lives
@@ -129,9 +132,10 @@ export function AuthPage({ mode = "login" }) {
       {error && <div className="form-error" role="alert">{t(error)}</div>}
       {!register && repeatedFailures >= 5 && <div className="form-notice" role="status">{t("Several sign-in attempts for this address have failed. For security, repeated failures pause sign-in for a short time, so a correct password may still be refused until the pause ends. Wait a minute and try again, or ")}<Link to="/forgot-password">{t("reset your password")}</Link>{t(" — completing a reset lifts the pause immediately.")}</div>}
       {register && <div className="auth-consents"><label className="check-label"><input required type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} /><span>{t("I accept the ")}<Link to="/terms" target="_blank">{t("Terms")}</Link>{t(" and ")}<Link to="/privacy" target="_blank">{t("Privacy Notice")}</Link>.</span></label><label className="check-label"><input required type="checkbox" checked={ageAcknowledged} onChange={(event) => setAgeAcknowledged(event.target.checked)} /><span>{t("I meet the configured minimum-age policy.")}</span></label></div>}
-      <Button className="wide" type="submit" disabled={submitting || googleBusy}>{submitting ? t("Connecting…") : register ? t("Create Member account") : t("Sign in")}<ArrowRight size={17} /></Button>
+      {(register || !googleRegistration) && human.widget}
+      <Button className="wide" type="submit" disabled={submitting || googleBusy || (!register && googleRegistration) || !human.ready}>{submitting ? t("Connecting…") : register ? t("Create Member account") : t("Sign in")}<ArrowRight size={17} /></Button>
       {!register && <p className="auth-recovery"><Link to="/forgot-password">{t("Forgot your password?")}</Link></p>}
-      {!register && <GoogleSignIn disabled={submitting} onBusyChange={setGoogleBusy} onSignedIn={signedInWithGoogle} />}
+      {!register && <GoogleSignIn disabled={submitting} human={human} onRegistrationChange={setGoogleRegistration} onBusyChange={setGoogleBusy} onSignedIn={signedInWithGoogle} />}
       <p className="auth-switch">{register ? t("Already have an account?") : t("New to CoLearnX?")} <Link to={register ? "/login" : "/register"}>{register ? t("Sign in") : t("Create account")}</Link></p>
     </form>
   </section></div>;
@@ -140,8 +144,25 @@ export function AuthPage({ mode = "login" }) {
 export function ForgotPasswordPage() {
   const { t } = useTranslation();
   const [email, setEmail] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [submitted, setSubmitted] = useState(false);
-  const submit = async (event) => { event.preventDefault(); setBusy(true); setError(""); try { await requestPasswordReset({ email: email.trim() }); setSubmitted(true); } catch (requestError) { setError(requestError.message); } finally { setBusy(false); } };
-  return <div className="auth-page"><AuthStory recovery /><section className="auth-form-wrap"><LanguageSwitcher className="auth-language" /><form className="auth-form" onSubmit={submit}><span className="eyebrow">{t("Password reset")}</span><h2>{t("Request a reset link")}</h2><p>{t("If the address belongs to an account, CoLearnX will send reset instructions. The same response is shown for every address.")}</p>{!submitted && <FormField label={t("Email address")}><div className="input-with-icon"><Mail size={18} /><input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("name@example.com")} /></div></FormField>}{error && <div className="form-error" role="alert">{t(error)}</div>}{submitted ? <div className="form-success" role="status">{t("If this address is registered, a reset link will arrive shortly.")}</div> : <Button className="wide" type="submit" disabled={busy}>{busy ? t("Requesting…") : t("Send reset instructions")}</Button>}<p className="auth-switch"><Link to="/login">{t("Back to sign in")}</Link></p></form></section></div>;
+  const human = useHumanCheck("forgot_password");
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy || !human.ready) return;
+    setBusy(true); setError(""); human.consume();
+    try { await requestPasswordReset({ email: email.trim(), turnstileToken: human.token }); setSubmitted(true); }
+    catch (requestError) { setError(requestError.message); }
+    finally { setBusy(false); }
+  };
+  return <div className="auth-page"><AuthStory recovery /><section className="auth-form-wrap"><LanguageSwitcher className="auth-language" />
+    <form className="auth-form" onSubmit={submit}><span className="eyebrow">{t("Password reset")}</span><h2>{t("Request a reset link")}</h2>
+      <p>{t("If the address belongs to an account, CoLearnX will send reset instructions. The same response is shown for every address.")}</p>
+      {!submitted && <FormField label={t("Email address")}><div className="input-with-icon"><Mail size={18} /><input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t("name@example.com")} /></div></FormField>}
+      {error && <div className="form-error" role="alert">{t(error)}</div>}
+      {!submitted && human.widget}
+      {submitted ? <div className="form-success" role="status">{t("If this address is registered, a reset link will arrive shortly.")}</div> :
+        <Button className="wide" type="submit" disabled={busy || !human.ready}>{busy ? t("Requesting…") : t("Send reset instructions")}</Button>}
+      <p className="auth-switch"><Link to="/login">{t("Back to sign in")}</Link></p>
+    </form></section></div>;
 }
 
 export function ResetPasswordPage() {
