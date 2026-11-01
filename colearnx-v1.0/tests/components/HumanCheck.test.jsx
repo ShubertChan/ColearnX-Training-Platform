@@ -40,10 +40,12 @@ test("password login consumes its proof on failure and ignores callbacks from th
 });
 
 test("registration sends a proof bound to register and never stores it", async () => {
+  act(() => setLanguage("zh-CN"));
   const { container } = mount(<AuthPage mode="register" />);
   api.signup.mockRejectedValue(new Error("Fixture"));
   const form = container.querySelector("form");
   await waitFor(() => expect(widgets[0]?.action).toBe("register"));
+  expect(widgets[0].language).toBe("zh-cn");
   fill(form.querySelector("input:not([type])"), "Fixture Member");
   fill(form.querySelector('input[type=email]'), "member@example.test");
   for (const input of form.querySelectorAll('input[type=password]')) fill(input, "Weather-Rivers-Book-762");

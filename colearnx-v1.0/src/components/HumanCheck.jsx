@@ -53,7 +53,7 @@ function HumanCheck({ id, action, report, retry }) {
       sdk = await loadWidget();
       if (!live) return;
       update("waiting");
-      widget = sdk.render(container.current, { sitekey: config.siteKey, action, language, size: "flexible",
+      widget = sdk.render(container.current, { sitekey: config.siteKey, action, language: language.toLowerCase(), size: "flexible",
         retry: "never", "refresh-expired": "manual",
         callback: token => update("verified", token),
         "expired-callback": () => update("expired"),
