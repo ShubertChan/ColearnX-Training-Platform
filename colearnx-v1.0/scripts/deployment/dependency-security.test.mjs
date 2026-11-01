@@ -59,10 +59,14 @@ test('restored root ignore rules protect root and nested local files without hid
   assert.deepEqual(output, ignored);
 });
 
-test('CI retains high-severity audits for application, development and deployment dependencies', async () => {
-  const workflow = await readFile(new URL('../../../.github/workflows/ci.yml', import.meta.url), 'utf8');
-  for (const prefix of ['', '--prefix apps/api ', '--prefix apps/video-worker ', '--prefix apps/media-gateway ', '--prefix deployment ']) {
-    assert.ok(workflow.includes(`npm ${prefix}audit --audit-level=high`), `Missing full audit for ${prefix || 'frontend'}`);
+test('required CI audits cover all five lockfiles before SAST and the test/build job', async () => {
+  const workflow = (await readFile(new URL('../../../.github/workflows/ci.yml', import.meta.url), 'utf8')).replaceAll('\r\n', '\n');
+  const { auditArguments, auditComponents } = await import('./security-audit.mjs');
+  const components = workflow.match(/component: \[([^\]]+)\]/)[1].split(/,\s*/);
+  assert.deepEqual(components.sort(), Object.keys(auditComponents).sort());
+  assert.ok(auditArguments.includes('--audit-level=high') && auditArguments.includes('--include=dev'));
+  assert.match(workflow, /npm run security:audit -- --component "\$COMPONENT"/);
+  for (const [job, prerequisite] of [['supply-chain', 'secrets'], ['sast', 'supply-chain'], ['validate', 'sast']]) {
+    assert.match(workflow, new RegExp('  ' + job + ':\n    name: [^\n]+\n    needs: ' + prerequisite));
   }
-  assert.doesNotMatch(workflow, /npm[^\n]*audit[^\n]*(?:--omit[= ]dev|--production|--audit-level=(?:critical|none))/);
 });
