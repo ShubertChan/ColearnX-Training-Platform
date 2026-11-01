@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { apiClient } from "./client.js";
 import { adjustPoints, decideReport, serviceMessage, submitReport } from "./workflows.js";
@@ -11,13 +12,14 @@ test("reports and points adapters use their protected server contracts with the 
     return { data: { data: { accepted: true } } };
   };
   try {
+    const decisionKey = randomUUID(), pointsKey = randomUUID();
     await submitReport({ kind: "content", productId: "content-version-id", category: "misleading", reason: "The supplied description does not match the item." }, "report-key-123");
-    await decideReport("report-id", { decision: "dismissed", reason: "The evidence does not support the report." }, "decision-key-123");
-    await adjustPoints({ userId: "user-id", deltaPoints: 12, reason: "Verified support adjustment." }, "points-key-123");
+    await decideReport("report-id", { decision: "dismissed", reason: "The evidence does not support the report." }, decisionKey);
+    await adjustPoints({ userId: "user-id", deltaPoints: 12, reason: "Verified support adjustment." }, pointsKey);
     assert.deepEqual(calls, [
       { url: "/reports", body: { kind: "content", productId: "content-version-id", category: "misleading", reason: "The supplied description does not match the item." }, options: { headers: { "Idempotency-Key": "report-key-123" } } },
-      { url: "/admin/reports/report-id/decision", body: { decision: "dismissed", reason: "The evidence does not support the report." }, options: { headers: { "Idempotency-Key": "decision-key-123" } } },
-      { url: "/admin/points/adjustments", body: { userId: "user-id", deltaPoints: 12, reason: "Verified support adjustment." }, options: { headers: { "Idempotency-Key": "points-key-123" } } },
+      { url: "/admin/reports/report-id/decision", body: { decision: "dismissed", reason: "The evidence does not support the report." }, options: { headers: { "Idempotency-Key": decisionKey } } },
+      { url: "/admin/points/adjustments", body: { userId: "user-id", deltaPoints: 12, reason: "Verified support adjustment." }, options: { headers: { "Idempotency-Key": pointsKey } } },
     ]);
   } finally {
     apiClient.post = originalPost;

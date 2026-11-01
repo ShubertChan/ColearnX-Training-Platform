@@ -18,6 +18,7 @@
     "db:seed": "npm --prefix apps/api run db:seed",
     "release:test": "node --test scripts/deployment/*.test.mjs",
     "security:audit": "node scripts/deployment/security-audit.mjs",
+    "security:sbom": "node scripts/deployment/security-sbom.mjs",
     "release:build": "node scripts/deployment/artifact.mjs build",
     "release:verify": "node scripts/deployment/artifact.mjs verify",
     "release:smoke": "node scripts/deployment/smoke.mjs",

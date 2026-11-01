@@ -54,6 +54,44 @@ jobs:
     uses: ./.github/workflows/ci.yml
     # No secrets are passed to install, test, or build steps.
 
+  dast:
+    name: Passive ZAP baseline on deployed staging
+    needs: deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - surface: web
+            target: https://staging.colearnx.net/
+          - surface: api
+            target: https://api-staging.colearnx.net/health/ready
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Spider the fixed staging target and evaluate passive rules
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          curl --fail --silent --show-error --max-time 45 "$TARGET" -o /dev/null
+          install -d -m 0777 "$RUNNER_TEMP/zap"
+          cp .github/zap-baseline.tsv "$RUNNER_TEMP/zap/rules.tsv"
+          docker run --rm -v "$RUNNER_TEMP/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6 \
+            zap-baseline.py -t "$TARGET" -m 1 -T 5 -I -c rules.tsv -J report.json -r report.html
+          test -s "$RUNNER_TEMP/zap/report.json"
+          jq -e --arg origin "${TARGET%/health/ready}" 'any(.site[]; .["@name"] == ($origin | rtrimstr("/")))' "$RUNNER_TEMP/zap/report.json" >/dev/null
+      - name: Retain staging baseline evidence even when a rule fails
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: zap-${{ matrix.surface }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/zap/report.*
+          if-no-files-found: error
+          retention-days: 14
+
   deploy:
     needs: validate
     runs-on: ubuntu-24.04
