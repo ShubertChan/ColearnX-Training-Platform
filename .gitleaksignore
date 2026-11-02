@@ -1,0 +1,6 @@
+# Three reviewed historical fingerprints only. Do not exempt entire templates or tests.
+# Empty MFA_CHALLENGE_SECRET; the next variable's NAME was read as its value.
+c9f3bb3e3948d17f585e10d7056fe8725db7e07b:colearnx-v1.0/apps/api/.env.example:generic-api-key:95
+# Literal HTTP idempotency keys used in a mocked frontend test, not credentials.
+46b1681ba482ab715006b51f3aea1b526224b434:colearnx-v1.0/src/api/workflows.test.js:generic-api-key:19
+46b1681ba482ab715006b51f3aea1b526224b434:colearnx-v1.0/src/api/workflows.test.js:generic-api-key:20
