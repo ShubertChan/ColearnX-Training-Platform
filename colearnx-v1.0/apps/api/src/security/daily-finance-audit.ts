@@ -13,6 +13,9 @@ export async function runDailyFinanceAudit(now = new Date()) {
   const status = await withTransaction(async client => {
     // One atomic batch on one restricted connection, even on a one-connection
     // pool. A crash rolls back both the findings and the completion marker.
+    // The marker lookup must see the commit of the last lock holder, including
+    // when the database role uses repeatable read by default.
+    await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
     const lock = await client.query("SELECT pg_try_advisory_xact_lock(hashtextextended('colearnx:daily-finance',0)) AS held");
     if (!lock.rows[0].held) return 'busy';
     const prior = await client.query(`SELECT 1 FROM security_events WHERE event_type='finance.daily_audit_completed'
