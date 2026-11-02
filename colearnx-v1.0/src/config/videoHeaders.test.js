@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import { securityHeaders } from "../../build/videoHeaders.js";
 
 test("Turnstile can load its SDK and iframe without weakening script policy", () => {
-  const csp = securityHeaders({});
+  const prefix = "Content-Security-Policy: ";
+  const csp = securityHeaders({}).split("\n").map(row => row.trim()).find(row => row.startsWith(prefix));
+  assert.ok(csp);
+  const directives = csp.slice(prefix.length).split("; ").map(value => value.trim().split(/\s+/));
   for (const directive of ["script-src", "frame-src"]) {
-    const line = csp.match(new RegExp(directive + "[^;]+"))[0];
-    assert.ok(line.includes("https://challenges.cloudflare.com"));
-    assert.doesNotMatch(line, /unsafe-inline|unsafe-eval|\*/);
+    const sources = new Set(directives.find(([name]) => name === directive)?.slice(1));
+    assert.ok(sources.has("https://challenges.cloudflare.com"));
+    assert.ok(!sources.has("'unsafe-inline'") && !sources.has("'unsafe-eval'") && ![...sources].some(value => value.includes("*")));
   }
 });
 
