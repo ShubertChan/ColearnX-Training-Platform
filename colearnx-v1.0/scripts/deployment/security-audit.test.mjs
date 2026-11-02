@@ -140,14 +140,20 @@ test('daily workflow scans every tree, saves failures and has no deployment perm
   assert.doesNotMatch(workflow, /secrets\.|environment:|write-all|contents: write|continue-on-error|npm (?:ci|install)|db:migrate|db:seed|deploy-staging\.yml/);
 });
 
-test('Dependabot covers all manifests and Actions without hiding security updates or enabling auto-merge', async () => {
+test('Dependabot disables version PRs for every configured ecosystem', async () => {
   const config = (await readFile(new URL('../../../.github/dependabot.yml', import.meta.url), 'utf8')).replace(/\r\n?/g, '\n');
+  const ecosystems = config.split(/^  - package-ecosystem: /m).slice(1);
+  const npm = ecosystems.find(block => block.startsWith('npm\n'));
+  const actions = ecosystems.find(block => block.startsWith('github-actions\n'));
+  assert.ok(npm && actions, 'Both npm and GitHub Actions must be configured');
+  assert.match(actions, /^    directory: \/$/m);
+  for (const block of ecosystems) {
+    assert.deepEqual(block.match(/^    open-pull-requests-limit:.*$/gm), ['    open-pull-requests-limit: 0']);
+  }
   for (const directory of Object.values(auditComponents)) {
     const path = directory === '.' ? '/colearnx-v1.0' : `/colearnx-v1.0/${directory}`;
-    assert.ok(config.includes(`- ${path}\n`));
+    assert.ok(npm.includes(`- ${path}\n`));
   }
-  assert.match(config, /package-ecosystem: github-actions/);
-  assert.match(config, /applies-to: security-updates/);
   assert.match(config, /timezone: Asia\/Shanghai/);
   assert.doesNotMatch(config, /\n\s+(?:ignore|target-branch|insecure-external-code-execution|auto-merge):/);
 });
