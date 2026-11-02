@@ -23,6 +23,22 @@
 
 来源取 Express 按现有 `TRUST_PROXY` 配置解析出的地址；反向代理必须按实际跳数设置，并防止客户端直接伪造转发头。IPv4 来源按地址、IPv6 按 /64 归组；邮箱规范化后使用 HMAC。各实例通过 PostgreSQL 共享同一个窗口，观察、判断和告警记录按来源或用户串行处理。管理员可在第 6 周的安全事件面板按事件、风险分和处置查看；外部通知使用原告警阈值及去重设置。
 
+## 第 5 周其余计划项
+
+- 不同 API 实例使用同一 `REDIS_URL`，按操作和来源共享限流配额和告警去重。单账号失败计数和锁定保存在 PostgreSQL。未配置 Redis 的单实例沿用内存计数，扩容前需配置共享 Redis 并验证跨实例 429。
+- 预发和生产须明确设置代理跳数。本项目预发 API 的 Render 入口为一跳，启动时拒绝其他值。回归测试在转发链左侧插入伪造 IP，仍消耗同一来源的配额。
+- 静态站点移除了脚本和样式中的 `unsafe-inline`。进度条使用原生控件，安全看板使用 SVG。API 和前端均发送两年 HSTS、`includeSubDomains` 和 `preload` 响应头，浏览器预加载名单登记另由域名所有者管理。
+- Vite 依据最终字节为首屏 JS、CSS 加 SHA-384 SRI，并为按需导入的 JS（视频、HLS、支付等）生成带完整性元数据的 import map。CSP 仅放行本次构建的 import map 哈希。按需模块的哈希检查依赖浏览器支持 import map 的 `integrity` 字段。由 Google、Stripe 和 Cloudflare 独立更新的 SDK 使用各自官方 HTTPS 来源。
+- MFA 两把密钥和事件指纹密钥统一使用同一校验函数。开发和测试沿用各自原有的派生标签，预发和生产要求显式配置。已有数据继续使用相同的密钥值。
+
+## 第 7 周退款率与每日对账
+
+退款频次、买后秒退、创作者自购仍按原规则计分。新增 `high_refund_ratio` 按同一购买窗口的付费订单项计算，默认窗口 30 天。账号至少购买 5 个付费项，其中至少一半有获批退款时记录风险事件。一个订单项重复申请只算一次，已取消订单、免费项及窗口外的购买不进入分母。该规则只告警。
+
+在现有 API 服务设置 `ENABLE_DAILY_SECURITY_AUDIT=true` 即可启用每日作业。API 启动和之后每 15 分钟检查一次，02:15 UTC（北京时间 10:15）后执行当天的检查。服务在当天稍晚恢复会补跑当天，多个实例通过数据库锁协调。作业检查每笔积分交易的借贷总和、每个账户的四种余额与账本投影，以及退款和自购风险。发现和当天的 `finance.daily_audit_completed` 完成记录同事务提交，失败回滚后重试。作业沿用受限的 API 数据库账号，无需另建计费的定时服务。
+
+预发验收应核对三个事实：配置接口返回 `enabled: true`，真实域名上的登录、注册、找回密码均能获得并验证各自的凭证，安全账本出现当天的完成记录。用无凭证请求验证 403。前端要先具备 Turnstile 支持再启用 API 的钥匙；回退时先在 API 同时撤下两把 Turnstile 钥匙，再回退前端。仅停每日作业可将其开关设为 `false`。正式 secret 应保存在服务平台，不写入仓库或聊天记录。
+
 ## 如何复验
 
 前端运行 `npm test`、`npm run test:components`、`npm run check:i18n` 和 `npm run build`；API 运行 `npm run api:test`、`npm run api:typecheck`。按仓库发布检查指引，给 `RELEASE_CHECK_DATABASE_URL` 指定全新的本机 PostgreSQL 16 测试库，再运行 `npm run release:database-test`；测试会覆盖真实 HTTP 路由、并发注册、撞库、冷却恢复、换网以及 Stripe 签名回调重放。测试验证器和付款签名均在本地生成，不访问正式 Cloudflare、Stripe、邮箱或生产数据。

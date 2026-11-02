@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createHash } from 'node:crypto';
+import { checkProxyTopology, resolveSecuritySecret } from './security-settings.js';
 import { z } from 'zod';
 import { checkTurnstileSettings } from '../security/turnstile.js';
 
@@ -13,6 +13,9 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   DATABASE_SSL: booleanFromString,
   DB_POOL_MAX: z.coerce.number().int().positive().max(50).default(10),
+  ENABLE_DAILY_SECURITY_AUDIT: booleanFromString,
+  FINANCE_RISK_WINDOW_DAYS: z.coerce.number().int().positive().default(30),
+  FINANCE_RAPID_REFUND_SECONDS: z.coerce.number().int().positive().default(300),
   // Number of proxy hops to trust for the client IP (used by per-IP rate
   // limiting and the security ledger). An explicit, bounded count -- never
   // `true`, which would trust an attacker-supplied X-Forwarded-For. Must equal
@@ -181,19 +184,8 @@ if (parsed.data.ENABLE_HOSTED_VIDEO) {
 const deployedEnvironment = parsed.data.NODE_ENV === 'production' || parsed.data.NODE_ENV === 'staging';
 checkTurnstileSettings(parsed.data.TURNSTILE_SITE_KEY, parsed.data.TURNSTILE_SECRET_KEY, deployedEnvironment);
 
-for (const name of ['MFA_SECRET_KEY', 'MFA_CHALLENGE_SECRET'] as const) {
-  if (!parsed.data[name]) {
-    if (deployedEnvironment) {
-      throw new Error(`${name} is required in staging and production.`);
-    }
-    // Distinct domain labels, so the two derived values are never equal and
-    // the separation the check below enforces still holds locally.
-    parsed.data[name] = createHash('sha256')
-      .update(`colearnx-local-${name.toLowerCase()}:${parsed.data.ACCESS_TOKEN_SECRET}`)
-      .digest('hex');
-  } else if (parsed.data[name].length < 32) {
-    throw new Error(`${name} must be at least 32 characters.`);
-  }
+for (const name of ['MFA_SECRET_KEY', 'MFA_CHALLENGE_SECRET', 'SECURITY_HASH_PEPPER'] as const) {
+  parsed.data[name] = resolveSecuritySecret(name, parsed.data[name], parsed.data.ACCESS_TOKEN_SECRET, deployedEnvironment);
 }
 
 if (parsed.data.MFA_SECRET_KEY === parsed.data.MFA_CHALLENGE_SECRET) {
@@ -201,19 +193,6 @@ if (parsed.data.MFA_SECRET_KEY === parsed.data.MFA_CHALLENGE_SECRET) {
   // rotation silently invalidate every outstanding challenge token, and vice
   // versa -- the coupling nobody discovers until a rotation goes wrong.
   throw new Error('MFA_SECRET_KEY and MFA_CHALLENGE_SECRET must be different values.');
-}
-
-if (!parsed.data.SECURITY_HASH_PEPPER) {
-  if (parsed.data.NODE_ENV === 'production' || parsed.data.NODE_ENV === 'staging') {
-    throw new Error('SECURITY_HASH_PEPPER is required in staging and production.');
-  }
-  // Derived, not empty: an empty HMAC key silently reduces the fingerprints to
-  // unkeyed digests, which is the exact weakness this replaced.
-  parsed.data.SECURITY_HASH_PEPPER = createHash('sha256')
-    .update(`colearnx-local-security-pepper:${parsed.data.ACCESS_TOKEN_SECRET}`)
-    .digest('hex');
-} else if (parsed.data.SECURITY_HASH_PEPPER.length < 32) {
-  throw new Error('SECURITY_HASH_PEPPER must be at least 32 characters.');
 }
 
 // Fail closed on a misconfiguration that would otherwise look like a working
@@ -226,9 +205,7 @@ if (parsed.data.NODE_ENV === 'production' && !parsed.data.SECURITY_ALERT_WEBHOOK
 // the socket. TRUST_PROXY=0 there would make every request appear to originate
 // from the load balancer, collapsing per-IP rate limiting and the security
 // ledger's source attribution onto one address. Fail closed on that misconfig.
-if (deployedEnvironment && parsed.data.TRUST_PROXY === 0) {
-  throw new Error('TRUST_PROXY must be the real proxy hop count (>= 1) in staging and production.');
-}
+checkProxyTopology(deployedEnvironment, process.env.TRUST_PROXY, parsed.data.TRUST_PROXY, parsed.data.API_ORIGIN);
 
 // W8 (F-09): in production an upload must not become downloadable without a
 // malware verdict. Staging may run without clamd (signature and archive checks

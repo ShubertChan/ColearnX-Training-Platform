@@ -13,6 +13,8 @@ export type ActorRiskInput = {
   actorUserId: string;
   // Refund requests this actor filed in the window.
   refundCount: number;
+  purchasedItems: number;
+  refundedItems: number;
   // Orders in the window where the actor bought an item they are also the
   // seller of (creator/trainer self-purchase -- wash trading / earnings
   // laundering).
@@ -48,6 +50,12 @@ export const FRAUD_RULES: readonly FraudRule[] = [
     weight: 40,
     fires: (input) => input.refundCount >= REFUND_VELOCITY_THRESHOLD,
     describe: (input) => `${input.refundCount} refund requests in window`,
+  },
+  {
+    key: 'high_refund_ratio',
+    weight: 30,
+    fires: (input) => input.purchasedItems >= 5 && input.refundedItems * 2 >= input.purchasedItems,
+    describe: (input) => `${input.refundedItems} of ${input.purchasedItems} purchased items have an approved refund`,
   },
   {
     // Kept below the medium cut (30) so a buy-then-refund pattern on its own is
