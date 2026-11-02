@@ -2,7 +2,7 @@
 
 更新：2026-10-21。迁移清单从当前提交动态枚举，不固定为某一迁移编号。新增能力与一次性配置详见 [云端迁移实际预检与组件发布计划](STAGING_RELEASE_PREFLIGHT.md)。
 
-2026-10-28 补充：新增 Dependabot 与每日依赖安全审计，配置和处理方法见第 9 节；手动发布、迁移确认和 staging Environment 审批保持不变。
+2026-11-02 更新：依赖升级和安全修复由组员开 PR。漏洞提醒和每日审计的维护方式见第 9 节。
 
 采用 **自动检查 + 人工批准发布**：PR 和 main 更新自动测试、构建；负责人从 main 手动运行发布。需要发布的组件锁定本次测试的完整 Git SHA，Pages 上传该次 CI 已检查的产物，不在发布时重新构建。没有运行时代码变更的组件可以保留旧提交，但必须通过独立在线基线、完整 Git 区间差异和最终身份核验；保留的前端文件必须仍与本次测试产物一致。
 
@@ -231,8 +231,8 @@ Neon 恢复分支不是独立导出的长期备份，也不等于已完成恢复
 合并到默认分支 main 后生效；本节描述代码配置，不代表定时任务已经实际运行。
 
 - 根目录 `.github/dependabot.yml` 覆盖前端、API、video-worker、media-gateway、deployment 五组 npm 清单，以及 GitHub Actions 的固定 SHA 引用。
-- npm 每周一北京时间 10:17 检查，minor/patch 更新分组提出 PR；两处 Wrangler 使用同一组，更新时仍须通过精确版本一致性检查。major 更新保留单独审查，不忽略安全修复。GitHub Actions 每周一 10:47 检查并提出 PR。
-- npm 安全更新分组需要仓库 Settings → Advanced Security 中启用 Dependabot alerts、security updates 和依赖图；提交配置本身不会启用这些仓库开关。不能假定仅 `allow: all` 就会维护所有 npm 间接依赖。每日审计始终扫描锁文件中的完整直接/间接依赖。
+- npm 和 GitHub Actions 都设置 `open-pull-requests-limit: 0`，停止自动创建常规升级 PR。组员更新清单和锁文件后自行开 PR，两个 Wrangler 安装仍须通过精确版本一致性检查。
+- 安全修复 PR 由仓库设置单独控制。在 Settings → Advanced Security 中开启 Dependency graph 和 Dependabot alerts，关闭 Dependabot security updates，并确保自动分流规则没有创建 PR 的动作。负责人根据告警或审计报告发起修复 PR。
 - 新的 `.github/workflows/security-audit.yml` 每天北京时间 09:37（UTC 01:37）扫描当时 main 的五组锁文件，也可以在 Actions → Dependency security audit → Run workflow 手动运行。相关配置/锁文件 PR 和 main 更新也会触发，供首次配置验收。
 - 使用 Node 文件中的固定版本和 `npm audit --package-lock-only --include=dev --audit-level=high`。不安装依赖、不执行生命周期脚本；只有 npm 公共漏洞库网络查询。开发、构建、测试和发布工具都在范围内。
 - 五组独立执行，某组失败不取消其他组。high/critical 使任务失败；low/moderate 保留报告并排期处理。超时、网络故障、无法识别的响应也失败，不能当成“零漏洞”。只有 registry 请求会按 npm 有限重试，已知漏洞不会靠重试变绿。

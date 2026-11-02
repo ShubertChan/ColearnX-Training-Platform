@@ -585,6 +585,9 @@ try {
   await runRefundNotificationChecks({ owner, app, environment, buyerId, sellerId, adminId, courseRunId, accessToken, passed });
   const { runMfaSessionChecks } = await import('./mfa-session-checks.mjs');
   await runMfaSessionChecks({ owner, app, apiPool, environment, passed });
+  const { runSecurityRegression } = await import('./security-regression-checks.mjs');
+  await runSecurityRegression({ owner, app, sellerId, versionId, accessToken,
+    environment, runJob: script => ownerCommand(script, runtimeUrl.href), passed });
   const { runVideoOrderIntegrityChecks } = await import('./video-order-integrity-checks.mjs');
   await runVideoOrderIntegrityChecks({ owner, buyerId, sellerId, courseId, courseRunId, passed });
   const { runGoogleSignInChecks } = await import('./google-sign-in-checks.mjs');
