@@ -50,9 +50,7 @@ export function Progress({ value, label }) {
         <span>{label || t("Progress")}</span>
         <b>{clamped}%</b>
       </div>
-      <div className="progress-track">
-        <span style={{ width: `${clamped}%` }} />
-      </div>
+      <progress className="progress-track" max="100" value={clamped} aria-label={label || t("Progress")} />
     </div>
   );
 }

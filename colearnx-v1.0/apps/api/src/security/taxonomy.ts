@@ -90,6 +90,7 @@ export const securityEventSeverity = {
   // entries (F-22). High: the ledger is authoritative for real balances, so a
   // drift is either corruption or an unledgered write path.
   'finance.ledger_imbalance': 3,
+  'finance.daily_audit_completed': 0,
   // The fund-side rule engine flagged an actor -- refund abuse, self-purchase
   // or buy-then-refund churn (F-21). Medium by default; the sweep raises the
   // severity with the risk score, so self-dealing pages an operator.

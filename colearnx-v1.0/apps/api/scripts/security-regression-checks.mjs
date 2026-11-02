@@ -80,4 +80,47 @@ export async function runSecurityRegression({ owner, app, sellerId, versionId, a
   const drift = await owner.query(`SELECT context_json FROM security_events WHERE actor_user_id=$1 AND event_type='finance.ledger_imbalance'`, [actor]);
   assert.ok(drift.rows.some(e => e.context_json.discrepancies.some(d => d.field === 'available' && d.delta === 7)));
   passed('W7: restricted-role jobs find self-purchase, refund velocity, rapid refunds and an exact seven-point discrepancy');
+
+  // Six paid items in the current cohort, three approved refunds. Repeated
+  // requests on one item and an old paid-and-refunded item must not change either side.
+  await owner.query("UPDATE refund_requests SET refund_status='approved' WHERE requested_by_user_id=$1", [actor]);
+  const first = (await owner.query('SELECT order_item_id FROM refund_requests WHERE requested_by_user_id=$1 LIMIT 1', [actor])).rows[0];
+  const addRefund = id => owner.query(`INSERT INTO refund_requests(order_item_id,requested_by_user_id,requested_points,
+    refund_reason,eligibility_snapshot_json,refund_status) VALUES($1,$2,125,'fixture','{}','approved')`, [id, actor]);
+  await addRefund(first.order_item_id);
+  for (const age of [0, 0, 0, 45]) {
+    const id = randomUUID(), item = randomUUID();
+    await owner.query(`INSERT INTO orders(order_id,buyer_user_id,order_no,total_points,paid_at)
+      VALUES($1,$2,$3,125,now()-$4::int * interval '1 day')`, [id, actor, 'ratio-' + id, age]);
+    await owner.query(`INSERT INTO order_items(order_item_id,order_id,item_type,content_version_id,seller_user_id,item_title_snapshot,points_amount)
+      VALUES($1,$2,'content_version',$3,$4,'ratio fixture',125)`, [item, id, versionId, sellerId]);
+    if (age) await addRefund(item);
+  }
+
+  const { runDailyFinanceAudit } = await import('../src/security/daily-finance-audit.ts');
+  const { UNBALANCED_TRANSACTIONS_QUERY } = await import('../src/security/ledger-audit.ts');
+  const opposing = await owner.query(`WITH point_ledger_entries(point_transaction_id,available_delta,frozen_delta,expired_delta,blocked_delta)
+    AS (VALUES (1,4,0,0,0),(2,-4,0,0,0),(3,5,-5,0,0)) ${UNBALANCED_TRANSACTIONS_QUERY}`);
+  assert.deepEqual(opposing.rows.map(row => row.net).sort(), ['-4','4']);
+  const nonce = new Date('2040-04-12T02:15:00Z');
+  assert.equal(await runDailyFinanceAudit(new Date('2040-04-12T02:14:00Z')), 'not-due');
+  // Force a failure at the last write in this isolated schema. Findings before
+  // it must roll back and a later poll must be able to finish the same day.
+  await owner.query(`ALTER TABLE security_events ADD CONSTRAINT w7_fixture_marker
+    CHECK (event_type <> 'finance.daily_audit_completed' OR context_json->>'auditDate' <> '2040-04-12')`);
+  try {
+    await assert.rejects(runDailyFinanceAudit(nonce), /w7_fixture_marker/);
+    const partial = await owner.query(`SELECT 1 FROM security_events WHERE actor_user_id=$1 AND 'high_refund_ratio'=ANY(rule_hits)`, [actor]);
+    assert.equal(partial.rowCount, 0);
+  } finally {
+    await owner.query('ALTER TABLE security_events DROP CONSTRAINT w7_fixture_marker');
+  }
+  const statuses = await Promise.all([runDailyFinanceAudit(nonce), runDailyFinanceAudit(nonce)]);
+  assert.equal(statuses.filter(s => s === 'completed').length, 1);
+  assert.equal(await runDailyFinanceAudit(nonce), 'already-complete');
+  const ratio = await owner.query(`SELECT context_json FROM security_events WHERE actor_user_id=$1 AND 'high_refund_ratio'=ANY(rule_hits)`, [actor]);
+  assert.equal(ratio.rowCount, 1);
+  assert.equal(ratio.rows[0].context_json.purchasedItems, 6);
+  assert.equal(ratio.rows[0].context_json.refundedItems, 3);
+  passed('W7: daily audit checks transaction and account balances, deduplicates refund ratios and survives a failed write or competing instance');
 }
