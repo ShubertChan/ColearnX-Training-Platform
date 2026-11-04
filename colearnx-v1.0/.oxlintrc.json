@@ -1,0 +1,11 @@
+{
+  "categories": { "correctness": "error" },
+  "rules": {
+    "no-unused-expressions": ["error", { "allowTernary": true }],
+    "no-unused-vars": "warn",
+    "no-control-regex": "warn",
+    "unicorn/no-useless-spread": "warn",
+    "unicorn/no-useless-fallback-in-spread": "warn",
+    "unicorn/prefer-string-starts-ends-with": "warn"
+  }
+}
