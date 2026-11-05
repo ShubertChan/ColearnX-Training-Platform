@@ -14,6 +14,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { contentDraftFromListing, isDeletableDraftListing, isEditableContentDraft, isMissingContentDraftFile } from "../utils/contentDraft";
 import { listingsForWorkspace, workspaceListingCopy } from "../utils/listingWorkspace";
 import { createContent, submitContent } from "../api/catalog";
+import { ListingCoverEditor } from "../components/ListingCover";
 import PrivateAssetUploader from "../components/uploads/PrivateAssetUploader";
 import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
 
@@ -221,6 +222,7 @@ function ContentListingEditor() {
   const requestedDraftId = searchParams.get("draft");
   const [form, setForm] = useState({ title: "", description: "", price: "", contentType: "digital" });
   const [draft, setDraft] = useState(null);
+  const [coverBusy, setCoverBusy] = useState(false);
   const [uploadSummary, setUploadSummary] = useState({ readyCount: 0, activeCount: 0 });
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -243,7 +245,7 @@ function ContentListingEditor() {
         return false;
       }
       setForm({ title: restored.title, description: listing.description || "", price: restored.price, contentType: restored.contentType });
-      setDraft({ id: restored.id, contentVersionId: restored.contentVersionId });
+      setDraft({ id: restored.id, contentVersionId: restored.contentVersionId, hasCover: listing.hasCover });
       setUploadSummary({ readyCount: 0, activeCount: 0 });
       setSubmitted(false);
       return true;
@@ -292,7 +294,7 @@ function ContentListingEditor() {
   }, []);
 
   const submitForReview = async () => {
-    if (!draft?.id || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0 || uploadSummary.unresolvedCount > 0 || uploadSummary.loading || uploadSummary.error || submitted) return;
+    if (!draft?.id || coverBusy || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0 || uploadSummary.unresolvedCount > 0 || uploadSummary.loading || uploadSummary.error || submitted) return;
     setBusy(true);
     setError("");
     try {
@@ -315,6 +317,7 @@ function ContentListingEditor() {
         <FormField label={t("Public description")}><textarea required disabled={Boolean(draft)} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></FormField>
         <FormField label={t("Price in points")}><input required min="0" disabled={Boolean(draft)} type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></FormField>
         <FormField label={t("Content type")}><input required disabled={Boolean(draft)} value={form.contentType} onChange={(event) => setForm({ ...form, contentType: event.target.value })} /></FormField>
+        {draft?.contentVersionId && <ListingCoverEditor key={draft.contentVersionId} kind="content" id={draft.contentVersionId} hasCover={draft.hasCover} disabled={submitted || busy} onBusy={setCoverBusy} />}
         <PrivateAssetUploader
           contentVersionId={draft?.contentVersionId}
           onAssetsChange={handleAssetsChange}
@@ -326,7 +329,7 @@ function ContentListingEditor() {
         {!draft ? (
           <Button type="submit" disabled={busy}><Send size={16} /> {busy ? t("Creating content…") : t("Create content")}</Button>
         ) : (
-          <Button type="button" onClick={submitForReview} disabled={busy || submitted || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0 || uploadSummary.unresolvedCount > 0 || uploadSummary.loading || Boolean(uploadSummary.error)}>
+          <Button type="button" onClick={submitForReview} disabled={busy || coverBusy || submitted || uploadSummary.readyCount < 1 || uploadSummary.activeCount > 0 || uploadSummary.unresolvedCount > 0 || uploadSummary.loading || Boolean(uploadSummary.error)}>
             <Send size={16} /> {submitted ? t("Submitted for administrator review") : busy ? t("Submitting…") : t("Submit for administrator review")}
           </Button>
         )}
