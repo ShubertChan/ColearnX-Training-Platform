@@ -73,7 +73,7 @@ function courseResponse(row: Record<string, unknown>) {
   return {
     id: row.course_run_id, courseId: row.course_id, title: row.title, description: row.description,
     pricePoints: Number(row.price_points), capacity: row.capacity, status: row.run_status,
-    startsAt: row.starts_at, endsAt: row.ends_at,
+    startsAt: row.starts_at, endsAt: row.ends_at, hasCover: row.has_cover === true,
     owner: { id: row.owner_user_id, displayName: row.owner_name },
     category: row.category_id ? { id: row.category_id, name: row.category_name } : null,
     deliveryModes: row.delivery_modes ?? [], progressTrackingType, onlineVideo: progressTrackingType === 'online_video',
@@ -84,7 +84,7 @@ function courseResponse(row: Record<string, unknown>) {
 
 export async function listCourses(req: Request, res: Response) {
   const input = parse(listQuery, req.query);
-  const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, cr.progress_tracking_type, cr.total_duration_seconds, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name,
+  const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, cr.progress_tracking_type, cr.total_duration_seconds, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cr.cover_image IS NOT NULL AS has_cover,
     COALESCE(jsonb_agg(cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
     FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id JOIN users u ON u.user_id = c.owner_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id AND cdo.option_status = 'active'
@@ -100,7 +100,7 @@ export async function listCourses(req: Request, res: Response) {
 
 export async function getCourse(req: Request, res: Response) {
   const id = parse(uuid, req.params.id);
-  const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, cr.progress_tracking_type, cr.total_duration_seconds, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name,
+  const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, cr.progress_tracking_type, cr.total_duration_seconds, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cr.cover_image IS NOT NULL AS has_cover,
     COALESCE(jsonb_agg(cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
     FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id JOIN users u ON u.user_id = c.owner_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id AND cdo.option_status = 'active'
@@ -112,7 +112,7 @@ export async function getCourse(req: Request, res: Response) {
 
 export async function listContent(req: Request, res: Response) {
   const input = parse(listQuery, req.query);
-  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name
+  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cv.cover_image IS NOT NULL AS has_cover
     FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id AND cv.version_status = 'published' JOIN users u ON u.user_id = c.creator_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id
     WHERE c.publication_status = 'published' AND ($1::text IS NULL OR c.search_vector @@ websearch_to_tsquery('simple', $1))
@@ -124,7 +124,7 @@ export async function listContent(req: Request, res: Response) {
 
 export async function getContent(req: Request, res: Response) {
   const id = parse(uuid, req.params.id);
-  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name
+  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cv.cover_image IS NOT NULL AS has_cover
     FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id AND cv.version_status = 'published' JOIN users u ON u.user_id = c.creator_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id WHERE cv.content_version_id = $1 AND c.publication_status = 'published'`, [id]);
   if (!result.rowCount) throw new ApiError(404, 'CONTENT_NOT_FOUND', 'Content version was not found.');
@@ -266,7 +266,7 @@ export async function deleteCourseDraft(req: Request, res: Response) {
     await client.query(`UPDATE course_delivery_options
       SET option_status = 'disabled'
       WHERE course_run_id = $1`, [courseRunId]);
-    await client.query(`UPDATE course_runs SET run_status = 'archived' WHERE course_run_id = $1`, [courseRunId]);
+    await client.query(`UPDATE course_runs SET run_status = 'archived', cover_image = NULL WHERE course_run_id = $1`, [courseRunId]);
     await client.query(`UPDATE courses
       SET publication_status = 'archived', updated_at = now()
       WHERE course_id = $1`, [course.rows[0].course_id]);
@@ -312,7 +312,7 @@ export async function deleteContentDraft(req: Request, res: Response) {
     // retained, and every private object is removed through the controlled R2
     // cleanup path after its primary reference is detached.
     await client.query(`UPDATE content_versions
-      SET storage_asset_id = NULL, version_status = 'retired'
+      SET storage_asset_id = NULL, cover_image = NULL, version_status = 'retired'
       WHERE content_version_id = $1`, [contentVersionId]);
     const cleanupAssets = await client.query<PendingStorageAsset>(`UPDATE storage_assets
       SET asset_status = 'delete_pending', updated_at = now()
@@ -337,7 +337,7 @@ export async function listMyListings(req: Request, res: Response) {
   const [courseResult, contentResult] = await Promise.all([
     query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity,
       cr.starts_at, cr.ends_at, cr.run_status, c.publication_status, c.updated_at, cr.progress_tracking_type,
-      cr.total_duration_seconds, cr.timezone, c.category_id,
+      cr.total_duration_seconds, cr.timezone, c.category_id, cr.cover_image IS NOT NULL AS has_cover,
       COALESCE(jsonb_agg(cdo.delivery_type ORDER BY cdo.is_primary DESC, cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
       , MAX(cdo.fulfilment_instructions) FILTER (WHERE cdo.delivery_type IN ('local', 'live')) AS fulfilment_instructions
       , MAX(cdo.trainer_contact) FILTER (WHERE cdo.delivery_type IN ('local', 'live')) AS trainer_contact
@@ -352,7 +352,7 @@ export async function listMyListings(req: Request, res: Response) {
     query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points,
       c.publication_status, cv.version_status, cv.storage_url, cv.storage_asset_id, sa.storage_asset_id AS asset_id,
       sa.original_filename, sa.declared_content_type, sa.verified_content_type, sa.declared_byte_size,
-      sa.verified_byte_size, sa.asset_status, sa.uploaded_at, c.updated_at
+      sa.verified_byte_size, sa.asset_status, sa.uploaded_at, c.updated_at, cv.cover_image IS NOT NULL AS has_cover
       FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id
       LEFT JOIN storage_assets sa ON sa.storage_asset_id = cv.storage_asset_id
       WHERE c.creator_user_id = $1
@@ -367,12 +367,12 @@ export async function listMyListings(req: Request, res: Response) {
     publicationStatus: row.publication_status, deliveryModes: row.delivery_modes ?? [],
     fulfilmentInstructions: row.fulfilment_instructions, trainerContact: row.trainer_contact, joinUrl: row.join_url,
     progressTrackingType: row.progress_tracking_type, totalDurationSeconds: row.total_duration_seconds ? Number(row.total_duration_seconds) : null,
-    updatedAt: row.updated_at,
+    updatedAt: row.updated_at, hasCover: row.has_cover === true,
   }));
   const contents = contentResult.rows.map((row) => ({
     kind: 'content', id: row.content_id, contentVersionId: row.content_version_id, title: row.title,
     description: row.description, contentType: row.content_type, pricePoints: Number(row.price_points), status: row.publication_status,
-    versionStatus: row.version_status, storageUrlPresent: Boolean(row.storage_url || row.storage_asset_id),
+    versionStatus: row.version_status, hasCover: row.has_cover === true, storageUrlPresent: Boolean(row.storage_url || row.storage_asset_id),
     fileStatus: row.asset_status ?? (row.storage_url ? 'legacy' : 'missing'), updatedAt: row.updated_at,
     asset: row.asset_id ? {
       assetId: row.asset_id,
@@ -391,7 +391,7 @@ export async function listMyListings(req: Request, res: Response) {
 export async function listCourseSubmissions(req: Request, res: Response) {
   const input = parse(moderationListQuery, req.query);
   const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, c.owner_user_id,
-    u.full_name AS owner_name, cr.price_points, cr.starts_at, cr.ends_at, cr.run_status,
+    u.full_name AS owner_name, cr.price_points, cr.starts_at, cr.ends_at, cr.run_status, cr.cover_image IS NOT NULL AS has_cover,
     COALESCE(jsonb_agg(cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
     FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id JOIN users u ON u.user_id = c.owner_user_id
     LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id
@@ -420,7 +420,7 @@ export async function decideCourseSubmission(req: Request, res: Response) {
       await client.query(`UPDATE course_delivery_options SET option_status = 'active' WHERE course_run_id = $1 AND option_status = 'draft'`, [courseRunId]);
     } else {
       await client.query(`UPDATE courses SET publication_status = 'rejected', updated_at = now() WHERE course_id = $1`, [course.rows[0].course_id]);
-      await client.query(`UPDATE course_runs SET run_status = 'archived' WHERE course_run_id = $1`, [courseRunId]);
+      await client.query(`UPDATE course_runs SET run_status = 'archived', cover_image = NULL WHERE course_run_id = $1`, [courseRunId]);
       await client.query(`UPDATE course_delivery_options SET option_status = 'disabled' WHERE course_run_id = $1`, [courseRunId]);
     }
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
@@ -439,7 +439,7 @@ export async function listContentSubmissions(req: Request, res: Response) {
   const input = parse(moderationListQuery, req.query);
   const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.content_type, c.price_points,
     c.creator_user_id, u.full_name AS owner_name, cv.storage_url, cv.storage_asset_id, cv.version_status,
-    asset_summary.asset_count, asset_summary.ready_asset_count, asset_summary.assets
+    asset_summary.asset_count, asset_summary.ready_asset_count, asset_summary.assets, cv.cover_image IS NOT NULL AS has_cover
     FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id JOIN users u ON u.user_id = c.creator_user_id
     LEFT JOIN LATERAL (
       SELECT
@@ -486,6 +486,7 @@ export async function listContentSubmissions(req: Request, res: Response) {
       readyAssetCount: Number(row.ready_asset_count || 0),
       assets,
       moderationStatus: row.version_status,
+      hasCover: row.has_cover === true,
     };
   }));
 }
