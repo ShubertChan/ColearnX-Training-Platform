@@ -15,7 +15,8 @@ test('a PNG cover becomes a small, metadata-free JPEG', async () => {
   assert.ok(jpeg.length <= 262144);
 });
 
-test('spoofed and truncated images are rejected before storage', async () => {
+test('empty, spoofed and truncated images are rejected before storage', async () => {
+  await assert.rejects(normalizeCoverImage(undefined, 'image/png'), { code: 'COVER_SIZE_INVALID' });
   await assert.rejects(normalizeCoverImage(Buffer.from('<svg/>'), 'image/png'), { code: 'COVER_TYPE_INVALID' });
   await assert.rejects(normalizeCoverImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0]), 'image/jpeg'), { code: 'COVER_IMAGE_INVALID' });
 });

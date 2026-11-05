@@ -5,8 +5,8 @@ import { sniffFileType } from '../security/file-signature.js';
 export const MAX_COVER_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const coverMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
-export async function normalizeCoverImage(body: unknown, mime: string) {
-  if (!Buffer.isBuffer(body) || !body.length || body.length > MAX_COVER_UPLOAD_BYTES) {
+export async function normalizeCoverImage(body: Buffer | undefined, mime: string) {
+  if (!(body instanceof Buffer) || body.byteLength === 0 || body.byteLength > MAX_COVER_UPLOAD_BYTES) {
     throw new ApiError(400, 'COVER_SIZE_INVALID', 'Choose an image up to 5 MB.');
   }
   const detected = sniffFileType(body);
