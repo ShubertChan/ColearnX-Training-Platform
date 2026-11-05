@@ -1694,5 +1694,7 @@
   "Refund status unavailable": "退款状态暂不可用",
   "Refresh your order to check the latest refund status before submitting another request.": "请刷新订单查看最新退款状态后再尝试申请。",
   "No refund requested": "未申请退款",
-  "No refund request has been submitted for this purchase.": "此购买项尚未提交退款申请。"
+  "No refund request has been submitted for this purchase.": "此购买项尚未提交退款申请。",
+  "Read full description": "查看完整简介",
+  "Full description": "完整简介"
 }
