@@ -1,4 +1,5 @@
 import express, { type Request, type Response } from 'express';
+import type { IncomingMessage } from 'node:http';
 import { z } from 'zod';
 import type { Actor } from '../auth/auth.js';
 import { query, withTransaction } from '../db/database.js';
@@ -15,7 +16,15 @@ const source = {
     parent: 'contents', foreignKey: 'content_id', owner: 'creator_user_id', role: 'creator' },
 } as const;
 
-const imageBody = express.raw({ type: coverMimeTypes, limit: MAX_COVER_UPLOAD_BYTES, inflate: false });
+// The raw parser guarantees that verify receives bytes. Do not process the
+// general-purpose req.body, which can also be assigned by other body parsers.
+const coverUploadBytes = new WeakMap<IncomingMessage, Buffer>();
+const imageBody = express.raw({
+  type: coverMimeTypes,
+  limit: MAX_COVER_UPLOAD_BYTES,
+  inflate: false,
+  verify(req, _res, bytes) { coverUploadBytes.set(req, bytes); },
+});
 export const parseCoverUpload: express.RequestHandler = (req, res, next) => {
   if (!req.is(coverMimeTypes)) return next(new ApiError(415, 'COVER_TYPE_INVALID', 'Choose a JPG, PNG or WebP image.'));
   return imageBody(req, res, (error) => next(error?.status === 413
@@ -38,7 +47,7 @@ export async function updateListingCover(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   if (!actor.roles.includes(item.role)) throw new ApiError(403, 'COVER_ROLE_REQUIRED', 'Only the listing owner can edit its cover.');
   const cover = req.method === 'DELETE' ? null
-    : await normalizeCoverImage(req.body, req.get('content-type')?.split(';')[0].trim().toLowerCase() ?? '');
+    : await normalizeCoverImage(coverUploadBytes.get(req), req.get('content-type')?.split(';')[0].trim().toLowerCase() ?? '');
   await withTransaction(async client => {
     if (kind === 'course') await assertTrainerOperational(client, actor.id);
     // Lock the same listing rows as submission, so review cannot race a cover change.
