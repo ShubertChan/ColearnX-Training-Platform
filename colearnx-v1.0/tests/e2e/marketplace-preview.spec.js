@@ -26,8 +26,10 @@ for (const resource of [false, true]) for (const language of ["en", "zh-CN"]) {
     const { card, preview, panel } = await openMarketplace(page, { language, resource });
     const toggle = card.getByRole("button", { name: language === "en" ? "Read full description" : "查看完整简介", exact: true });
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(card.getByText(longDescription, { exact: true })).toHaveCount(1);
     const other = page.locator(resource ? ".content-card" : ".market-card").filter({ has: page.getByRole("heading", { name: "Short workshop", exact: true }) });
     await expect(other.locator(".marketplace-description-toggle")).toHaveCount(0);
+    await expect(other.getByText("A short introduction.", { exact: true })).toHaveCount(1);
     const otherBefore = await other.boundingBox();
     const footerBefore = await card.locator(".market-card-footer").boundingBox();
     await preview.hover();
@@ -45,6 +47,7 @@ for (const resource of [false, true]) for (const language of ["en", "zh-CN"]) {
     await page.screenshot({ path: testInfo.outputPath(`marketplace-${resource ? "resources" : "courses"}-${language}.png`), fullPage: true });
     await page.locator(".topbar h1").hover();
     await expect(panel).toBeHidden();
+    await expect(card.getByText(longDescription, { exact: true })).toHaveCount(1);
     await card.getByRole("link", { name: language === "en" ? "View" : "查看", exact: false }).click();
     await expect(page).toHaveURL(new RegExp(`/${resource ? "contents" : "courses"}/preview-long$`));
     expect(errors).toEqual([]);
