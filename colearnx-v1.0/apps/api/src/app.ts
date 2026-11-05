@@ -18,6 +18,7 @@ import { authenticate, csrf, forgotPassword, login, logout, me, refresh, registe
 import { googleChallenge, googleConfig, googleLogin } from './auth/google.js';
 import { createCheckoutSession, getCheckoutSession, getTopUp, stripeWebhook } from './payments/stripe.js';
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
+import { getPublishedListingCover, parseCoverUpload, previewDraftListingCover, previewReviewListingCover, updateListingCover } from './catalog/listing-covers.js';
 import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, deleteContentDraft, deleteCourseDraft, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse, updateCourse } from './catalog/catalog.js';
 import { listContentVersions, listCourseVersions, saveCourseResources, validateCourseResources } from './catalog/publishing-tools.js';
 import { checkout, getOrder, listOrders } from './orders/commerce.js';
@@ -146,6 +147,11 @@ export function createApp() {
   api.get('/courses/:id', getCourse);
   api.get('/content', listContent);
   api.get('/content/:id', getContent);
+  api.get('/listing-covers/:kind/:id', getPublishedListingCover);
+  api.get('/listing-covers/:kind/:id/preview', authenticate, noStore, previewDraftListingCover);
+  api.put('/listing-covers/:kind/:id', authenticate, mutationLimiter, noStore, parseCoverUpload, updateListingCover);
+  api.delete('/listing-covers/:kind/:id', authenticate, mutationLimiter, noStore, updateListingCover);
+  api.get('/admin/listing-covers/:kind/:id', authenticate, requireRole('admin'), requireAdminMfa, noStore, previewReviewListingCover);
   api.get('/my/listings', authenticate, listMyListings);
   api.get('/my/analytics', authenticate, publishingAnalytics);
   api.post('/courses', authenticate, mutationLimiter, createCourse);
