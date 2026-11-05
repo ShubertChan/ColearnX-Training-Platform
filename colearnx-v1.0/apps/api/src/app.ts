@@ -45,25 +45,27 @@ const logger = pino({ level: env.LOG_LEVEL, redact: ['req.headers.authorization'
 // one process's memory. With no Redis configured, rateLimitStore returns
 // undefined and express-rate-limit uses its in-process MemoryStore -- identical
 // behaviour to before W5. The window/limit/message of each bucket are unchanged.
-function limiter(bucket: string, windowMs: number, limit: number, message: string) {
+function limiterOptions(bucket: string, windowMs: number, limit: number, message: string): Parameters<typeof rateLimit>[0] {
   const store = rateLimitStore(bucket);
-  return rateLimit({
+  return {
     windowMs,
     limit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     ...(store ? { store } : {}),
     handler: (_req, _res, next) => next(Object.assign(new Error(message), { status: 429, code: 'RATE_LIMITED' })),
-  });
+  };
 }
-const authLimiter = limiter('auth', 15 * 60 * 1000, 20, 'Too many authentication attempts.');
-const verificationLimiter = limiter('verification', 15 * 60 * 1000, 10, 'Too many verification attempts.');
-const mutationLimiter = limiter('mutation', 60 * 1000, 60, 'Too many requests.');
+const authLimiter = rateLimit(limiterOptions('auth', 15 * 60 * 1000, 20, 'Too many authentication attempts.'));
+const verificationLimiter = rateLimit(limiterOptions('verification', 15 * 60 * 1000, 10, 'Too many verification attempts.'));
+const mutationLimiter = rateLimit(limiterOptions('mutation', 60 * 1000, 60, 'Too many requests.'));
+const coverReadLimiter = rateLimit(limiterOptions('cover-read', 60 * 1000, 240, 'Too many requests.'));
+const coverWriteLimiter = rateLimit(limiterOptions('cover-write', 60 * 1000, 20, 'Too many requests.'));
 // Password reset is the highest-value unauthenticated endpoint here and is
 // also an outbound email amplifier, so it gets its own budget rather than
 // sharing the general auth one. The per-account cooldown in auth.ts is the
 // other half: this bounds one source, that bounds one inbox.
-const passwordResetLimiter = limiter('password-reset', 15 * 60 * 1000, 5, 'Too many password reset attempts.');
+const passwordResetLimiter = rateLimit(limiterOptions('password-reset', 15 * 60 * 1000, 5, 'Too many password reset attempts.'));
 
 // W5 (ASVS 8.2.1): mark sensitive authenticated reads non-cacheable so account
 // state is not left in a shared or browser cache after sign-out.
@@ -147,11 +149,11 @@ export function createApp() {
   api.get('/courses/:id', getCourse);
   api.get('/content', listContent);
   api.get('/content/:id', getContent);
-  api.get('/listing-covers/:kind/:id', getPublishedListingCover);
-  api.get('/listing-covers/:kind/:id/preview', authenticate, noStore, previewDraftListingCover);
-  api.put('/listing-covers/:kind/:id', authenticate, mutationLimiter, noStore, parseCoverUpload, updateListingCover);
-  api.delete('/listing-covers/:kind/:id', authenticate, mutationLimiter, noStore, updateListingCover);
-  api.get('/admin/listing-covers/:kind/:id', authenticate, requireRole('admin'), requireAdminMfa, noStore, previewReviewListingCover);
+  api.get('/listing-covers/:kind/:id', coverReadLimiter, getPublishedListingCover);
+  api.get('/listing-covers/:kind/:id/preview', coverReadLimiter, authenticate, noStore, previewDraftListingCover);
+  api.put('/listing-covers/:kind/:id', coverWriteLimiter, authenticate, noStore, parseCoverUpload, updateListingCover);
+  api.delete('/listing-covers/:kind/:id', coverWriteLimiter, authenticate, noStore, updateListingCover);
+  api.get('/admin/listing-covers/:kind/:id', coverReadLimiter, authenticate, requireRole('admin'), requireAdminMfa, noStore, previewReviewListingCover);
   api.get('/my/listings', authenticate, listMyListings);
   api.get('/my/analytics', authenticate, publishingAnalytics);
   api.post('/courses', authenticate, mutationLimiter, createCourse);
