@@ -6,6 +6,7 @@ import { TrainerVideoPage } from "./video.pages.js";
 // Wait for user-visible state rather than depending on a fixed delay.
 const expect = baseExpect.configure({ timeout: 20000 });
 test.describe.configure({ timeout: 60000 });
+const mainVideoInput = page => page.locator('input[type="file"][accept^="video/"]');
 
 async function dropFiles(page, files) {
   const dataTransfer = await page.evaluateHandle(entries => {
@@ -24,11 +25,12 @@ test("video draft has one lower upload entry and uses it for the required main v
   const state = await mockVideoApi(page), trainer = new TrainerVideoPage(page);
   await trainer.open("course");
   await expect(page.getByRole("heading", { name: "Main course video", exact: true })).toBeVisible({ timeout: testInfo.project.name === "webkit" ? 60000 : 20000 });
-  await expect(page.locator('input[type="file"]')).toHaveCount(1);
+  await expect(mainVideoInput(page)).toHaveCount(1);
+  await expect(page.getByLabel("Cover image (optional)", { exact: true })).toHaveCount(1);
   await expect(page.getByRole("region", { name: "Course video upload", exact: true }).locator('input[type="file"]')).toHaveCount(0);
   await expect(page.getByRole("radio", { name: "Optional attachments", exact: true })).toHaveCount(0);
   await expect(page.getByText(/PDF, DOCX, ZIP/)).toHaveCount(0);
-  await expect(page.locator('input[type="file"]')).toHaveAttribute("accept", "video/*,.mp4,.mov,.m4v,.webm,.mkv");
+  await expect(mainVideoInput(page)).toHaveAttribute("accept", "video/*,.mp4,.mov,.m4v,.webm,.mkv");
   await expect(trainer.submitButton()).toBeDisabled();
   await page.getByRole("region", { name: "Course files", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath("single-video-uploader-desktop.png"), fullPage: true });
@@ -48,7 +50,7 @@ test("video draft has one lower upload entry and uses it for the required main v
   await expect(trainer.submitButton()).toBeEnabled();
   await trainer.submitButton().click();
   await expect(page.getByRole("button", { name: "Submitted for review", exact: true })).toBeVisible();
-  await expect(page.locator('input[type="file"]')).toBeDisabled();
+  await expect(mainVideoInput(page)).toBeDisabled();
   expect(state.submitted).toBe(true);
   await dropFiles(page, [{ name: "after-review.mp4", type: "video/mp4" }]);
   expect(state.calls.filter(c => c.path === "/courses/course/video-upload-intents")).toHaveLength(1);
@@ -64,7 +66,7 @@ test("a deletion-pending old version does not introduce a second upload entry", 
   } }) }));
   await trainer.open("course");
   await expect(page.getByText("Deletion pending", { exact: true })).toBeVisible();
-  await expect(page.locator('input[type="file"]')).toHaveCount(1);
+  await expect(mainVideoInput(page)).toHaveCount(1);
   const input = page.getByLabel("Choose course video", { exact: true });
   await expect(input).toBeEnabled();
   await input.setInputFiles({ name: "new.mp4", mimeType: "video/mp4", buffer: Buffer.alloc(1024, 1) });
@@ -102,8 +104,8 @@ test("dropping multiple videos is rejected without silently selecting one; a sin
   await dropFiles(page, [{ name: "one.mp4", type: "video/mp4" }]);
   await expect(page.getByText("Queued for processing", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
-  await expect(page.locator('input[type="file"]')).toHaveCount(1);
-  await expect(page.locator('input[type="file"]')).toBeDisabled();
+  await expect(mainVideoInput(page)).toHaveCount(1);
+  await expect(mainVideoInput(page)).toBeDisabled();
 });
 
 test("interrupted main video resumes through the same lower entry after reloading", async ({ page }) => {
@@ -120,7 +122,7 @@ test("interrupted main video resumes through the same lower entry after reloadin
   await page.reload();
   const input = page.getByLabel("Choose original video to resume", { exact: true });
   await expect(input).toBeEnabled();
-  await expect(page.locator('input[type="file"]')).toHaveCount(1);
+  await expect(mainVideoInput(page)).toHaveCount(1);
   await expect(page.getByText("Select the exact original video to resume the paused upload.")).toBeVisible();
   failParts = false;
   await dropFiles(page, [{ name: "original.mp4", type: "video/mp4" }]);
@@ -166,7 +168,7 @@ test("mobile lower upload entry is keyboard-accessible and does not overflow", a
   const chooser = await chooserPromise;
   expect(chooser.isMultiple()).toBe(false);
   await chooser.setFiles([]);
-  await expect(page.locator('input[type="file"]')).toHaveCount(1);
+  await expect(mainVideoInput(page)).toHaveCount(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole("region", { name: "Course files", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath("single-video-uploader-mobile.png"), fullPage: true });
