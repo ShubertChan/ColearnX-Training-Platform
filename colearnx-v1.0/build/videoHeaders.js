@@ -52,7 +52,7 @@ export function securityHeaders(env) {
   // present in the tested artifact before deployment (no build-time secrets).
   const googleBase = "https://accounts.google.com/gsi/";
   const connect = [...new Set(["'self'", ...api, ...media, ...upload, ...stripeConnect, googleBase])].join(" ");
-  const img = ["'self'", "data:", ...media, ...(paymentsOn ? ["https://*.stripe.com", "https://*.link.com"] : [])].join(" ");
+  const img = ["'self'", "data:", ...api, ...media, ...(paymentsOn ? ["https://*.stripe.com", "https://*.link.com"] : [])].join(" ");
   const mediaSrc = ["'self'", "blob:", ...media].join(" ");
 
   const csp = [
