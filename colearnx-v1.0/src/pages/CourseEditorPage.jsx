@@ -1,3 +1,4 @@
+import { ListingCoverEditor } from "../components/ListingCover";
 import DateInput from "../components/DateInput";
 import { useTranslation } from "../i18n/LanguageContext";
 import { useCallback, useEffect, useState } from "react";
@@ -19,6 +20,7 @@ export default function CourseEditorPage() {
   const [params, setParams] = useSearchParams();
   const requested = params.get("draft");
   const [form, setForm] = useState(initial), [draft, setDraft] = useState(null);
+  const [coverBusy, setCoverBusy] = useState(false);
   const [files, setFiles] = useState({ readyCount: 0, activeCount: 0, unresolvedCount: 0, loading: true });
   const [busy, setBusy] = useState(false), [submitted, setSubmitted] = useState(false), [error, setError] = useState("");
   const [video, setVideo] = useState({ ready: false, busy: true, error: false });
@@ -30,7 +32,7 @@ export default function CourseEditorPage() {
       if (!current) return;
       const item = items.find((row) => row.id === requested && row.kind === "course" && row.status === "Draft");
       if (!item) throw new Error("This course draft is unavailable. Return to My listings and choose an editable draft.");
-      setForm({ ...initial, ...item, startsAt: localDateTime(item.startsAt), endsAt: localDateTime(item.endsAt), pricePoints: item.price }); setDraft({ id: item.id });
+      setForm({ ...initial, ...item, startsAt: localDateTime(item.startsAt), endsAt: localDateTime(item.endsAt), pricePoints: item.price }); setDraft({ id: item.id, hasCover: item.hasCover });
     }).catch((error) => { if (current) setError(error.message); }).finally(() => { if (current) setBusy(false); });
     return () => { current = false; };
   }, [requested, draft?.id, refreshMyListings]);
@@ -69,7 +71,7 @@ export default function CourseEditorPage() {
     } catch (error) { setError(error.message); } finally { setBusy(false); }
   };
   const submit = async () => {
-    if (busy || submitted || !canSubmit) return;
+    if (busy || coverBusy || submitted || !canSubmit) return;
     setBusy(true); setError("");
     try {
       await submitCourse(draft.id); setSubmitted(true); notify("Course submitted for administrator review.");
@@ -100,12 +102,13 @@ export default function CourseEditorPage() {
       {coordination && <p className="editor-policy-note">{t("Confirm the start time before saving an instructor-led course. It determines the 72-hour refund deadline for both online and offline sessions.")}</p>}
     </fieldset>{!draft && <Button type="submit" disabled={busy || Boolean(requested)}>{busy ? t("Saving…") : t("Create draft")}</Button>}</form>
     {error && <p role="alert" className="form-error">{t(error)}</p>}
-    {draft && <>{form.onlineVideo
+    {draft && <><ListingCoverEditor key={draft.id} kind="course" id={draft.id} hasCover={draft.hasCover} disabled={submitted || busy} onBusy={setCoverBusy} />
+      {form.onlineVideo
       ? hostedVideoEnabled ? <CourseFilesUploader key={draft.id} courseId={draft.id} onVideoChange={setVideo} onAssetsChange={updateFiles} disabled={submitted || busy} />
         : <p role="status">{t("Video uploads are not enabled for this deployment.")}</p>
       : <PrivateAssetUploader key={draft.id} contentVersionId={draft.id} assetApi={courseAssetApi} label={t("Course attachments")} onAssetsChange={updateFiles} disabled={submitted || busy} />}
       {!form.onlineVideo && <p>{t("Instructor-led courses show their course announcement only to purchasers.")}</p>}
-      <Button disabled={busy || submitted || !canSubmit} onClick={() => void submit()}>{submitted ? t("Submitted for review") : busy ? t("Submitting…") : t("Submit for administrator review")}</Button>
+      <Button disabled={busy || coverBusy || submitted || !canSubmit} onClick={() => void submit()}>{submitted ? t("Submitted for review") : busy ? t("Submitting…") : t("Submit for administrator review")}</Button>
       {submitted && <Button variant="secondary" onClick={() => { setDraft(null); setForm(initial); setSubmitted(false); setParams({}); }}>{t("Create another course")}</Button>}</>}
   </Card><Card><h3>{t("Private delivery")}</h3><p>{t("Video-course files are uploaded directly with a short-lived signed URL. The service must confirm each file before review is enabled.")}</p><p>{t("Instructor-led course announcements and contact details are separate from the public description and displayed only through protected purchase endpoints.")}</p><p>{t("Saved metadata can be revised in Publishing tools. No local change is presented as published until the service accepts it.")}</p></Card></div>;
 }
