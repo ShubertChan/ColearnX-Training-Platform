@@ -44,6 +44,6 @@ export default function MarketplaceDescription({ text }) {
       aria-label={t("Read full description")} aria-expanded={expanded} aria-controls={id}
       onClick={() => setExpanded((value) => !value)}><ChevronUp size={16} /></button>}
     <div ref={fullRef} id={id} className="marketplace-description-full" role="region" aria-label={t("Full description")}
-      hidden={!expanded} tabIndex={expanded ? 0 : -1}><p>{text}</p></div>
+      hidden={!expanded} tabIndex={expanded ? 0 : -1}>{expanded && <p>{text}</p>}</div>
   </div>;
 }
