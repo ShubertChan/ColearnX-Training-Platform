@@ -24,11 +24,13 @@ const credential = () => mocks.initialize.mock.calls.at(-1)[0].callback({ creden
 
 test('button switches language without resetting the challenge or enabling automatic login', async () => {
   await setup();
-  expect(mocks.initialize.mock.calls[0][0]).toMatchObject({ nonce: 'nonce', auto_select: false, ux_mode: 'popup' });
+  expect(mocks.initialize.mock.calls[0][0]).toMatchObject({ nonce: 'nonce', auto_select: false, button_auto_select: false, ux_mode: 'popup' });
   expect(mocks.renderButton.mock.calls.at(-1)[1].locale).toBe('en');
+  expect(mocks.renderButton.mock.calls.at(-1)[1]).toMatchObject({ type: 'standard', size: 'medium', text: 'signin_with' });
   act(() => setLanguage('zh-CN'));
   expect(mocks.renderButton.mock.calls.at(-1)[1].locale).toBe('zh_CN');
   expect(screen.getByLabelText('使用 Google 登录')).toBeTruthy();
+  expect(screen.getByText('在共用电脑上，请使用浏览器访客模式。')).toBeTruthy();
   expect(mocks.challenge).toHaveBeenCalledTimes(1);
 });
 test('new Google users must accept both policies; the credential stays in component memory', async () => {
