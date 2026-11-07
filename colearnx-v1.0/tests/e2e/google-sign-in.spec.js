@@ -18,7 +18,10 @@ async function googleFixture(page) {
       initialize(config) { window.googleFixtureConfig = config; },
       renderButton(container, options) {
         const button = document.createElement('button'); button.type = 'button';
-        button.textContent = options.locale === 'zh_CN' ? '使用 Google 登录' : 'Sign in with Google';
+        // Match Google's documented personalized-button condition: large
+        // standard buttons can expose a previously signed-in account.
+        button.textContent = options.size === 'large' ? 'Sign in as Previous Visitor' :
+          options.locale === 'zh_CN' ? '使用 Google 登录' : 'Sign in with Google';
         button.style.cssText = 'width:100%;min-height:44px;border:1px solid #747775;border-radius:4px;background:#fff;color:#1f1f1f;font:500 14px Arial';
         button.onclick = () => window.googleFixtureConfig.callback({ credential: 'fixture-credential' });
         container.appendChild(button);
@@ -38,6 +41,8 @@ for (const width of [375, 768, 1440]) test(`Google sign-in translates and fits $
   const passwordButton = page.getByRole('button', { name: 'Sign in', exact: true });
   const googleButton = page.getByRole('button', { name: 'Sign in with Google', exact: true });
   await expect(googleButton).toBeVisible();
+  await expect(page.getByText('Sign in as Previous Visitor')).toHaveCount(0);
+  expect(await page.evaluate(() => window.googleFixtureConfig.button_auto_select)).toBe(false);
   await expect(page.locator('script[src="https://accounts.google.com/gsi/client"]')).toHaveAttribute('referrerpolicy', 'strict-origin');
   expect((await googleButton.boundingBox()).y).toBeGreaterThan((await passwordButton.boundingBox()).y);
   await page.getByLabel('Email address').fill('kept@gmail.com');
