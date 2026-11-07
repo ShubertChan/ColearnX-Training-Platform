@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { env } from '../config/env.js';
 import { closeDatabase } from '../db/database.js';
 import { closeRedis } from '../lib/redis.js';
+import { ledgerEvent } from './finance-events.js';
 import { drainSecurityAlerts, persistSecurityEvent, systemFingerprint } from './events.js';
 import { auditLedgerBalances } from './ledger-audit.js';
 
@@ -22,18 +23,13 @@ async function main() {
     ssl: env.DATABASE_SSL ? { rejectUnauthorized: true } : undefined,
   });
   try {
-    const summary = await auditLedgerBalances(pool, async ({ pointAccountId, actorUserId, accountStatus, discrepancies }) => {
+    const summary = await auditLedgerBalances(pool, async (finding) => {
       try {
-        await persistSecurityEvent(systemFingerprint(), {
-          type: 'finance.ledger_imbalance',
-          actorUserId,
-          decision: 'allow',
-          context: { pointAccountId, accountStatus, discrepancies },
-        });
+        await persistSecurityEvent(systemFingerprint(), ledgerEvent(finding));
       } catch (error) {
         // Make the lost finding loud, then rethrow so the job counts it.
         process.stderr.write(
-          `Failed to record ledger imbalance for account ${pointAccountId}: ${error instanceof Error ? error.message : String(error)}\n`,
+          `Failed to record ledger imbalance for account ${finding.pointAccountId}: ${error instanceof Error ? error.message : String(error)}\n`,
         );
         throw error;
       }

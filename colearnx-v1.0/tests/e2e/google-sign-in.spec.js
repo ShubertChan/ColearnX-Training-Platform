@@ -4,6 +4,7 @@ const json = (data) => ({ contentType: 'application/json', body: JSON.stringify(
 async function googleFixture(page) {
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/auth/human-check')) return route.fulfill(json({ enabled: false, siteKey: null }));
     if (path.endsWith('/auth/google/config')) return route.fulfill(json({ enabled: true, clientId: 'fixture.apps.googleusercontent.com' }));
     if (path.endsWith('/auth/google/challenge')) return route.fulfill(json({ nonce: 'nonce', expiresAt: new Date(Date.now() + 600000).toISOString() }));
     if (path.endsWith('/auth/google')) return route.fulfill(json({ registrationRequired: true }));

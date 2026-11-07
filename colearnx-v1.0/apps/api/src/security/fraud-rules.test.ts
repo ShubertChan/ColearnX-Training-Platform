@@ -7,7 +7,7 @@ import {
   type ActorRiskInput,
 } from './fraud-rules.js';
 
-const clean: ActorRiskInput = { actorUserId: 'u1', refundCount: 0, selfPurchaseCount: 0, rapidRefundCount: 0 };
+const clean: ActorRiskInput = { actorUserId: 'u1', refundCount: 0, purchasedItems: 0, refundedItems: 0, selfPurchaseCount: 0, rapidRefundCount: 0 };
 
 test('an actor that trips no rule produces no verdict', () => {
   assert.equal(scoreActor(clean), null);
@@ -40,11 +40,17 @@ test('rapid refunds alone are low severity', () => {
 });
 
 test('multiple signals stack and the score is capped at 100', () => {
-  const verdict = scoreActor({ actorUserId: 'u1', refundCount: 9, selfPurchaseCount: 2, rapidRefundCount: 5 });
+  const verdict = scoreActor({ ...clean, refundCount: 9, selfPurchaseCount: 2, rapidRefundCount: 5 });
   assert.ok(verdict);
   // 60 + 40 + 30 = 130, capped at 100.
   assert.equal(verdict.riskScore, 100);
   assert.equal(verdict.severity, 3);
   assert.deepEqual(verdict.ruleHits, ['self_purchase', 'refund_velocity', 'rapid_refund']);
   assert.equal(verdict.reasons.length, 3);
+});
+
+test('refund ratios require a purchase cohort and distinguish half from just below half', () => {
+  assert.equal(scoreActor({ ...clean, purchasedItems: 4, refundedItems: 4 }), null);
+  assert.equal(scoreActor({ ...clean, purchasedItems: 7, refundedItems: 3 }), null);
+  assert.deepEqual(scoreActor({ ...clean, purchasedItems: 6, refundedItems: 3 })?.ruleHits, ['high_refund_ratio']);
 });

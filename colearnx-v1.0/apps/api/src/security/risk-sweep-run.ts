@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { env } from '../config/env.js';
 import { closeDatabase } from '../db/database.js';
 import { closeRedis } from '../lib/redis.js';
+import { riskEvent } from './finance-events.js';
 import { drainSecurityAlerts, persistSecurityEvent, systemFingerprint } from './events.js';
 import { runRiskSweep } from './risk-sweep.js';
 
@@ -18,17 +19,9 @@ import { runRiskSweep } from './risk-sweep.js';
  * FINANCE_RISK_WINDOW_DAYS and FINANCE_RAPID_REFUND_SECONDS; both default
  * sensibly and are validated as positive integers before any query runs.
  */
-function positiveIntFromEnv(value: string | undefined, fallback: number): number {
-  if (value === undefined || value === '') return fallback;
-  if (!/^\d+$/.test(value)) throw new Error(`Expected a positive integer, got: ${value}`);
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error(`Expected a positive integer, got: ${value}`);
-  return parsed;
-}
-
 async function main() {
-  const windowDays = positiveIntFromEnv(process.env.FINANCE_RISK_WINDOW_DAYS, 30);
-  const rapidRefundSeconds = positiveIntFromEnv(process.env.FINANCE_RAPID_REFUND_SECONDS, 300);
+  const windowDays = env.FINANCE_RISK_WINDOW_DAYS;
+  const rapidRefundSeconds = env.FINANCE_RAPID_REFUND_SECONDS;
   const pool = new Pool({
     connectionString: env.DATABASE_URL,
     max: 2,
@@ -37,20 +30,7 @@ async function main() {
   try {
     const summary = await runRiskSweep(pool, async (verdict, counts) => {
       try {
-        await persistSecurityEvent(systemFingerprint(), {
-          type: 'finance.risk_flagged',
-          severity: verdict.severity,
-          actorUserId: verdict.actorUserId,
-          decision: 'allow',
-          riskScore: verdict.riskScore,
-          ruleHits: verdict.ruleHits,
-          context: {
-            reasons: verdict.reasons,
-            refundCount: counts.refundCount,
-            selfPurchaseCount: counts.selfPurchaseCount,
-            rapidRefundCount: counts.rapidRefundCount,
-          },
-        });
+        await persistSecurityEvent(systemFingerprint(), riskEvent(verdict, counts));
       } catch (error) {
         // Make the lost flag loud, then rethrow so the job counts it.
         process.stderr.write(
