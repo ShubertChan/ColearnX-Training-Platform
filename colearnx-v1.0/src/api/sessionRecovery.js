@@ -1,4 +1,4 @@
-// Only session GETs use this cold-start allowance. Never replay a login,
+// Read-only requests used to set up sign-in can wait for a cold API. Never replay a login,
 // refresh-token rotation, payment or other write after an uncertain response.
 export const SESSION_READ_TIMEOUT_MS = 20000;
 const retryDelays = [1000, 2000, 4000];

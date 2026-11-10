@@ -17,6 +17,19 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+test('a cancelled Google configuration lookup stops retrying while the service wakes', async () => {
+  const { apiClient } = await import('../../src/api/client');
+  const { getGoogleConfig } = await import('../../src/api/googleIdentity');
+  apiClient.get.mockReset().mockRejectedValueOnce(Object.assign(new Error('timeout'), { status: 0 }));
+  const controller = new AbortController();
+  const cancelled = expect(getGoogleConfig(controller.signal)).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+  await vi.advanceTimersByTimeAsync(5);
+  controller.abort();
+  await cancelled;
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(apiClient.get).toHaveBeenCalledTimes(1);
+});
+
 test('SDK loading shares one origin-only request and reuses the loaded identity', async () => {
   const { loadGoogleIdentity } = await import('../../src/api/googleIdentity');
   const first = loadGoogleIdentity();

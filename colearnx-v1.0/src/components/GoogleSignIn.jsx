@@ -28,28 +28,29 @@ export default function GoogleSignIn({ disabled = false, onSignedIn, onBusyChang
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
     let expiry;
+    const controller = new AbortController();
+    const { signal } = controller;
     setError(""); setSetup(null);
     (async () => {
-      const config = await getGoogleConfig();
-      if (cancelled) return;
+      const config = await getGoogleConfig(signal);
+      if (signal.aborted) return;
       if (!config.enabled) { setSetup({ disabled: true }); return; }
       const sdk = await loadGoogleIdentity();
-      if (cancelled) return;
+      if (signal.aborted) return;
       const challenge = await createGoogleChallenge();
-      if (cancelled) return;
+      if (signal.aborted) return;
       sdk.initialize({ client_id: config.clientId, nonce: challenge.nonce, auto_select: false, button_auto_select: false,
-        ux_mode: "popup", callback: (response) => { if (!cancelled) void handler.current(response.credential); } });
+        ux_mode: "popup", callback: (response) => { if (!signal.aborted) void handler.current(response.credential); } });
       setSetup({ sdk });
       expiry = setTimeout(() => {
         setPendingCredential(""); setSetup(null);
         setError("Google sign-in expired. Please try again and allow cookies.");
       }, Math.max(0, Date.parse(challenge.expiresAt) - Date.now()));
     })().catch(() => {
-      if (!cancelled) setError("Google sign-in could not load. Check your connection and try again.");
+      if (!signal.aborted) setError("Google sign-in could not load. Check your connection and try again.");
     });
-    return () => { cancelled = true; clearTimeout(expiry); };
+    return () => { controller.abort(); clearTimeout(expiry); };
   }, [attempt]);
 
   useEffect(() => {
