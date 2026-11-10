@@ -15,6 +15,7 @@ import { spawn } from 'node:child_process';
 import { Pool } from 'pg';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import sharp from 'sharp';
 import { migrationChecksum } from '../src/db/migration-checksum.ts';
 
 const apiRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -419,6 +420,41 @@ try {
   assert.equal('joinUrl' in publicCourse.body.data, false);
   passed('draft metadata is preserved, untrusted durations stay null, verified durations cannot be forged, and public delivery fields stay private');
 
+  await owner.query(`INSERT INTO roles (role_code, role_name, description) VALUES ('creator', 'Creator', 'Fixture')`);
+  await owner.query(`INSERT INTO user_roles (user_id, role_id) SELECT $1, role_id FROM roles WHERE role_code = 'creator'`, [sellerId]);
+  const resourceDraft = await request(app).post('/api/v1/content').set('Authorization', `Bearer ${trainerToken}`)
+    .send({ title: 'Cover test resource', pricePoints: 15 }).expect(201);
+  const draftResource = resourceDraft.body.data;
+  const coverPng = await sharp({ create: { width: 16, height: 20, channels: 3, background: '#4260bc' } }).png().toBuffer();
+  for (const [kind, id] of [['course', savedDraft.id], ['content', draftResource.contentVersionId]]) {
+    const url = `/api/v1/listing-covers/${kind}/${id}`;
+    const upload = (token) => request(app).put(url).set('Authorization', `Bearer ${token}`).set('Content-Type', 'image/png').send(coverPng);
+    await upload(buyerToken).expect(403);
+    const saved = await upload(trainerToken).expect(200);
+    assert.match(saved.body.data.image, /^data:image\/jpeg;base64,/);
+    await request(app).get(url).expect(404);
+    await request(app).get(`${url}/preview`).expect(401);
+    await request(app).get(`${url}/preview`).set('Authorization', `Bearer ${buyerToken}`).expect(404);
+    const privatePreview = await request(app).get(`${url}/preview`).set('Authorization', `Bearer ${trainerToken}`).expect(200);
+    assert.equal(privatePreview.body.data.image, saved.body.data.image);
+    if (kind === 'course') {
+      await request(app).delete(url).set('Authorization', `Bearer ${trainerToken}`).expect(200);
+      const removed = await request(app).get(`${url}/preview`).set('Authorization', `Bearer ${trainerToken}`).expect(200);
+      assert.equal(removed.body.data.image, null);
+    } else {
+      // Only this test database simulates review approval without private assets.
+      await owner.query("UPDATE contents SET publication_status = 'published' WHERE content_id = $1", [draftResource.id]);
+      await owner.query("UPDATE content_versions SET version_status = 'published', published_at = now() WHERE content_version_id = $1", [id]);
+      const published = await request(app).get(url).expect('Content-Type', /image\/jpeg/).expect(200);
+      assert.equal(published.body.toString('base64'), saved.body.data.image.split(',')[1]);
+      const detailWithCover = await request(app).get(`/api/v1/content/${id}`).expect(200);
+      assert.equal(detailWithCover.body.data.hasCover, true);
+      assert.equal('image' in detailWithCover.body.data, false);
+      await upload(trainerToken).expect(404);
+    }
+  }
+  passed('listing covers persist for draft owners, stay private until published, and cannot be changed after approval');
+
   const assetId = randomUUID();
   await apiPool.query(`INSERT INTO course_delivery_assets (course_delivery_asset_id, course_run_id, owner_user_id, asset_purpose,
     bucket_name, object_key, original_filename, declared_content_type, declared_byte_size, upload_expires_at)
@@ -583,6 +619,9 @@ try {
   await runRefundNotificationChecks({ owner, app, environment, buyerId, sellerId, adminId, courseRunId, accessToken, passed });
   const { runMfaSessionChecks } = await import('./mfa-session-checks.mjs');
   await runMfaSessionChecks({ owner, app, apiPool, environment, passed });
+  const { runSecurityRegression } = await import('./security-regression-checks.mjs');
+  await runSecurityRegression({ owner, app, sellerId, versionId, accessToken,
+    environment, runJob: script => ownerCommand(script, runtimeUrl.href), passed });
   const { runVideoOrderIntegrityChecks } = await import('./video-order-integrity-checks.mjs');
   await runVideoOrderIntegrityChecks({ owner, buyerId, sellerId, courseId, courseRunId, passed });
   const { runGoogleSignInChecks } = await import('./google-sign-in-checks.mjs');

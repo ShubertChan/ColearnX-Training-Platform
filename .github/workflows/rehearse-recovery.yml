@@ -1,0 +1,86 @@
+name: Rehearse database recovery and application rollback
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/rehearse-recovery.yml
+      - colearnx-v1.0/scripts/deployment/recovery-drill.py
+      - colearnx-v1.0/scripts/deployment/drill-web.mjs
+  workflow_dispatch:
+    inputs:
+      previous_sha:
+        description: Full SHA of the previous known-good staging release
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the checkout and resolve the rollback pair
+        env:
+          PREVIOUS_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.previous_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            test "$GITHUB_REF" = refs/heads/main
+            test "$(git -C candidate rev-parse origin/main)" = "$GITHUB_SHA"
+          else
+            test "$GITHUB_EVENT_NAME" = pull_request
+            test "$GITHUB_BASE_REF" = main
+          fi
+          [[ "$PREVIOUS_SHA" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C candidate rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$PREVIOUS_SHA" != "$GITHUB_SHA"
+          git -C candidate merge-base --is-ancestor "$PREVIOUS_SHA" "$GITHUB_SHA"
+          git -C candidate worktree add --detach "$GITHUB_WORKSPACE/previous" "$PREVIOUS_SHA"
+          cmp candidate/colearnx-v1.0/.node-version previous/colearnx-v1.0/.node-version
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: candidate/colearnx-v1.0/.node-version
+      - name: Build both web and API versions without hosted-service credentials
+        env:
+          VITE_API_BASE_URL: /api/v1
+          VITE_PAYMENTS_API_ENABLED: 'false'
+          VITE_HOSTED_VIDEO_ENABLED: 'false'
+        run: |
+          for release in candidate previous; do
+            (
+              cd "$release/colearnx-v1.0"
+              npm ci --include=dev
+              npm --prefix apps/api ci --include=dev
+              npm run api:build
+              npm run build -- --configLoader native
+            )
+          done
+      - name: Check PostgreSQL 16 tools
+        run: |
+          if [[ ! -x /usr/lib/postgresql/16/bin/pg_restore ]]; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-16
+          fi
+          /usr/lib/postgresql/16/bin/pg_restore --version
+      - name: Restore a backup and serve the previous app on the restored schema
+        run: |
+          python3 candidate/colearnx-v1.0/scripts/deployment/recovery-drill.py \
+            --candidate candidate --previous previous --pg-bin /usr/lib/postgresql/16/bin \
+            --work-root "$RUNNER_TEMP/recovery-work" --evidence "$RUNNER_TEMP/recovery-rehearsal.json"
+          jq '{scope, migrations, lastMigration, restoreAndValidateSeconds, rollbackAndValidateSeconds, postReleaseDataPreserved}' \
+            "$RUNNER_TEMP/recovery-rehearsal.json" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: recovery-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/recovery-rehearsal.json
+          if-no-files-found: error
+          retention-days: 14

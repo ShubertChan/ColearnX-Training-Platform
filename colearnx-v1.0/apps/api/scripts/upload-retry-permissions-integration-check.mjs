@@ -23,6 +23,8 @@ const migrationDirectory = join(apiRoot, '../../db/migrations');
 const permissionMigration = '018_upload_retry_expiry_permissions.sql';
 const promotionMigration = '019_upload_promotion_permissions.sql';
 const rawUrl = process.env.RELEASE_CHECK_DATABASE_URL;
+const testClamd = process.env.CLAMAV_TEST_HOST === '127.0.0.1';
+const clamdPort = process.env.CLAMAV_TEST_PORT ?? '3310';
 assert.ok(rawUrl, 'Set RELEASE_CHECK_DATABASE_URL to a new disposable LOCAL PostgreSQL 16 database.');
 const ownerUrl = new URL(rawUrl);
 assert.ok(['postgres:', 'postgresql:'].includes(ownerUrl.protocol), 'PostgreSQL URL required.');
@@ -50,12 +52,29 @@ Object.assign(process.env, operatingEnvironment, {
   EMAIL_PROVIDER: 'disabled', PWNED_PASSWORDS_ENABLED: 'false', REDIS_URL: '',
   OBJECT_STORAGE_PROVIDER: 'r2', R2_ACCOUNT_ID: 'fixture-account', R2_ACCESS_KEY_ID: 'fixture-key',
   R2_SECRET_ACCESS_KEY: 'fixture-secret', R2_BUCKET_NAME: 'fixture-bucket', ENABLE_HOSTED_VIDEO: 'false',
+  UPLOAD_MALWARE_SCANNER: testClamd ? 'clamav' : 'disabled', CLAMAV_HOST: '127.0.0.1',
+  CLAMAV_PORT: clamdPort,
 });
 let externalCalls = 0;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => { externalCalls++; throw new Error('External HTTP is prohibited.'); };
 // Signing is real and local, with inert test credentials; object I/O is blocked.
-mock.method(S3Client.prototype, 'send', async () => { externalCalls++; throw new Error('External object storage is prohibited.'); });
+const incoming = new Map();
+const deletedKeys = new Set();
+mock.method(S3Client.prototype, 'send', async command => {
+  const object = incoming.get(command.input.Key);
+  // R2 DELETE is idempotent: a later intent may sweep the quarantined row a second time.
+  if (command.constructor.name === 'DeleteObjectCommand' && (object || deletedKeys.has(command.input.Key))) {
+    incoming.delete(command.input.Key); deletedKeys.add(command.input.Key); return {};
+  }
+  if (object) {
+    if (command.constructor.name === 'HeadObjectCommand') return { ContentLength: object.bytes.length, ContentType: object.type, ETag: '"fixture"' };
+    if (command.constructor.name === 'GetObjectCommand' && command.input.IfMatch === '"fixture"') {
+      return { Body: { transformToByteArray: async () => object.bytes } };
+    }
+  }
+  externalCalls++; throw new Error('Unexpected object storage operation.');
+});
 
 const owner = new Pool({ connectionString: ownerUrl.href, ssl: false, max: 1, connectionTimeoutMillis: 5000 });
 let runtime;
@@ -302,6 +321,57 @@ try {
   }
   assert.equal(externalCalls, 0);
   passed('already-uploaded files recover without another upload URL or any external cloud requests');
+  const { fakeWindowsExecutable, buildZip, eicarTestFile } = await import('../src/security/malicious-samples.test-support.ts');
+  for (const sample of [
+    { f: fixtures[0], type: 'application/pdf', name: 'notes.pdf', bytes: fakeWindowsExecutable(), event: 'upload.executable_blocked' },
+    { f: fixtures[1], type: 'application/zip', name: 'notes.zip',
+      bytes: buildZip([{ name: 'notes.txt', data: Buffer.alloc(11 * 1024 * 1024), method: 8 }]), event: 'upload.archive_rejected' },
+    ...(testClamd ? [{ f: fixtures[0], type: 'application/zip', name: 'sample.zip',
+      bytes: buildZip([{ name: 'sample.txt', data: eicarTestFile() }]), event: 'upload.malware_detected' }] : []),
+  ]) {
+    const { f, type, name, bytes } = sample;
+    const intent = await request(app).post(f.base + '/upload-intents').auth(token, { type: 'bearer' })
+      .set('Idempotency-Key', randomUUID()).send({ filename: name, mediaType: type, sizeBytes: bytes.length }).expect(201);
+    const id = intent.body.data.assetId;
+    const key = (await owner.query(`SELECT object_key FROM ${f.table} WHERE ${f.idColumn}=$1`, [id])).rows[0].object_key;
+    incoming.set(key, { type, bytes });
+    const blocked = await request(app).post(f.base + '/upload-intents/' + id + '/complete').auth(token, { type: 'bearer' }).send({}).expect(422);
+    assert.equal(blocked.body.error.code, 'UPLOAD_CONTENT_REJECTED');
+    assert.equal((await owner.query(`SELECT asset_status FROM ${f.table} WHERE ${f.idColumn}=$1`, [id])).rows[0].asset_status, 'quarantined');
+    assert.equal(incoming.has(key), false);
+    const recorded = await owner.query("SELECT decision FROM security_events WHERE event_type=$1 AND context_json->>'assetId'=$2", [sample.event, id]);
+    assert.deepEqual(recorded.rows, [{ decision: 'deny' }]);
+    passed('W8: ' + f.kind + ' malicious bytes quarantined, deleted and audited via the real completion route');
+  }
+  const { runDownloadAudit } = await import('../src/security/download-audit.ts');
+  const file = fixtures[0];
+  const issueLink = ip => request(app).post(file.base + '/download-url').auth(token, { type: 'bearer' })
+    .set('X-Forwarded-For', ip).send({ assetId: file.assetId });
+  const findings = [];
+  const scanLinks = () => runDownloadAudit(runtime, async (verdict, pattern) => findings.push({ verdict, pattern }));
+  await issueLink('192.0.2.21').expect(404); // draft content must not leak a bearer URL
+  await owner.query("UPDATE contents SET publication_status='published' WHERE content_id=$1", [contentId]);
+  await owner.query("UPDATE content_versions SET version_status='published' WHERE content_version_id=$1", [versionId]);
+  const networks = ['192.0.2.21', '192.0.2.22', '192.0.2.23', '192.0.2.24'];
+  for (const [i, ip] of networks.entries()) {
+    const result = (await issueLink(ip).expect(200)).body.data;
+    assert.ok(new URL(result.downloadUrl).searchParams.has('X-Amz-Signature'));
+    if (i === 2) assert.equal((await scanLinks()).flagged, 0);
+  }
+  const issues = await owner.query(`SELECT actor_ip_hash,context_json FROM security_events
+    WHERE actor_user_id=$1 AND event_type='content.download_issued' AND context_json->>'assetId'=$2`, [userId, file.assetId]);
+  assert.equal(issues.rowCount, 4);
+  assert.equal(new Set(issues.rows.map(row => row.actor_ip_hash)).size, 4);
+  for (const row of issues.rows) {
+    assert.ok(/^[a-f0-9]{64}$/.test(row.actor_ip_hash));
+    assert.deepEqual(row.context_json, { assetId: file.assetId, assetKind: 'content', mode: 'attachment' });
+  }
+  assert.equal((await scanLinks()).flagged, 1);
+  assert.equal(findings[0].pattern.issued, 4);
+  assert.equal(findings[0].pattern.networks, 4);
+  assert.deepEqual(findings[0].verdict.ruleHits, ['download_many_networks']);
+  passed('W8: draft link denied; four authorized signed links recorded without bearer URLs and flagged across four sources');
+  assert.equal(externalCalls, 0);
   process.stdout.write(`Completed ${checks} real low-privilege PostgreSQL/HTTP integration checks.\n`);
 } finally {
   await runtime?.end();

@@ -1,4 +1,5 @@
 import { getFormatLocale, useTranslation } from "../i18n/LanguageContext";
+import { ReviewListingCover } from "../components/ListingCover";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -496,6 +497,7 @@ export function AdminCatalogPage() {
         <div>
           <b>{item.title}</b>
           <small>{item.owner?.displayName || t("Owner")} · {item.pricePoints}{t(" points · ")}{item.kind === "course" ? item.deliveryModes?.join(", ") : item.contentType}</small>
+          {item.hasCover && <ReviewListingCover kind={item.kind} id={item.id} />}
           {item.kind === "content" && <span className="queue-detail">{t("Private attachments: ")}{Math.max(Number(item.assetCount || 0), item.assets?.length || 0, item.storageUrlPresent ? 1 : 0)}</span>}
         </div>
         {item.kind === "content"

@@ -1,4 +1,5 @@
 {
+  "On a shared computer, use a guest browser window.": "在共用电脑上，请使用浏览器访客模式。",
   "or": "或",
   "Sign in with Google": "使用 Google 登录",
   "Loading Google sign-in…": "正在加载 Google 登录…",
@@ -1694,5 +1695,21 @@
   "Refund status unavailable": "退款状态暂不可用",
   "Refresh your order to check the latest refund status before submitting another request.": "请刷新订单查看最新退款状态后再尝试申请。",
   "No refund requested": "未申请退款",
-  "No refund request has been submitted for this purchase.": "此购买项尚未提交退款申请。"
+  "No refund request has been submitted for this purchase.": "此购买项尚未提交退款申请。",
+  "Read full description": "查看完整简介",
+  "Full description": "完整简介",
+  "Cover image (optional)": "封面图（选填）",
+  "JPG, PNG or WebP, up to 5 MB. The image is public after approval.": "支持 JPG、PNG 或 WebP，最大 5 MB。审核通过后公开展示。",
+  "Choose a JPG, PNG or WebP image.": "请选择 JPG、PNG 或 WebP 图片。",
+  "Choose an image up to 5 MB.": "请选择不超过 5 MB 的图片。",
+  "This image could not be processed. Try a smaller JPG, PNG or WebP image.": "无法处理这张图片，请尝试较小的 JPG、PNG 或 WebP 图片。",
+  "Only the listing owner can edit its cover.": "只有商品的发布者可以编辑封面。",
+  "An editable draft was not found.": "未找到可编辑的草稿。",
+  "Listing cover was not found.": "未找到商品封面。",
+  "Listing cover preview": "商品封面预览",
+  "Cover image saved.": "封面图已保存。",
+  "Cover image removed.": "封面图已移除。",
+  "Saving cover image…": "正在保存封面图…",
+  "Remove cover": "移除封面",
+  "Preview cover image": "预览封面图"
 }

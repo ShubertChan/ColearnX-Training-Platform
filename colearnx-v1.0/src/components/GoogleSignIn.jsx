@@ -39,7 +39,7 @@ export default function GoogleSignIn({ disabled = false, onSignedIn, onBusyChang
       if (cancelled) return;
       const challenge = await createGoogleChallenge();
       if (cancelled) return;
-      sdk.initialize({ client_id: config.clientId, nonce: challenge.nonce, auto_select: false,
+      sdk.initialize({ client_id: config.clientId, nonce: challenge.nonce, auto_select: false, button_auto_select: false,
         ux_mode: "popup", callback: (response) => { if (!cancelled) void handler.current(response.credential); } });
       setSetup({ sdk });
       expiry = setTimeout(() => {
@@ -56,7 +56,9 @@ export default function GoogleSignIn({ disabled = false, onSignedIn, onBusyChang
     if (!setup?.sdk || !container.current || pendingCredential) return;
     container.current.replaceChildren();
     setup.sdk.renderButton(container.current, {
-      type: "standard", theme: "outline", size: "large", text: "signin_with",
+      // Google personalizes large standard buttons with a previous visitor's
+      // name/email. Medium keeps Google's translated text without that preview.
+      type: "standard", theme: "outline", size: "medium", text: "signin_with",
       shape: "rectangular", logo_alignment: "left",
       width: Math.min(400, Math.floor(container.current.getBoundingClientRect().width || 300)),
       locale: language === "zh-CN" ? "zh_CN" : "en",
@@ -95,5 +97,6 @@ export default function GoogleSignIn({ disabled = false, onSignedIn, onBusyChang
     </div> : setup?.sdk && <div ref={container} className="google-sign-in-button" inert={busy || disabled} aria-label={t("Sign in with Google")} />}
     {busy && <p className="google-sign-in-status" role="status">{t("Connecting…")}</p>}
     {error && <div className="form-error" role="alert">{t(error)} <button className="link-button" type="button" disabled={busy || disabled} onClick={() => setAttempt((value) => value + 1)}>{t("Try again")}</button></div>}
+    <p className="google-sign-in-status">{t("On a shared computer, use a guest browser window.")}</p>
   </div>;
 }
