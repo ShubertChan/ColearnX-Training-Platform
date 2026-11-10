@@ -21,4 +21,4 @@
 
 2026-11-01 本地一次验收的三轮耗时为 **1,475 / 1,479 / 1,478 毫秒**，分别吊销 **22 / 3 / 3** 条未吊销会话（首轮包含之前测试建立的会话）。算术平均 **1,477 毫秒**。计时从宣告模拟泄露到完成旧凭据拒绝、新登录及刷新验证，包括启动新的 Node 进程；不含人工发现、托管服务发布或生产流量切换时间，不作为线上恢复承诺。
 
-命令和讲解顺序见[演示脚本](W10-demo.md)。每次执行都重新计时并写 `release-report/security-w10/rotation.json`，只含环境、时间、轮数和计数；CI 以 `w10-rotation-<SHA>-<attempt>` 保存。该次完整数据库运行通过 46 组检查。F-13、F-19 的复评和实际部署步骤见[安全设计与风险复评](W10-security-design.md)。
+`npm run release:database-test` 在隔离测试库中执行这组检查。每次运行都会重新计时，将结果写入 `release-report/security-w10/rotation.json`。CI 使用 `w10-rotation-<SHA>-<attempt>` 保存该报告。F-13、F-19 的复评和密钥泄露处置步骤见[安全设计与风险复评](W10-security-design.md)。
