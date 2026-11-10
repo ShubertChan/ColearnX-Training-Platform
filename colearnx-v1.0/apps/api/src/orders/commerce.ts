@@ -6,6 +6,7 @@ import type { Actor } from '../auth/auth.js';
 import { query, withTransaction } from '../db/database.js';
 import { sha256 } from '../lib/crypto.js';
 import { ApiError, ok } from '../lib/http.js';
+import { completeIdempotency, reserveIdempotency } from '../lib/idempotency.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 import { loadSystemPointAccount, postPointTransaction } from '../points/ledger.js';
 import { refundPolicySnapshot } from '../refunds/purchase-policy.js';
@@ -54,23 +55,6 @@ function points(value: string, field: string) {
 function refundDeadline(product: Product, _purchasedAt: Date) {
   const selfArranged = product.kind === 'course' && product.deliveryModes.some((mode) => mode === 'local' || mode === 'live');
   return selfArranged && product.startsAt ? new Date(product.startsAt.getTime() - 72 * 60 * 60 * 1000) : null;
-}
-
-async function claimIdempotency(client: PoolClient, actorId: string, key: string, fingerprint: string) {
-  const existing = await client.query<{ request_fingerprint: string; response_body: CheckoutResponse | null }>(`SELECT request_fingerprint, response_body
-    FROM idempotency_records
-    WHERE actor_user_id = $1 AND operation_scope = 'checkout' AND idempotency_key = $2
-    FOR UPDATE`, [actorId, key]);
-  if (existing.rowCount) {
-    if (existing.rows[0].request_fingerprint !== fingerprint) {
-      throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was used for a different checkout.');
-    }
-    if (existing.rows[0].response_body) return existing.rows[0].response_body;
-    throw new ApiError(409, 'REQUEST_IN_PROGRESS', 'The matching checkout is still processing.');
-  }
-  await client.query(`INSERT INTO idempotency_records (actor_user_id, operation_scope, idempotency_key, request_fingerprint)
-    VALUES ($1, 'checkout', $2, $3)`, [actorId, key, fingerprint]);
-  return null;
 }
 
 async function lockProduct(client: PoolClient, item: { kind: 'course' | 'content'; id: string }): Promise<Product> {
@@ -203,9 +187,9 @@ export async function checkout(req: Request, res: Response) {
     throw new ApiError(403, 'MEMBER_PURCHASE_REQUIRED', 'A non-administrator Member account is required for checkout.');
   }
   const key = parse(idempotencyKey, req.get('idempotency-key'));
-  const fingerprint = sha256(JSON.stringify(input));
+  const reservation = { actorUserId: actor.id, operationScope: 'checkout', key, fingerprint: sha256(JSON.stringify(input)) };
   const response = await withTransaction(async (client) => {
-    const cached = await claimIdempotency(client, actor.id, key, fingerprint);
+    const cached = await reserveIdempotency<CheckoutResponse>(client, reservation);
     if (cached) return cached;
     const products: Product[] = [];
     for (const item of [...input.items].sort((left, right) => `${left.kind}:${left.id}`.localeCompare(`${right.kind}:${right.id}`))) {
@@ -291,9 +275,7 @@ export async function checkout(req: Request, res: Response) {
       id: order.rows[0].order_id, orderNo, status: 'paid', totalPoints: total,
       remainingAvailablePoints: Number(pointAccount.rows[0].available_balance), items: orderedItems,
     };
-    await client.query(`UPDATE idempotency_records SET response_status = 201, response_body = $4::jsonb, completed_at = now()
-      WHERE actor_user_id = $1 AND operation_scope = 'checkout' AND idempotency_key = $2 AND request_fingerprint = $3`,
-      [actor.id, key, fingerprint, JSON.stringify(body)]);
+    await completeIdempotency(client, reservation, 201, body);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
       VALUES ($1, 'checkout.complete', 'orders', $2, jsonb_build_object('totalPoints', $3::bigint, 'outcome', 'success'), $4)`,
       [actor.id, order.rows[0].order_id, total, res.locals.requestId]);

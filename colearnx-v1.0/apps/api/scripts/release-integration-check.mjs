@@ -626,6 +626,10 @@ try {
   await runVideoOrderIntegrityChecks({ owner, buyerId, sellerId, courseId, courseRunId, passed });
   const { runGoogleSignInChecks } = await import('./google-sign-in-checks.mjs');
   await runGoogleSignInChecks({ owner, app, passed });
+  const { runW10Pentest } = await import('./w10-pentest-checks.mjs');
+  await runW10Pentest({ owner, app, environment, sellerId, passed });
+  const { runW10RotationDrill } = await import('./w10-rotation-drill.mjs');
+  await runW10RotationDrill({ owner, app, environment, passed });
   const { runReleasePreflightChecks } = await import('./release-preflight-checks.mjs');
   await runReleasePreflightChecks({ owner, ownerUrl, passed });
   assert.equal(blockedHttpCalls, 0, 'No email, HIBP, alert, payment, or storage HTTP request may be attempted.');
