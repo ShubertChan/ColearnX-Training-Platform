@@ -30,6 +30,28 @@ async function googleFixture(page) {
   }));
 }
 
+test('Google sign-in recovers from an API cold start without interrupting the password form', async ({ page }) => {
+  await googleFixture(page);
+  let reads = 0;
+  let challenges = 0;
+  page.on('request', request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/auth/google/challenge')) challenges++;
+  });
+  await page.route('**/api/v1/auth/google/config', route => {
+    reads++;
+    if (reads === 1) return route.fulfill({ status: 503, body: 'Starting' });
+    return route.fallback();
+  });
+  await page.goto('/#/login');
+  const email = page.getByLabel('Email address');
+  await email.fill('test@example.com');
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Sign in with Google', exact: true })).toBeVisible();
+  await expect(email).toHaveValue('test@example.com');
+  expect(challenges).toBe(1);
+  expect(reads).toBe(2);
+});
+
 for (const width of [375, 768, 1440]) test(`Google sign-in translates and fits ${width}px`, async ({ page }) => {
   await googleFixture(page);
   await page.setViewportSize({ width, height: 950 });
