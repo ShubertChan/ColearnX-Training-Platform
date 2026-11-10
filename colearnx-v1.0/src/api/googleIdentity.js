@@ -1,6 +1,10 @@
 import { apiClient } from './client';
+import { readSessionResource } from './sessionRecovery.js';
 
-export const getGoogleConfig = () => apiClient.get('/auth/google/config').then((response) => response.data.data);
+export const getGoogleConfig = (signal) => readSessionResource(
+  options => apiClient.get('/auth/google/config', options).then(response => response.data.data),
+  { signal },
+);
 export const loginWithGoogle = (input) => apiClient.post('/auth/google', input).then((response) => response.data.data);
 
 let challengePending;
