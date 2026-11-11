@@ -9,6 +9,7 @@ import { parse } from '../lib/validation.js';
 import { completePrimarySignIn } from './auth.js';
 import { googleIdentity } from './google-identity.js';
 import { resolveGoogleAccount } from './google-account.js';
+import { checkLoginSource, observeSource } from '../security/access-risk.js';
 
 const google = new OAuth2Client({ transporterOptions: { timeout: 5000, retry: false } });
 const browserCookie = 'colearnx_google_browser';
@@ -49,6 +50,7 @@ export async function googleChallenge(req: Request, res: Response) {
 export async function googleLogin(req: Request, res: Response) {
   assertEnabledOrigin(req);
   const input = parse(loginSchema, req.body);
+  await checkLoginSource(req, res);
   const browser = req.cookies?.[browserCookie];
   if (typeof browser !== 'string' || !/^[A-Za-z0-9_-]{64}$/.test(browser)) {
     throw new ApiError(401, 'GOOGLE_CHALLENGE_INVALID', 'Google sign-in expired. Please try again and allow cookies.');
@@ -61,6 +63,10 @@ export async function googleLogin(req: Request, res: Response) {
     throw new ApiError(401, 'GOOGLE_CREDENTIAL_INVALID', 'Google sign-in expired or could not be verified. Please try again.');
   }
   const identity = googleIdentity(ticket.getPayload());
+  const consent = input.acceptedTerms === true && input.ageAcknowledged === true;
+  // Count only identities verified by Google. Observe before taking any nonce
+  // row locks so the risk transaction never waits on a second pooled client.
+  if (consent) await observeSource('register', req, res, identity.email);
   const outcome = await withTransaction(async (client) => {
     // A row lock + DELETE prevents parallel requests or replays issuing two
     // sessions. Rollback leaves the nonce usable for the consent continuation.
@@ -68,7 +74,7 @@ export async function googleLogin(req: Request, res: Response) {
       WHERE nonce_hash = $1 AND browser_hash = $2 AND expires_at > now() FOR UPDATE`,
     [sha256(identity.nonce), sha256(browser)]);
     if (!challenge.rowCount) throw new ApiError(401, 'GOOGLE_CHALLENGE_INVALID', 'Google sign-in expired. Please try again and allow cookies.');
-    const account = await resolveGoogleAccount(client, identity, input.acceptedTerms === true && input.ageAcknowledged === true);
+    const account = await resolveGoogleAccount(client, identity, consent);
     if ('registrationRequired' in account) return account;
     await client.query('DELETE FROM google_login_challenges WHERE nonce_hash = $1', [sha256(identity.nonce)]);
     return account;

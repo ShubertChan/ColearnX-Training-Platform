@@ -59,6 +59,8 @@ function testEnvironment(databaseUrl) {
     REFRESH_TOKEN_SECRET: randomBytes(32).toString('hex'),
     CSRF_SECRET: randomBytes(32).toString('hex'),
     SECURITY_HASH_PEPPER: randomBytes(32).toString('hex'),
+    TURNSTILE_SITE_KEY: '',
+    TURNSTILE_SECRET_KEY: '',
     MFA_SECRET_KEY: randomBytes(32).toString('hex'),
     MFA_CHALLENGE_SECRET: randomBytes(32).toString('hex'),
     SECURITY_ALERT_WEBHOOK_URL: '',
@@ -631,6 +633,8 @@ try {
   const { runW10RotationDrill } = await import('./w10-rotation-drill.mjs');
   await runW10RotationDrill({ owner, app, environment, passed });
   const { runReleasePreflightChecks } = await import('./release-preflight-checks.mjs');
+  const { runAccessRiskChecks } = await import('./access-risk-checks.mjs');
+  await runAccessRiskChecks({ owner, app, passed });
   await runReleasePreflightChecks({ owner, ownerUrl, passed });
   assert.equal(blockedHttpCalls, 0, 'No email, HIBP, alert, payment, or storage HTTP request may be attempted.');
   process.stdout.write(`SUCCESS ${checks} integration check groups passed; test-only data retained in disposable local PostgreSQL cluster.\n`);

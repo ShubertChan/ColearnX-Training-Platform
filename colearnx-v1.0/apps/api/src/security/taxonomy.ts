@@ -57,6 +57,12 @@ export const securityEventSeverity = {
 
   // --- password reset (the flow introduced in migration 008) ---------------
   'auth.reset_requested': 1,
+  'auth.human_check_failed': 1,
+  'auth.registration_attempt': 0,
+  'auth.credential_stuffing': 3,
+  'auth.registration_burst': 2,
+  'auth.login_network_changed': 2,
+  'finance.topup_velocity': 3,
   // A request suppressed by the per-account cooldown. Low on its own; the W7
   // rules care about the rate, which is what distinguishes a user clicking
   // twice from an inbox being flooded.
@@ -84,6 +90,7 @@ export const securityEventSeverity = {
   // entries (F-22). High: the ledger is authoritative for real balances, so a
   // drift is either corruption or an unledgered write path.
   'finance.ledger_imbalance': 3,
+  'finance.daily_audit_completed': 0,
   // The fund-side rule engine flagged an actor -- refund abuse, self-purchase
   // or buy-then-refund churn (F-21). Medium by default; the sweep raises the
   // severity with the risk score, so self-dealing pages an operator.

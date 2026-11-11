@@ -15,7 +15,7 @@ test("unknown routes use the same login entry rather than the marketplace", () =
 });
 
 test("login keeps its session guard and catalogue sharing routes stay public", () => {
-  assert.match(appSource, /path="\/login" element=\{<AnonymousOnly><AuthPage \/><\/AnonymousOnly>\}/);
+  assert.match(appSource, /path="\/login" element=\{<AnonymousOnly><AuthPage\b[^/>]*\/><\/AnonymousOnly>\}/);
   for (const path of ["courses", "courses/:id", "contents", "contents/:id"]) {
     assert.match(appSource, new RegExp(`path="/${path}"\\s+element=\\{\\s*<MarketplaceShell>`));
   }

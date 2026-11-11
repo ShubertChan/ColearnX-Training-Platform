@@ -2,6 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { securityHeaders } from "../../build/videoHeaders.js";
 
+test("Turnstile can load its SDK and iframe without weakening script policy", () => {
+  const prefix = "Content-Security-Policy: ";
+  const csp = securityHeaders({}).split("\n").map(row => row.trim()).find(row => row.startsWith(prefix));
+  assert.ok(csp);
+  const directives = csp.slice(prefix.length).split("; ").map(value => value.trim().split(/\s+/));
+  for (const directive of ["script-src", "frame-src"]) {
+    const sources = new Set(directives.find(([name]) => name === directive)?.slice(1));
+    assert.ok(sources.has("https://challenges.cloudflare.com"));
+    assert.ok(!sources.has("'unsafe-inline'") && !sources.has("'unsafe-eval'") && ![...sources].some(value => value.includes("*")));
+  }
+});
+
 test("runtime Google sign-in permits only its SDK paths and popup communication", () => {
   const headers = securityHeaders({});
   assert.match(headers, /script-src[^;]*https:\/\/accounts.google.com\/gsi\/client/);

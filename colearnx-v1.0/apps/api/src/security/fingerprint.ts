@@ -15,7 +15,7 @@ import { createHmac } from 'node:crypto';
  * auth/email-verification.ts, so that they stay unit-testable without loading
  * the environment.
  */
-export type FingerprintDomain = 'ip' | 'ua' | 'email';
+export type FingerprintDomain = 'ip' | 'ua' | 'email' | 'network';
 
 export function fingerprint(domain: FingerprintDomain, value: string, pepper: string) {
   return createHmac('sha256', pepper).update(`${domain}:${value}`).digest('hex');

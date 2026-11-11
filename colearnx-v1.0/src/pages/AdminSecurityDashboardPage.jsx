@@ -56,14 +56,14 @@ function TrendChart({ daily }) {
             className="sec-trend-col"
             title={t(bar.total === 1 ? "{date}: {count} event" : "{date}: {count} events", { date: bar.date, count: bar.total }) + (bar.severe ? t(" · {count} high/critical", { count: bar.severe }) : "")}
           >
-            <div className="sec-trend-stack">
+            <svg className="sec-trend-stack" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               {bar.routine > 0 && (
-                <span className="sec-bar routine" style={{ height: `${bar.totalPct - bar.severePct}%` }} />
+                <rect className="sec-bar routine" width="100" y={100 - bar.totalPct} height={bar.totalPct - bar.severePct} />
               )}
               {bar.severe > 0 && (
-                <span className="sec-bar severe" style={{ height: `${Math.max(bar.severePct, 3)}%` }} />
+                <rect className="sec-bar severe" width="100" y={100 - Math.max(bar.severePct, 3)} height={Math.max(bar.severePct, 3)} />
               )}
-            </div>
+            </svg>
           </div>
         ))}
       </div>

@@ -31,6 +31,7 @@ export type RiskSweepOptions = { windowDays?: number; rapidRefundSeconds?: numbe
 export type RiskSweepSummary = { actorsAssessed: number; actorsFlagged: number; recordFailures: number };
 
 type ActorCountRow = { actor: string; n: string };
+type RefundCohortRow = { actor: string; purchased: string; refunded: string };
 
 // Refund requests per actor in the window.
 export const REFUND_VELOCITY_SQL = `
@@ -38,6 +39,18 @@ export const REFUND_VELOCITY_SQL = `
     FROM refund_requests
    WHERE requested_at > now() - ($1 * interval '1 day')
    GROUP BY requested_by_user_id`;
+
+// Use one purchase cohort for both sides of the ratio. Each paid item counts
+// once even if it had multiple requests. Older orders refunded today stay out.
+export const REFUND_RATIO_SQL = `
+  SELECT o.buyer_user_id::text AS actor, count(*)::text AS purchased,
+         count(*) FILTER (WHERE EXISTS (SELECT 1 FROM refund_requests r
+           WHERE r.order_item_id = oi.order_item_id AND r.requested_by_user_id = o.buyer_user_id
+             AND r.refund_status = 'approved'))::text AS refunded
+    FROM orders o JOIN order_items oi USING (order_id)
+   WHERE o.order_status IN ('paid', 'partially_refunded', 'refunded') AND oi.points_amount > 0
+     AND COALESCE(o.paid_at, o.created_at) > now() - ($1 * interval '1 day')
+   GROUP BY o.buyer_user_id`;
 
 // Orders in the window where the buyer is also the item's seller.
 export const SELF_PURCHASE_SQL = `
@@ -72,12 +85,13 @@ export function mergeActorAggregates(
   refunds: ActorCountRow[],
   selfPurchases: ActorCountRow[],
   rapidRefunds: ActorCountRow[],
+  ratios: RefundCohortRow[] = [],
 ): ActorRiskInput[] {
   const byActor = new Map<string, ActorRiskInput>();
   const ensure = (actor: string): ActorRiskInput => {
     let record = byActor.get(actor);
     if (!record) {
-      record = { actorUserId: actor, refundCount: 0, selfPurchaseCount: 0, rapidRefundCount: 0 };
+      record = { actorUserId: actor, refundCount: 0, purchasedItems: 0, refundedItems: 0, selfPurchaseCount: 0, rapidRefundCount: 0 };
       byActor.set(actor, record);
     }
     return record;
@@ -85,34 +99,42 @@ export function mergeActorAggregates(
   for (const row of refunds) ensure(row.actor).refundCount = toCount(row.n);
   for (const row of selfPurchases) ensure(row.actor).selfPurchaseCount = toCount(row.n);
   for (const row of rapidRefunds) ensure(row.actor).rapidRefundCount = toCount(row.n);
+  for (const row of ratios) {
+    const actor = ensure(row.actor);
+    actor.purchasedItems = toCount(row.purchased);
+    actor.refundedItems = toCount(row.refunded);
+  }
   return [...byActor.values()];
 }
 
 export async function runRiskSweep(pool: RiskSweepPool, emit: RiskSweepEmit, options: RiskSweepOptions = {}): Promise<RiskSweepSummary> {
-  const windowDays = options.windowDays ?? DEFAULT_WINDOW_DAYS;
-  const rapidRefundSeconds = options.rapidRefundSeconds ?? DEFAULT_RAPID_REFUND_SECONDS;
   const client = await pool.connect();
   try {
-    const refunds = (await client.query(REFUND_VELOCITY_SQL, [windowDays])).rows as ActorCountRow[];
-    const selfPurchases = (await client.query(SELF_PURCHASE_SQL, [windowDays])).rows as ActorCountRow[];
-    const rapidRefunds = (await client.query(RAPID_REFUND_SQL, [windowDays, rapidRefundSeconds])).rows as ActorCountRow[];
-    const actors = mergeActorAggregates(refunds, selfPurchases, rapidRefunds);
-    let actorsFlagged = 0;
-    let recordFailures = 0;
-    for (const actor of actors) {
-      const verdict = scoreActor(actor);
-      if (!verdict) continue;
-      actorsFlagged += 1;
-      try {
-        await emit(verdict, actor);
-      } catch {
-        // The write failed; keep assessing the rest and report the loss. The
-        // emit callback is responsible for logging the specific error.
-        recordFailures += 1;
-      }
-    }
-    return { actorsAssessed: actors.length, actorsFlagged, recordFailures };
+    return await sweepWithClient(client, emit, options);
   } finally {
     client.release();
   }
+}
+
+export async function sweepWithClient(client: SweepClient, emit: RiskSweepEmit, options: RiskSweepOptions = {}): Promise<RiskSweepSummary> {
+  const windowDays = options.windowDays ?? DEFAULT_WINDOW_DAYS;
+  const rapidRefundSeconds = options.rapidRefundSeconds ?? DEFAULT_RAPID_REFUND_SECONDS;
+  const refunds = (await client.query(REFUND_VELOCITY_SQL, [windowDays])).rows as ActorCountRow[];
+  const selfPurchases = (await client.query(SELF_PURCHASE_SQL, [windowDays])).rows as ActorCountRow[];
+  const rapidRefunds = (await client.query(RAPID_REFUND_SQL, [windowDays, rapidRefundSeconds])).rows as ActorCountRow[];
+  const ratios = (await client.query(REFUND_RATIO_SQL, [windowDays])).rows as RefundCohortRow[];
+  const actors = mergeActorAggregates(refunds, selfPurchases, rapidRefunds, ratios);
+  let actorsFlagged = 0;
+  let recordFailures = 0;
+  for (const actor of actors) {
+    const verdict = scoreActor(actor);
+    if (!verdict) continue;
+    actorsFlagged += 1;
+    try {
+      await emit(verdict, actor);
+    } catch {
+      recordFailures += 1;
+    }
+  }
+  return { actorsAssessed: actors.length, actorsFlagged, recordFailures };
 }

@@ -1,0 +1,12 @@
+.fixture-card { border: 1px solid #e3e8f1; border-radius: 8px; font: 14px system-ui; color: #172033; }
+.fixture-method { padding: 16px; border-bottom: 1px solid #e3e8f1; }
+.fixture-radio, .fixture-fields > div, .fixture-wallets { display: flex; gap: 12px; }
+.fixture-radio { align-items: center; }
+.fixture-card > .fixture-radio { padding: 16px; }
+.fixture-radio span { margin-left: auto; color: #4057d6; font-size: 12px; }
+.fixture-radio input { width: 18px; height: 18px; min-height: 0; flex: 0 0 18px; margin: 0; padding: 0; }
+.fixture-fields { display: grid; gap: 8px; margin-top: 16px; }
+.fixture-fields input { width: 50%; padding: 12px; border: 1px solid #c8ced8; border-radius: 6px; }
+.fixture-fields label input { width: 100%; margin-top: 8px; }
+.fixture-wallets button { flex: 1; min-height: 48px; background: #000; color: white; border: 0; border-radius: 8px; font: 600 20px system-ui; }
+.fixture-wallets [data-wallet="link"] { background: #00d66f; color: #003b22; font: 700 24px system-ui; }
