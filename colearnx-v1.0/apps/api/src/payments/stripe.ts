@@ -10,6 +10,8 @@ import { ApiError, ok } from '../lib/http.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 import { loadSystemPointAccount, postPointTransaction } from '../points/ledger.js';
 import type { Actor } from '../auth/auth.js';
+import { assessCreditedTopups } from '../security/access-risk.js';
+import { notifySecurityEvent, systemFingerprint } from '../security/events.js';
 import { requireStripeSandboxSecret, requireStripeSandboxPublishableKey, stripeCheckoutError, stripeFailureLogFields } from './stripe-support.js';
 
 const checkoutSchema = z.object({
@@ -229,7 +231,7 @@ export async function stripeWebhook(req: Request, res: Response) {
     throw new ApiError(400, 'STRIPE_SIGNATURE_INVALID', 'Stripe signature verification failed.');
   }
   if (env.STRIPE_MODE !== 'test' || event.livemode) throw new ApiError(400, 'STRIPE_LIVEMODE_REJECTED', 'Only Stripe test-mode events are accepted.');
-  await withTransaction(async (client) => {
+  const finding = await withTransaction(async (client) => {
     const insertedEvent = await client.query<{ stripe_event_id: string }>(`INSERT INTO stripe_payment_events
       (stripe_event_id, event_type, payload_sha256, diagnostic_metadata)
       VALUES ($1, $2, $3, jsonb_build_object('livemode', $4::boolean))
@@ -282,7 +284,9 @@ export async function stripeWebhook(req: Request, res: Response) {
       [payment.user_id, payment.payment_transaction_id, payment.points_amount, event.id, res.locals.requestId]);
     await client.query(`INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
       VALUES ('point_topup_order', $1, 'wallet.top_up.posted', jsonb_build_object('topUpOrderId', $1::uuid))`, [payment.topup_order_id]);
+    return assessCreditedTopups(client, payment.user_id, res);
   });
+  if (finding) notifySecurityEvent(systemFingerprint(), finding);
   return ok(res, { received: true });
 }
 

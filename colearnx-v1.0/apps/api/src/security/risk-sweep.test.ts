@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   mergeActorAggregates,
   RAPID_REFUND_SQL,
+  REFUND_RATIO_SQL,
   REFUND_VELOCITY_SQL,
   runRiskSweep,
   SELF_PURCHASE_SQL,
@@ -15,8 +16,8 @@ test('aggregates merge per actor and default missing signals to zero', () => {
     [{ actor: 'a', n: '3' }],
   );
   const byId = new Map(merged.map((m) => [m.actorUserId, m]));
-  assert.deepEqual(byId.get('a'), { actorUserId: 'a', refundCount: 4, selfPurchaseCount: 0, rapidRefundCount: 3 });
-  assert.deepEqual(byId.get('b'), { actorUserId: 'b', refundCount: 1, selfPurchaseCount: 2, rapidRefundCount: 0 });
+  assert.deepEqual(byId.get('a'), { actorUserId: 'a', refundCount: 4, selfPurchaseCount: 0, rapidRefundCount: 3, purchasedItems: 0, refundedItems: 0 });
+  assert.deepEqual(byId.get('b'), { actorUserId: 'b', refundCount: 1, selfPurchaseCount: 2, rapidRefundCount: 0, purchasedItems: 0, refundedItems: 0 });
 });
 
 test('a malformed aggregate count is rejected rather than scored', () => {
@@ -29,6 +30,7 @@ function fakePool(results: { refunds: unknown[]; selfPurchases: unknown[]; rapid
     async connect() {
       return {
         async query(sql: string, parameters?: unknown[]) {
+          if (sql === REFUND_RATIO_SQL) return { rows: [], rowCount: 0 };
           if (sql === REFUND_VELOCITY_SQL) { windowParams.push(parameters ?? []); return { rows: results.refunds, rowCount: results.refunds.length }; }
           if (sql === SELF_PURCHASE_SQL) { return { rows: results.selfPurchases, rowCount: results.selfPurchases.length }; }
           if (sql === RAPID_REFUND_SQL) { windowParams.push(parameters ?? []); return { rows: results.rapidRefunds, rowCount: results.rapidRefunds.length }; }

@@ -71,6 +71,13 @@ export const LEDGER_AUDIT_QUERY = `
     LEFT JOIN point_ledger_entries le ON le.point_account_id = pa.point_account_id
    GROUP BY pa.point_account_id`;
 
+// Recheck historical entries by transaction as well as by account. Opposite
+// errors in different transactions can cancel at account level.
+export const UNBALANCED_TRANSACTIONS_QUERY = `
+  SELECT point_transaction_id, sum(available_delta::numeric + frozen_delta + expired_delta + blocked_delta)::text AS net
+    FROM point_ledger_entries GROUP BY point_transaction_id
+  HAVING sum(available_delta::numeric + frozen_delta + expired_delta + blocked_delta) <> 0`;
+
 type AuditClient = {
   query(sql: string, parameters?: unknown[]): Promise<{ rows: unknown[]; rowCount: number | null }>;
   release(): void;
@@ -114,6 +121,10 @@ export async function auditLedgerBalances(pool: LedgerAuditPool, emit: LedgerAud
   // Read the whole snapshot first; emit afterwards, since emit writes on a
   // different connection and must not run inside the read-only transaction.
   const rows = await readLedgerBalances(pool);
+  return assessLedgerRows(rows, emit);
+}
+
+export async function assessLedgerRows(rows: LedgerBalanceRow[], emit: LedgerAuditEmit): Promise<LedgerAuditSummary> {
   let imbalancedAccounts = 0;
   let recordFailures = 0;
   for (const row of rows) {

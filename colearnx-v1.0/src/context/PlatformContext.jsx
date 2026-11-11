@@ -585,9 +585,9 @@ export function PlatformProvider({ children }) {
     return { roles };
   };
 
-  const signIn = async ({ email, password }) => {
+  const signIn = async ({ email, password, turnstileToken }) => {
     await beginAuthentication();
-    const result = await loginAccount({ email, password });
+    const result = await loginAccount({ email, password, turnstileToken });
     // No session is issued yet when a second factor is enrolled. The caller
     // must collect a code and call completeSignIn; nothing here is stored in
     // the meantime, so abandoning the flow leaves no usable state behind.
@@ -611,9 +611,9 @@ export function PlatformProvider({ children }) {
     return establishSession(result);
   };
 
-  const registerMember = async ({ name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged }) => {
+  const registerMember = async ({ name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged, turnstileToken }) => {
     await beginAuthentication();
-    const result = await registerAccount({ displayName: name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged });
+    const result = await registerAccount({ displayName: name, email, password, passwordConfirmation, acceptedTerms, ageAcknowledged, turnstileToken });
     return result;
   };
 

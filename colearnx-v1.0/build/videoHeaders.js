@@ -31,7 +31,7 @@ function exactOrigins(value) {
     });
 }
 
-export function securityHeaders(env) {
+export function securityHeaders(env, mapHash) {
   const paymentsOn = String(env.VITE_PAYMENTS_API_ENABLED).toLowerCase() === "true";
   const videoOn = String(env.VITE_ENABLE_HOSTED_VIDEO).toLowerCase() === "true";
   const media = videoOn ? exactOrigins(env.VITE_MEDIA_ORIGINS) : [];
@@ -57,9 +57,10 @@ export function securityHeaders(env) {
 
   const csp = [
     "default-src 'self'",
-    ["script-src 'self'", ...stripeScripts, `${googleBase}client`].join(" "),
-    ["frame-src 'self'", ...stripeFrames, googleBase].join(" "),
-    `style-src 'self' 'unsafe-inline' ${googleBase}style`,
+    ["script-src 'self'", ...stripeScripts, `${googleBase}client`, "https://challenges.cloudflare.com", ...(mapHash ? ["'" + mapHash + "'"] : [])].join(" "),
+    ["frame-src 'self'", ...stripeFrames, googleBase, "https://challenges.cloudflare.com"].join(" "),
+    `style-src 'self' ${googleBase}style`,
+    "style-src-attr 'none'",
     "img-src " + img,
     "font-src 'self'",
     "connect-src " + connect,

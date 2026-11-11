@@ -118,8 +118,8 @@ export default function App() {
       <Route path="/wallet/checkout/:paymentTransactionId" element={<Workspace><Suspense fallback={<p role="status">{t("Loading secure payment…")}</p>}><TopUpCheckoutPage /></Suspense></Workspace>} />
       <Route path="/admin/inbox" element={<Workspace><Protected roles={["Admin"]}><AdminInboxPage /></Protected></Workspace>} />
       <Route path="/admin/certifications" element={<Workspace><Protected roles={["Admin"]}><AdminCertificationsPage /></Protected></Workspace>} />
-      <Route path="/login" element={<AnonymousOnly><AuthPage /></AnonymousOnly>} />
-      <Route path="/register" element={<AnonymousOnly><AuthPage mode="register" /></AnonymousOnly>} />
+      <Route path="/login" element={<AnonymousOnly><AuthPage key="login" /></AnonymousOnly>} />
+      <Route path="/register" element={<AnonymousOnly><AuthPage key="register" mode="register" /></AnonymousOnly>} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />

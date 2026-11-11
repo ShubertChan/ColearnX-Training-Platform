@@ -298,9 +298,7 @@ export default function PrivateAssetUploader({
               <small>{formatBytes(item.sizeBytes)} · {item.mediaType}</small>
               <span className="upload-file-message">{t(itemMessage(item, contentVersionId))}</span>
               {item.status === "uploading" && (
-                <div className="upload-progress" role="progressbar" aria-label={t("{0} upload progress", { 0: item.filename })} aria-valuemin="0" aria-valuemax="100" aria-valuenow={item.progress}>
-                  <span style={{ width: `${item.progress}%` }} />
-                </div>
+                <progress className="upload-progress" aria-label={t("{0} upload progress", { 0: item.filename })} max="100" value={item.progress} />
               )}
             </div>
             {item.status === "error" && item.file && contentVersionId && (
