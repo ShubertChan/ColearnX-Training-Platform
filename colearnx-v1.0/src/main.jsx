@@ -11,6 +11,7 @@ import { AdminInboxProvider } from "./context/AdminInboxContext";
 import "./styles.css";
 import "./styles/language-and-pages.css";
 import "./styles/marketplace.css";
+import "./styles/admin-identities.css";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
