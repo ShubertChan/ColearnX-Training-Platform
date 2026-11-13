@@ -33,7 +33,11 @@
 
 ## 第 7 周退款率与每日对账
 
-预发发布前按仓库迁移流程读回 ledger 与校验和。此分支增加的唯一迁移是 [022_credited_topup_velocity.sql](../../db/migrations/022_credited_topup_velocity.sql)，给已到账充值的账号与到账时间建部分索引。若 ledger 正确停在 021，由迁移管理员单独批准并应用 022，再核对索引定义和 ledger。普通建索引可能等待或阻塞并发写入，应在合适的发布时间执行。CD 的人工确认不能替代这一步。
+迁移顺序为 [022_marketplace_covers.sql](../../db/migrations/022_marketplace_covers.sql)（课程和内容封面），随后是 [023_credited_topup_velocity.sql](../../db/migrations/023_credited_topup_velocity.sql)（已到账充值的风控查询索引）。本次改号保留两份 SQL 的原有内容。
+
+1. 迁移前只读核对目标库的 `public.schema_migrations` 和 `public.point_topup_orders_account_credited_idx`。若账本中有旧名 `022_credited_topup_velocity.sql`、其他文件名记录了同一校验和，或索引与账本不一致，先交数据库负责人核对历史。
+2. 若账本截至封面 `022`、校验和匹配，且充值迁移和索引均未出现，单独申请 `023` 的迁移审批。获批后在充值写入较少的时段通过现有迁移流程执行。普通建索引可能等待或阻塞并发写入。
+3. 核对账本中的 `023` 文件名、校验和及索引定义。索引应位于 `public.point_topup_orders`，键为 `(point_account_id, credited_at DESC)`，筛选条件为 `topup_status = 'paid' AND credited_at IS NOT NULL`。如果目标库已满足这些条件，跳过重复执行，按既有流程手动确认 staging 发布。
 
 退款频次、买后秒退、创作者自购仍按原规则计分。新增 `high_refund_ratio` 按同一购买窗口的付费订单项计算，默认窗口 30 天。账号至少购买 5 个付费项，其中至少一半有获批退款时记录风险事件。一个订单项重复申请只算一次，已取消订单、免费项及窗口外的购买不进入分母。该规则只告警。
 
