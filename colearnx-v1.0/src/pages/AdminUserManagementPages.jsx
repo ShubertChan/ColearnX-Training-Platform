@@ -12,6 +12,7 @@ import {
 } from "../api/admin";
 import { usePlatform } from "../context/PlatformContext";
 import { Badge, Button, Card, EmptyState, FormField } from "../components/ui";
+import { UserIdentities, UserIdentityOverview } from "../components/UserIdentities";
 
 const roleLabel = (role) => role.charAt(0).toUpperCase() + role.slice(1);
 
@@ -71,6 +72,7 @@ export function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [identity, setIdentity] = useState("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
@@ -83,6 +85,7 @@ export function AdminUsersPage() {
       const response = await getAdminUsers({ search: search || undefined, status: status || undefined, page: nextPage, limit: 50 });
       setUsers(response.items);
       setPage(nextPage);
+      setIdentity("all");
       setPagination({ total: response.total, hasNext: response.hasNext });
     } catch (loadError) {
       setError(loadError.message);
@@ -93,13 +96,17 @@ export function AdminUsersPage() {
 
   useEffect(() => { void load(1); }, []);
 
+  const visibleUsers = users.filter(user => identity === "all" || (identity === "dual"
+    ? user.roles.includes("trainer") && user.roles.includes("creator")
+    : user.roles.includes(identity)));
+
   return <div className="stack"><Card>
     <div className="card-heading">
       <div><span className="eyebrow">{t("User administration")}</span><h2>{t("Platform users")}</h2></div>
       <Button variant="secondary" onClick={() => void load(page)} disabled={loading}>{loading ? t("Refreshing…") : t("Refresh")}</Button>
     </div>
     <p className="muted">{t("Select a user to inspect their profile, roles and account controls. Delete is available only on the account-detail page.")}</p>
-    <div className="queue-actions">
+    <div className="queue-actions admin-user-filters">
       <input aria-label={t("Search users")} placeholder={t("Search name or email")} value={search} onChange={(event) => setSearch(event.target.value)} />
       <select aria-label={t("Filter account status")} value={status} onChange={(event) => setStatus(event.target.value)}>
         <option value="">{t("All visible accounts")}</option>
@@ -109,14 +116,15 @@ export function AdminUsersPage() {
       <Button className="sm" onClick={() => void load(1)} disabled={loading}>{t("Apply filter")}</Button>
     </div>
     {error && <p className="form-error" role="alert">{t(error)}</p>}
-    {users.length ? <><div className="result-bar"><span><b>{pagination.total || users.length}</b>{t(" accounts · page ")}{page}</span><small>{users.length}{t(" accounts loaded on this page")}</small></div><div className="admin-user-list">{users.map((user) => <div key={user.id} className="admin-user-row">
+    <UserIdentityOverview users={users} selected={identity} onSelect={setIdentity} loading={loading} />
+    {users.length ? <><div className="result-bar"><span><b>{pagination.total || users.length}</b>{t(" accounts · page ")}{page}</span><small>{users.length}{t(" accounts loaded on this page")}</small></div><div className="admin-user-list">{visibleUsers.map((user) => <div key={user.id} className="admin-user-row">
       <button type="button" className="admin-user-row-main" onClick={() => navigate(`/admin/users/${user.id}`)}>
         <span className="admin-user-avatar">{user.displayName.slice(0, 1).toUpperCase()}</span>
-        <span><b>{user.displayName}</b><small>{user.email}</small><em>{user.roles.length ? user.roles.map(role => t(roleLabel(role))).join(", ") : t("No active role")}{t(" · joined ")}{user.createdAt ? new Date(user.createdAt).toLocaleDateString(getFormatLocale()) : "—"}</em></span>
+        <span><b>{user.displayName}</b><small>{user.email}</small><UserIdentities roles={user.roles} /><em>{t("Joined")}{" "}{user.createdAt ? new Date(user.createdAt).toLocaleDateString(getFormatLocale()) : "—"}</em></span>
         <AccountStatus status={user.status} />
         <ChevronRight size={18} />
       </button>
-    </div>)}</div><nav className="pagination" aria-label={t("User pages")}><Button variant="secondary" size="sm" disabled={loading || page <= 1} onClick={() => void load(page - 1)}>{t("Previous")}</Button><span>{t("Page ")}{page}</span><Button variant="secondary" size="sm" disabled={loading || !pagination.hasNext} onClick={() => void load(page + 1)}>{t("Next")}</Button></nav></> : <EmptyState icon={Users} title={t("No accounts match")} description={t("Adjust the search or status filter to view another account.")} />}
+    </div>)}</div>{!visibleUsers.length && <EmptyState icon={Users} title={t("No accounts with this identity on this page")} description={t("Choose another identity or use the page controls to view more accounts.")} />}<nav className="pagination" aria-label={t("User pages")}><Button variant="secondary" size="sm" disabled={loading || page <= 1} onClick={() => void load(page - 1)}>{t("Previous")}</Button><span>{t("Page ")}{page}</span><Button variant="secondary" size="sm" disabled={loading || !pagination.hasNext} onClick={() => void load(page + 1)}>{t("Next")}</Button></nav></> : <EmptyState icon={Users} title={t("No accounts match")} description={t("Adjust the search or status filter to view another account.")} />}
   </Card><TrainerCertificationReview /></div>;
 }
 export function AdminUserDetailPage() {
@@ -166,5 +174,5 @@ export function AdminUserDetailPage() {
   if (!user) return <EmptyState icon={ShieldAlert} title={t("User unavailable")} description={t(error)} action={<Button onClick={() => navigate("/admin/users")}>{t("Return to users")}</Button>} />;
   const accountIsAdmin = user.roles.includes("admin");
   const canChangeAccountStatus = user.status !== "deleted" && !accountIsAdmin;
-  return <div className="stack"><div className="button-row"><Button variant="secondary" className="sm" onClick={() => navigate("/admin/users")}><ArrowLeft size={15} />{t(" All users")}</Button></div><Card><div className="card-heading"><div><span className="eyebrow">{t("User profile")}</span><h2>{user.displayName}</h2><p>{user.email}</p></div><AccountStatus status={user.status} /></div><dl className="detail-list"><div><dt>{t("Full name")}</dt><dd>{user.profile.fullName}</dd></div><div><dt>{t("Phone")}</dt><dd>{user.profile.phone || t("Not supplied")}</dd></div><div><dt>{t("Location")}</dt><dd>{user.profile.location || t("Not supplied")}</dd></div><div><dt>{t("Joined")}</dt><dd>{user.createdAt ? new Date(user.createdAt).toLocaleString(getFormatLocale()) : "—"}</dd></div><div><dt>{t("Bio")}</dt><dd>{user.profile.bio || t("Not supplied")}</dd></div></dl></Card><Card><div className="card-heading"><div><span className="eyebrow">{t("Role access")}</span><h2>{t("Granted roles")}</h2><p>{t("Role changes are audited and revoke the user’s active sessions.")}</p></div></div><div className="badge-row admin-role-badges">{user.roles.map((role) => <Badge key={role} tone={role === "admin" ? "danger" : role === "member" ? "info" : "success"}>{t(roleLabel(role))}</Badge>)}</div>{user.status !== "active" ? <p className="muted">{t("Role access can be changed only while the account is active.")}</p> : <><FormField label={t("Administration reason")}><input value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("Required for every access change")} /></FormField><div className="role-management-list">{["trainer", "creator", "admin"].map((role) => { const granted = user.roles.includes(role); const action = granted ? "revoke" : "grant"; return <div key={role}><div><b>{t(roleLabel(role))}</b><small>{granted ? t("Currently granted") : t("Not granted")}</small></div><Button className="sm" variant={granted ? "secondary" : "primary"} disabled={Boolean(busy)} onClick={() => runRoleAction(role, action)}>{busy === `${action}-${role}` ? t("Saving…") : granted ? t("Revoke") : t("Grant")}</Button></div>; })}</div></>}</Card><Card><div className="card-heading"><div><span className="eyebrow">{t("Account status")}</span><h2>{t("Session and access control")}</h2><p>{t("Suspension immediately revokes active sessions. Deletion also removes the account from this list and releases its email for a new registration.")}</p></div></div>{error && <p className="form-error">{t(error)}</p>}{user.status === "deleted" ? <p className="muted">{t("This account has been deleted and cannot be restored through the administrator interface.")}</p> : accountIsAdmin ? <p className="muted">{t("Administrator accounts cannot be frozen or deleted from this screen. Change the administrator role first, while ensuring at least one active administrator remains.")}</p> : <><FormField label={t("Administration reason")}><input value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("Required for every account action")} /></FormField><div className="button-row">{user.status === "active" ? <Button disabled={Boolean(busy)} onClick={() => runAccountAction("suspend")}>{busy === "suspend" ? t("Freezing…") : t("Freeze account")}</Button> : <Button disabled={Boolean(busy)} onClick={() => runAccountAction("reinstate")}>{busy === "reinstate" ? t("Restoring…") : t("Reinstate account")}</Button>}<Button className="danger" disabled={Boolean(busy)} onClick={() => runAccountAction("delete")}>{busy === "delete" ? t("Deleting…") : t("Delete account")}</Button></div></>}</Card></div>;
+  return <div className="stack"><div className="button-row"><Button variant="secondary" className="sm" onClick={() => navigate("/admin/users")}><ArrowLeft size={15} />{t(" All users")}</Button></div><Card><div className="card-heading"><div><span className="eyebrow">{t("User profile")}</span><h2>{user.displayName}</h2><p>{user.email}</p></div><AccountStatus status={user.status} /></div><section className="identity-detail" aria-label={t("Current user identities")}><h3>{t("Current user identities")}</h3><UserIdentities roles={user.roles} /><p>{t("These are the roles currently granted to this account. An application or pending certification is not an additional granted role.")}</p></section><dl className="detail-list"><div><dt>{t("Full name")}</dt><dd>{user.profile.fullName}</dd></div><div><dt>{t("Phone")}</dt><dd>{user.profile.phone || t("Not supplied")}</dd></div><div><dt>{t("Location")}</dt><dd>{user.profile.location || t("Not supplied")}</dd></div><div><dt>{t("Joined")}</dt><dd>{user.createdAt ? new Date(user.createdAt).toLocaleString(getFormatLocale()) : "—"}</dd></div><div><dt>{t("Bio")}</dt><dd>{user.profile.bio || t("Not supplied")}</dd></div></dl></Card><Card><div className="card-heading"><div><span className="eyebrow">{t("Role access")}</span><h2>{t("Granted roles")}</h2><p>{t("Role changes are audited and revoke the user’s active sessions.")}</p></div></div><div className="badge-row admin-role-badges">{user.roles.map((role) => <Badge key={role} tone={role === "admin" ? "danger" : role === "member" ? "info" : "success"}>{t(roleLabel(role))}</Badge>)}</div>{user.status !== "active" ? <p className="muted">{t("Role access can be changed only while the account is active.")}</p> : <><FormField label={t("Administration reason")}><input value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("Required for every access change")} /></FormField><div className="role-management-list">{["trainer", "creator", "admin"].map((role) => { const granted = user.roles.includes(role); const action = granted ? "revoke" : "grant"; return <div key={role}><div><b>{t(roleLabel(role))}</b><small>{granted ? t("Currently granted") : t("Not granted")}</small></div><Button className="sm" variant={granted ? "secondary" : "primary"} disabled={Boolean(busy)} onClick={() => runRoleAction(role, action)}>{busy === `${action}-${role}` ? t("Saving…") : granted ? t("Revoke") : t("Grant")}</Button></div>; })}</div></>}</Card><Card><div className="card-heading"><div><span className="eyebrow">{t("Account status")}</span><h2>{t("Session and access control")}</h2><p>{t("Suspension immediately revokes active sessions. Deletion also removes the account from this list and releases its email for a new registration.")}</p></div></div>{error && <p className="form-error">{t(error)}</p>}{user.status === "deleted" ? <p className="muted">{t("This account has been deleted and cannot be restored through the administrator interface.")}</p> : accountIsAdmin ? <p className="muted">{t("Administrator accounts cannot be frozen or deleted from this screen. Change the administrator role first, while ensuring at least one active administrator remains.")}</p> : <><FormField label={t("Administration reason")}><input value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("Required for every account action")} /></FormField><div className="button-row">{user.status === "active" ? <Button disabled={Boolean(busy)} onClick={() => runAccountAction("suspend")}>{busy === "suspend" ? t("Freezing…") : t("Freeze account")}</Button> : <Button disabled={Boolean(busy)} onClick={() => runAccountAction("reinstate")}>{busy === "reinstate" ? t("Restoring…") : t("Reinstate account")}</Button>}<Button className="danger" disabled={Boolean(busy)} onClick={() => runAccountAction("delete")}>{busy === "delete" ? t("Deleting…") : t("Delete account")}</Button></div></>}</Card></div>;
 }

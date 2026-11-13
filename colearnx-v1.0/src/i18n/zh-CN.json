@@ -1724,5 +1724,21 @@
   "Cover image removed.": "封面图已移除。",
   "Saving cover image…": "正在保存封面图…",
   "Remove cover": "移除封面",
-  "Preview cover image": "预览封面图"
+  "Preview cover image": "预览封面图",
+  "Granted identities": "已授予的身份",
+  "Trainer and Creator": "讲师兼创作者",
+  "All identities": "全部身份",
+  "Accounts on this page": "本页已加载的账户",
+  "Creates and teaches courses": "创建和讲授课程",
+  "Publishes digital resources": "发布数字资源",
+  "Both publishing identities": "同时具有讲师和创作者身份",
+  "User identities": "用户身份",
+  "Filter the accounts on this page by their granted roles. A dual-role account appears in both Trainer and Creator counts.": "按已授予的角色筛选本页账户。双重身份账户会同时计入讲师和创作者数量。",
+  "Filter identities on this page": "筛选本页用户身份",
+  "No accounts with this identity on this page": "本页没有此身份的账户",
+  "Choose another identity or use the page controls to view more accounts.": "请选择其他身份，或使用翻页按钮查看更多账户。",
+  "Current user identities": "当前用户身份",
+  "These are the roles currently granted to this account. An application or pending certification is not an additional granted role.": "这里显示账户当前已获授予的角色。申请中的身份或待审核资质不会被显示为新增的已授予角色。",
+  "Clearly distinguish Trainers, Creators and accounts with both identities.": "清晰区分讲师（Trainer）、创作者（Creator），以及同时拥有这两种身份的账户。",
+  "View user identities": "查看用户身份"
 }
