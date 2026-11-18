@@ -238,8 +238,11 @@ export function createApp() {
   api.get('/orders', authenticate, listOrders);
   api.get('/orders/:id', authenticate, getOrder);
   api.post('/refund-requests', authenticate, mutationLimiter, createRefundRequest);
-  api.get('/order-items/:orderItemId/delivery', authenticate, getCourseDelivery);
-  api.use('/order-items/:orderItemId/delivery/download-url', fileLinkRouter(createCourseDownloadUrl));
+  const purchasedCourseFiles = express.Router({ mergeParams: true });
+  purchasedCourseFiles.use(fileReadLimiter);
+  purchasedCourseFiles.get('/', noStore, authenticate, getCourseDelivery);
+  purchasedCourseFiles.use('/download-url', fileLinkRouter(createCourseDownloadUrl));
+  api.use('/order-items/:orderItemId/delivery', purchasedCourseFiles);
   api.post('/order-items/:orderItemId/progress', authenticate, mutationLimiter, recordVideoProgress);
   api.post('/order-items/:orderItemId/playback-sessions', authenticate, mutationLimiter, createPlaybackSession);
   api.get('/refund-requests/:id', authenticate, getRefundRequest);

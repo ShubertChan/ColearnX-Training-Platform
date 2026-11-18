@@ -44,6 +44,8 @@ export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerI
   const paid = await order(true), unpaid = await order(false);
   const courseItem = await item(paid, run, null, 'reserved');
   const workbookItem = await item(paid, null, version, 'fulfilled');
+  const manifest = await request(app).get('/api/v1/order-items/' + courseItem + '/delivery').expect(401);
+  assert.ok(manifest.headers.ratelimit);
   for (const path of ['content-versions/' + version + '/download-url', 'order-items/' + courseItem + '/delivery/download-url']) {
     const denied = await request(app).post('/api/v1/' + path).send({}).expect(401);
     assert.ok(denied.headers.ratelimit);
@@ -65,6 +67,8 @@ export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerI
   await owner.query(`INSERT INTO course_delivery_assets(course_delivery_asset_id,course_run_id,owner_user_id,asset_purpose,
     bucket_name,object_key,original_filename,declared_content_type,declared_byte_size,verified_byte_size,verified_content_type,verified_at,asset_status,upload_expires_at)
     VALUES ($1,$2,$3,'cloud_download','fixture','fixture/guide.pdf','guide.pdf','application/pdf',10,10,'application/pdf',now(),'ready',now()+interval '1 hour')`, [asset,run,sellerId]);
+  const delivery = await request(app).get('/api/v1/order-items/' + courseItem + '/delivery').auth(accessToken(buyerId), { type: 'bearer' }).expect(200);
+  assert.ok(delivery.body.data.assets.some(file => file.assetId === asset));
   await request(app).post('/api/v1/order-items/' + courseItem + '/delivery/download-url')
     .auth(accessToken(buyerId), { type: 'bearer' }).send({ assetId: asset }).expect(503);
   await activity('courses', run, 1, 0);
