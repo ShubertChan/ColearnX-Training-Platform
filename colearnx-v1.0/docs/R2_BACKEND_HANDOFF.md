@@ -381,7 +381,7 @@ Authorization: Bearer <access token>
     "filename": "course-notes.pdf",
     "mediaType": "application/pdf",
     "sizeBytes": 4831021,
-    "downloadUrl": "https://...short-lived-presigned-get...",
+    "downloadUrl": "https://api.example/api/v1/file-download?ticket=...",
     "expiresAt": "2026-09-01T12:05:00.000Z"
   },
   "meta": {
@@ -393,12 +393,11 @@ Authorization: Bearer <access token>
 每次签发前必须重新查询授权，允许以下任一情况：
 
 - `content_access_grants.user_id` 为当前用户，并且 `expires_at IS NULL OR expires_at > now()`；
-- 当前用户是该内容的 Creator owner；
-- 当前用户具有 `admin` role。
+- 当前用户是该内容的 Creator owner。管理员审核预览使用独立的预览端点。
 
 普通用户没有有效 grant 时返回 403；内容未发布、asset 非 `ready` 或已删除时不得签发。
 
-不要把永久 R2 URL写入订单、grant 或浏览器 localStorage。signed GET 建议 5 分钟有效，并尽量使用 `Content-Disposition: attachment`。
+买家链接默认 5 分钟有效。浏览器按 `Content-Disposition: attachment` 保存文件，续传时使用同一次传输的地址或 ETag。
 
 ### 7.8 统一错误码
 
@@ -409,7 +408,7 @@ Authorization: Bearer <access token>
 | 401 | `AUTH_REQUIRED` | 未登录或 access token 无效 |
 | 403 | `CREATOR_ROLE_REQUIRED` | 上传用户没有 Creator role |
 | 403 | `CONTENT_UPLOAD_FORBIDDEN` | 非 owner 操作内容版本或 asset |
-| 403 | `CONTENT_ACCESS_DENIED` | 无有效购买 grant 且不是 Owner/Admin |
+| 403 | `CONTENT_ACCESS_DENIED` | 当前账号缺少该内容的下载权限 |
 | 404 | `CONTENT_VERSION_NOT_FOUND` | 内容版本不存在；不得借此泄露其他用户私有记录 |
 | 404 | `UPLOAD_INTENT_NOT_FOUND` | upload intent 不存在或不可见 |
 | 409 | `CONTENT_VERSION_NOT_DRAFT` | submitted/published 版本尝试上传、替换或删除 |
@@ -427,11 +426,7 @@ Authorization: Bearer <access token>
 
 ## 8. `first_accessed_at` 约定
 
-`content_access_grants` 已有 `first_accessed_at`，但当前退款服务没有读取内容下载证据。由于 presigned GET 由浏览器直接访问 R2，Render API 无法可靠判断客户端下载是否完整完成。
-
-本轮明确采用以下约定：
-
-> 成功签发购买者 download URL，即视为首次访问该内容。
+`first_accessed_at` 记录买家首次领取链接的时间。同一订单项重复领取只计一笔。迁移 026 在各环境保存文件下载统计的 UTC 起始时间，历史领取记录保留原有含义。
 
 下载端点应在同一数据库事务中：
 
@@ -445,7 +440,7 @@ WHERE content_version_id = $1
 
 Owner/Admin 预览不得修改购买者的 `first_accessed_at`。
 
-若未来产品要求“只有完成实际下载才阻断退款”，必须增加受控代理下载、Cloudflare Worker 回调或可靠事件采集，不能仅依赖 presigned URL。退款模块也需单独增加内容访问证据读取；本轮不得宣称已经实现完整内容下载退款判定。
+买家下载课程附件或数字资源时，API 从 R2 流式转发文件。每次打开链接均获得独立的传输标识，同一传输的 HTTP 分段按字节区间合并。服务端发完整个文件后累计一次，重复完整传输可再次计数。原有退款判定继续使用领取记录。部署容量规划需计入买家附件的 API 出站流量，托管视频继续使用媒体网关。
 
 ## 9. 安全、审计与日志
 

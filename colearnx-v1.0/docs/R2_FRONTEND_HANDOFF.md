@@ -280,14 +280,12 @@ Content-Type: application/pdf
 
 Node API 必须先校验：
 
-- 当前用户拥有有效 `content_access_grants`；或
-- 当前用户是该内容的 Creator；或
-- 当前用户是有审核需要的 Admin。
+- 当前用户拥有有效 `content_access_grants`，或是该内容的 Creator。审核人员使用独立的预览端点。
 
 ```json
 {
   "data": {
-    "downloadUrl": "https://temporary-r2-presigned-url.example",
+    "downloadUrl": "https://api.example/api/v1/file-download?ticket=...",
     "expiresAt": "2026-09-01T12:10:00.000Z",
     "filename": "prompt-guide.pdf",
     "mediaType": "application/pdf",
@@ -298,6 +296,8 @@ Node API 必须先校验：
 ```
 
 前端收到后立即打开或下载，并在链接过期时重新请求。不得缓存、分享或渲染成永久资源链接。未购买用户必须得到 403；公开 `/content` 接口不得包含下载地址或 object key。管理员审核预览使用独立的 `POST /api/v1/admin/content-versions/:contentVersionId/preview-url`，不得借用购买者下载接口。
+
+买家链接会重定向至本次文件传输的地址。自定义下载客户端续传时应使用该地址或携带先前响应的 ETag 作为 `If-Range`。市场上的领取订单数和完整文件下载次数由 API 分别返回。
 
 ## 7. 前端上传状态机
 

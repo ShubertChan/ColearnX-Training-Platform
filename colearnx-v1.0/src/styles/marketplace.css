@@ -41,11 +41,12 @@
 .marketplace-listing-body { min-width: 0; align-self: center; overflow-wrap: anywhere; }
 .marketplace-listing-body > a h3 { margin: 6px 0; font-size: 19px; }
 .listing-activity { margin-block: 10px; }
-.listing-activity dl { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; }
+.listing-activity dl { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; }
 .listing-activity dl > div { display: inline-flex; align-items: baseline; gap: 5px; }
 .listing-activity dt { color: var(--muted); font-size: .8rem; }
 .listing-activity dd { margin: 0; color: var(--ink); font-size: .875rem; font-weight: 650; font-variant-numeric: tabular-nums; }
 .listing-activity p { margin: 5px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }
+.download-tracking-date { display: block; margin-block: 4px; color: var(--muted); font-size: .75rem; line-height: 1.4; }
 .marketplace-listing-card .market-card-footer { flex-wrap: wrap; column-gap: 12px; row-gap: 8px; }
 .marketplace-listing-card .market-card-footer > span { flex: 1 1 90px; min-width: 0; }
 .marketplace-listing-card .market-card-footer .button { justify-content: center; white-space: nowrap; }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { runFileTransferChecks } from './file-transfer-checks.mjs';
 
 export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerId, accessToken, passed }) {
   const course = randomUUID(), run = randomUUID(), content = randomUUID(), version = randomUUID();
@@ -12,12 +13,13 @@ export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerI
   await owner.query("INSERT INTO contents(content_id,creator_user_id,title,content_type,price_points,publication_status) VALUES ($1,$2,'Marketreceipt workbook','digital',10,'published')", [content,sellerId]);
   await owner.query("INSERT INTO content_versions(content_version_id,content_id,version_no,version_status,published_at) VALUES ($1,$2,1,'retired',now()),($3,$2,2,'published',now())", [oldVersion,content,version]);
 
-  async function activity(path, id, sales, downloads) {
-    const expected = { sales, downloads };
+  async function activity(path, id, sales, claimedOrders, fileDownloads = 0) {
     const listed = await request(app).get('/api/v1/' + path).query({ q: 'marketreceipt' }).expect(200);
     const detail = await request(app).get('/api/v1/' + path + '/' + id).expect(200);
-    assert.deepEqual(listed.body.data.find(row => row.id === id)?.activity, expected);
-    assert.deepEqual(detail.body.data.activity, expected);
+    const result = detail.body.data.activity;
+    assert.ok(Number.isFinite(Date.parse(result.fileDownloadsSince)));
+    assert.deepEqual(result, { sales, downloads: claimedOrders, claimedOrders, fileDownloads, fileDownloadsSince: result.fileDownloadsSince });
+    assert.deepEqual(listed.body.data.find(row => row.id === id)?.activity, result);
   }
   async function order(isPaid) {
     const id = randomUUID();
@@ -67,15 +69,27 @@ export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerI
   await activity('courses', run, 1, 1);
   await activity('courses', otherRun, 0, 0);
   await activity('content', version, 1, 1);
+  const courseLink = await runFileTransferChecks({ owner, app, buyerId, sellerId, version, courseItem, workbookItem,
+    courseAsset: asset, accessToken, passed });
+  await activity('courses', run, 1, 1, 1);
+  await activity('content', version, 1, 1, 2);
   await owner.query("UPDATE order_items SET fulfilment_status='refunded' WHERE order_item_id=$1", [courseItem]);
   await posting(courseItem, 'refund');
-  await activity('courses', run, 0, 0);
-  await activity('content', version, 1, 1);
+  await request(app).get(courseLink).expect(404);
+  await activity('courses', run, 0, 0, 1);
+  await activity('content', version, 1, 1, 2);
+  for (const [kind, id, claims, files] of [['course', run, 0, 1], ['content', version, 1, 2]]) {
+    const report = await request(app).get('/api/v1/my/analytics').query({ kind }).auth(accessToken(sellerId), { type: 'bearer' }).expect(200);
+    const item = report.body.data.items.find(row => row.id === id);
+    assert.equal(item.claimedOrders, claims);
+    assert.equal(item.fileDownloads, files);
+    assert.ok(Number.isFinite(Date.parse(report.body.data.fileDownloadsSince)));
+  }
   const receipt = await request(app).get('/api/v1/orders/' + paid).auth(accessToken(buyerId), { type: 'bearer' }).expect(200);
   const references = new Map(receipt.body.data.items.map(row => [row.id,row.transactionReference]));
   assert.equal(references.get(courseItem), hold);
   assert.equal(references.get(workbookItem), debit);
-  passed('published listing counts isolate versions and runs, exclude unpaid and reversed items, and count repeated downloads once');
+  passed('listing sales and claims exclude reversals while physical file deliveries remain attributed to the correct run or version');
   passed('historical mixed-order receipts retain the original purchase and live reservation postings after a refund');
-  passed('a failed course-file signature leaves download and refund evidence unchanged');
+  passed('unavailable storage leaves claim and refund evidence unchanged');
 }
