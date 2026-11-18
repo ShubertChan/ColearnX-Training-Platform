@@ -79,14 +79,6 @@ const noStore: express.RequestHandler = (_req, res, next) => {
   next();
 };
 
-// Both link issuers check the shared request budget before authentication or storage work.
-function fileLinkRouter(issue: express.RequestHandler) {
-  const router = express.Router({ mergeParams: true });
-  router.use(mutationLimiter);
-  router.post('/', noStore, authenticate, issue);
-  return router;
-}
-
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
@@ -135,6 +127,10 @@ export function createApp() {
   });
 
   const api = express.Router();
+  // Charge the file-serving budget before any account/entitlement lookup.
+  // Issuing a link also consumes the normal authenticated mutation budget.
+  api.use('/order-items/:orderItemId/delivery', fileReadLimiter, noStore);
+  api.use('/content-versions/:contentVersionId/download-url', fileReadLimiter, noStore);
   api.get('/file-download', fileReadLimiter, serveFileDownload);
   api.get('/auth/csrf', csrf);
   api.get('/auth/human-check', noStore, humanCheckConfig);
@@ -202,7 +198,7 @@ export function createApp() {
   api.post('/content-versions/:contentVersionId/upload-intents', authenticate, mutationLimiter, createUploadIntent);
   api.post('/content-versions/:contentVersionId/upload-intents/:assetId/complete', authenticate, mutationLimiter, completeUploadIntent);
   api.delete('/content-versions/:contentVersionId/upload-intents/:assetId', authenticate, mutationLimiter, deleteUploadIntent);
-  api.use('/content-versions/:contentVersionId/download-url', fileLinkRouter(createContentDownloadUrl));
+  api.post('/content-versions/:contentVersionId/download-url', authenticate, mutationLimiter, createContentDownloadUrl);
 
   api.get('/courses/:courseRunId/assets', authenticate, listCourseAssets);
   api.post('/courses/:courseRunId/upload-intents', authenticate, mutationLimiter, createCourseUploadIntent);
@@ -238,11 +234,8 @@ export function createApp() {
   api.get('/orders', authenticate, listOrders);
   api.get('/orders/:id', authenticate, getOrder);
   api.post('/refund-requests', authenticate, mutationLimiter, createRefundRequest);
-  const purchasedCourseFiles = express.Router({ mergeParams: true });
-  purchasedCourseFiles.use(fileReadLimiter);
-  purchasedCourseFiles.get('/', noStore, authenticate, getCourseDelivery);
-  purchasedCourseFiles.use('/download-url', fileLinkRouter(createCourseDownloadUrl));
-  api.use('/order-items/:orderItemId/delivery', purchasedCourseFiles);
+  api.get('/order-items/:orderItemId/delivery', authenticate, getCourseDelivery);
+  api.post('/order-items/:orderItemId/delivery/download-url', authenticate, mutationLimiter, createCourseDownloadUrl);
   api.post('/order-items/:orderItemId/progress', authenticate, mutationLimiter, recordVideoProgress);
   api.post('/order-items/:orderItemId/playback-sessions', authenticate, mutationLimiter, createPlaybackSession);
   api.get('/refund-requests/:id', authenticate, getRefundRequest);
