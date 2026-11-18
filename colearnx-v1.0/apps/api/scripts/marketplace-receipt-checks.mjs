@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { runFileTransferChecks } from './file-transfer-checks.mjs';
 
-export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerId, accessToken, passed }) {
+export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerId, accessToken, passed, transport }) {
   const course = randomUUID(), run = randomUUID(), content = randomUUID(), version = randomUUID();
   const otherRun = randomUUID(), oldVersion = randomUUID();
   await owner.query("INSERT INTO courses(course_id,owner_user_id,title,publication_status) VALUES ($1,$2,'Marketreceipt workshop','published')", [course,sellerId]);
@@ -44,6 +44,11 @@ export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerI
   const paid = await order(true), unpaid = await order(false);
   const courseItem = await item(paid, run, null, 'reserved');
   const workbookItem = await item(paid, null, version, 'fulfilled');
+  for (const path of ['content-versions/' + version + '/download-url', 'order-items/' + courseItem + '/delivery/download-url']) {
+    const denied = await request(app).post('/api/v1/' + path).send({}).expect(401);
+    assert.ok(denied.headers.ratelimit);
+    assert.match(denied.headers['cache-control'], /no-store/);
+  }
   await item(paid, null, oldVersion, 'fulfilled');
   await item(paid, null, version, 'cancelled');
   await item(unpaid, run, null, 'paid');
@@ -70,7 +75,7 @@ export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerI
   await activity('courses', otherRun, 0, 0);
   await activity('content', version, 1, 1);
   const courseLink = await runFileTransferChecks({ owner, app, buyerId, sellerId, version, courseItem, workbookItem,
-    courseAsset: asset, accessToken, passed });
+    courseAsset: asset, accessToken, passed, transport });
   await activity('courses', run, 1, 1, 1);
   await activity('content', version, 1, 1, 2);
   await owner.query("UPDATE order_items SET fulfilment_status='refunded' WHERE order_item_id=$1", [courseItem]);
@@ -78,9 +83,13 @@ export async function runMarketplaceReceiptChecks({ owner, app, buyerId, sellerI
   await request(app).get(courseLink).expect(404);
   await activity('courses', run, 0, 0, 1);
   await activity('content', version, 1, 1, 2);
+  // More than one royalty allocation for a seller still represents a single sold item.
+  await owner.query(`INSERT INTO earnings_allocations(order_item_id,recipient_kind,recipient_user_id,share_bps,points_amount)
+    VALUES ($1,'trainer',$2,5000,5), ($1,'creator',$2,5000,5)`, [workbookItem,sellerId]);
   for (const [kind, id, claims, files] of [['course', run, 0, 1], ['content', version, 1, 2]]) {
     const report = await request(app).get('/api/v1/my/analytics').query({ kind }).auth(accessToken(sellerId), { type: 'bearer' }).expect(200);
     const item = report.body.data.items.find(row => row.id === id);
+    assert.equal(item.sales, kind === 'course' ? 0 : 1);
     assert.equal(item.claimedOrders, claims);
     assert.equal(item.fileDownloads, files);
     assert.ok(Number.isFinite(Date.parse(report.body.data.fileDownloadsSince)));

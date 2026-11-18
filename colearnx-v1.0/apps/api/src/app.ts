@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { rateLimit } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 import pino from 'pino';
 import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
@@ -78,6 +78,14 @@ const noStore: express.RequestHandler = (_req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 };
+
+// Both link issuers check the shared request budget before authentication or storage work.
+function fileLinkRouter(issue: express.RequestHandler) {
+  const router = express.Router({ mergeParams: true });
+  router.use(mutationLimiter);
+  router.post('/', noStore, authenticate, issue);
+  return router;
+}
 
 export function createApp() {
   const app = express();
@@ -194,7 +202,7 @@ export function createApp() {
   api.post('/content-versions/:contentVersionId/upload-intents', authenticate, mutationLimiter, createUploadIntent);
   api.post('/content-versions/:contentVersionId/upload-intents/:assetId/complete', authenticate, mutationLimiter, completeUploadIntent);
   api.delete('/content-versions/:contentVersionId/upload-intents/:assetId', authenticate, mutationLimiter, deleteUploadIntent);
-  api.post('/content-versions/:contentVersionId/download-url', authenticate, mutationLimiter, noStore, createContentDownloadUrl);
+  api.use('/content-versions/:contentVersionId/download-url', fileLinkRouter(createContentDownloadUrl));
 
   api.get('/courses/:courseRunId/assets', authenticate, listCourseAssets);
   api.post('/courses/:courseRunId/upload-intents', authenticate, mutationLimiter, createCourseUploadIntent);
@@ -231,7 +239,7 @@ export function createApp() {
   api.get('/orders/:id', authenticate, getOrder);
   api.post('/refund-requests', authenticate, mutationLimiter, createRefundRequest);
   api.get('/order-items/:orderItemId/delivery', authenticate, getCourseDelivery);
-  api.post('/order-items/:orderItemId/delivery/download-url', authenticate, mutationLimiter, noStore, createCourseDownloadUrl);
+  api.use('/order-items/:orderItemId/delivery/download-url', fileLinkRouter(createCourseDownloadUrl));
   api.post('/order-items/:orderItemId/progress', authenticate, mutationLimiter, recordVideoProgress);
   api.post('/order-items/:orderItemId/playback-sessions', authenticate, mutationLimiter, createPlaybackSession);
   api.get('/refund-requests/:id', authenticate, getRefundRequest);

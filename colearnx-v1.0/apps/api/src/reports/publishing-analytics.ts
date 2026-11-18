@@ -21,14 +21,12 @@ function metricsQuery(groupBy = false) {
     SELECT oi.order_item_id,
       COALESCE(oi.course_run_id, oi.content_version_id)::text AS id,
       oi.item_title_snapshot AS title,
-      COALESCE(earnings.points_amount, 0)::text AS revenue_points,
+      COALESCE((SELECT sum(e.points_amount) FROM earnings_allocations e
+        WHERE e.order_item_id = oi.order_item_id AND e.recipient_user_id = $1
+          AND e.allocation_status <> 'reversed'), 0) AS revenue_points,
       ${eligibleSale} AS eligible, ${hasDownloadClaim} AS claimed, oi.completed_file_downloads
     FROM order_items oi
     JOIN orders o ON o.order_id = oi.order_id
-    LEFT JOIN earnings_allocations earnings
-      ON earnings.order_item_id = oi.order_item_id
-     AND earnings.recipient_user_id = $1
-     AND earnings.allocation_status <> 'reversed'
     WHERE oi.seller_user_id = $1
       AND oi.item_type = $2
       AND ((${eligibleSale}) OR oi.completed_file_downloads > 0)

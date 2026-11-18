@@ -7,7 +7,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import request from 'supertest';
 import { env } from '../src/config/env.ts';
 
-export async function runFileTransferChecks({ owner, app, buyerId, sellerId, version, courseItem, workbookItem, courseAsset, accessToken, passed }) {
+export async function runFileTransferChecks({ owner, app, buyerId, sellerId, version, courseItem, workbookItem, courseAsset, accessToken, passed, transport = globalThis.fetch }) {
   const bytes = randomBytes(128 * 1024);
   const contentAsset = randomUUID();
   await owner.query(`INSERT INTO storage_assets(storage_asset_id,content_version_id,owner_user_id,bucket_name,object_key,
@@ -37,6 +37,20 @@ export async function runFileTransferChecks({ owner, app, buyerId, sellerId, ver
   await once(server, 'listening');
   env.API_ORIGIN = 'http://127.0.0.1:' + server.address().port;
   env.OBJECT_STORAGE_PROVIDER = 'r2';
+  // The release harness blocks external fetches. Exercise real sockets only
+  // on this ephemeral loopback origin, including every redirect hop.
+  const localOrigin = env.API_ORIGIN;
+  async function readFile(url, options) {
+    let target = new URL(url);
+    for (let hop = 0; hop < 3; hop++) {
+      assert.equal(target.origin, localOrigin);
+      const response = await transport(target, { ...options, redirect: 'manual' });
+      if (response.status !== 307) return response;
+      await response.arrayBuffer();
+      target = new URL(response.headers.get('location'), target);
+    }
+    assert.fail('Too many local download redirects');
+  }
   async function getLink(path, assetId) {
     const result = await request(app).post('/api/v1/' + path).auth(accessToken(buyerId), { type: 'bearer' }).send({ assetId }).expect(200);
     return new URL(result.body.data.downloadUrl);
@@ -57,27 +71,27 @@ export async function runFileTransferChecks({ owner, app, buyerId, sellerId, ver
     assert.notEqual(content.href, second.href);
     await owner.query("UPDATE file_download_links SET expires_at=now()-interval '1 minute' WHERE token_hash=$1",
       [createHash('sha256').update(second.searchParams.get('ticket')).digest('hex')]);
-    const expired = await fetch(second);
+    const expired = await readFile(second);
     assert.equal(expired.status, 404);
     await expired.arrayBuffer();
-    assert.equal((await fetch(content, { method: 'HEAD' })).headers.get('content-length'), String(bytes.length));
-    const invalid = await fetch(content, { headers: { Range: 'bytes=999999999-' } });
+    assert.equal((await readFile(content, { method: 'HEAD' })).headers.get('content-length'), String(bytes.length));
+    const invalid = await readFile(content, { headers: { Range: 'bytes=999999999-' } });
     assert.equal(invalid.status, 416);
     await invalid.arrayBuffer();
     await countIs(workbookItem, 0);
     // Two independent readers must not be combined into one fictitious download.
     const half = bytes.length / 2;
-    const ranges = await Promise.all([fetch(content, { headers: { Range: 'bytes=0-' + (half - 1) } }),
-      fetch(content, { headers: { Range: 'bytes=' + half + '-' } })]);
+    const ranges = await Promise.all([readFile(content, { headers: { Range: 'bytes=0-' + (half - 1) } }),
+      readFile(content, { headers: { Range: 'bytes=' + half + '-' } })]);
     assert.notEqual(ranges[0].url, ranges[1].url);
     for (const part of ranges) { assert.equal(part.status, 206); await part.arrayBuffer(); }
     await countIs(workbookItem, 0);
     storageEtag = '"fixture-v2"';
-    const changed = await fetch(ranges[0].url, { headers: { Range: 'bytes=' + half + '-' } });
+    const changed = await readFile(ranges[0].url, { headers: { Range: 'bytes=' + half + '-' } });
     assert.equal(changed.status, 409);
     await changed.arrayBuffer();
     storageEtag = '"fixture-v1"';
-    for (const downloaded of await Promise.all([fetch(content), fetch(content)])) {
+    for (const downloaded of await Promise.all([readFile(content), readFile(content)])) {
       assert.equal(downloaded.status, 200);
       assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), bytes);
     }
@@ -86,20 +100,20 @@ export async function runFileTransferChecks({ owner, app, buyerId, sellerId, ver
 
     interruptNext = true;
     const stop = new AbortController();
-    const first = await fetch(course, { signal: stop.signal });
+    const first = await readFile(course, { signal: stop.signal });
     const etag = first.headers.get('etag');
     const received = (await first.body.getReader().read()).value;
     assert.deepEqual(Buffer.from(received), bytes.subarray(0, received.length));
     stop.abort();
     await countIs(courseItem, 0);
     const offset = received.length - 4; // A real resume can overlap the last bytes.
-    const tail = await fetch(course, { headers: { Range: 'bytes=' + offset + '-', 'If-Range': etag } });
+    const tail = await readFile(course, { headers: { Range: 'bytes=' + offset + '-', 'If-Range': etag } });
     assert.equal(tail.status, 206);
     const remainder = Buffer.from(await tail.arrayBuffer());
     assert.deepEqual(Buffer.concat([received.subarray(0, offset), remainder]), bytes);
     await countIs(courseItem, 1);
-    const duplicates = await Promise.all([fetch(first.url, { headers: { Range: 'bytes=-32' } }),
-      fetch(course, { headers: { Range: 'bytes=-32', 'If-Range': etag } })]);
+    const duplicates = await Promise.all([readFile(first.url, { headers: { Range: 'bytes=-32' } }),
+      readFile(course, { headers: { Range: 'bytes=-32', 'If-Range': etag } })]);
     for (const duplicate of duplicates) {
       assert.equal(duplicate.status, 206);
       assert.deepEqual(Buffer.from(await duplicate.arrayBuffer()), bytes.subarray(-32));
