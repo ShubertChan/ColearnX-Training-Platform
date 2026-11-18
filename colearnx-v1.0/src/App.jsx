@@ -75,7 +75,7 @@ function Workspace({ children }) {
     : ["/orders", "/purchases"].includes(location.pathname) || location.pathname.startsWith("/purchases/") || location.pathname.startsWith("/refund/") ? ["orders"]
     : location.pathname === "/cart" ? ["wallet", "catalog"]
     : location.pathname === "/role-application" ? ["applications", "certification"]
-    : location.pathname.startsWith("/checkout-success") && !orders.length ? ["orders"] : [];
+    : location.pathname === "/checkout-success" && !orders.length ? ["orders"] : [];
   const states = { ...dataStates, catalog: [courseCatalogState, contentCatalogState].some((state) => state.status === "error") ? "error" : [courseCatalogState, contentCatalogState].some((state) => state.status === "loading") ? "loading" : "ready" };
   const loading = required.some((name) => states[name] === "loading");
   const failed = required.some((name) => states[name] === "error");

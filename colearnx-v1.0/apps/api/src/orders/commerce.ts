@@ -177,8 +177,14 @@ type CheckoutResponse = {
   status: 'paid';
   totalPoints: number;
   remainingAvailablePoints: number;
-  items: Array<{ id: string; kind: 'course' | 'content'; productId: string; title: string; pricePoints: number }>;
+  items: Array<{ id: string; kind: 'course' | 'content'; productId: string; title: string; pricePoints: number; transactionReference: string | null }>;
 };
+
+const purchaseTransactionJoin = `LEFT JOIN LATERAL (
+  SELECT pt.point_transaction_id FROM point_transactions pt
+  WHERE pt.order_item_id = oi.order_item_id AND pt.transaction_type IN ('purchase', 'live_hold')
+  ORDER BY pt.created_at, pt.point_transaction_id LIMIT 1
+) purchase ON true`;
 
 export async function checkout(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
@@ -190,7 +196,17 @@ export async function checkout(req: Request, res: Response) {
   const reservation = { actorUserId: actor.id, operationScope: 'checkout', key, fingerprint: sha256(JSON.stringify(input)) };
   const response = await withTransaction(async (client) => {
     const cached = await reserveIdempotency<CheckoutResponse>(client, reservation);
-    if (cached) return cached;
+    if (cached) {
+      // Responses cached before receipts included a reference can still be retried.
+      if (cached.items.some(item => item.transactionReference === undefined)) {
+        const postings = await client.query<{ order_item_id: string; point_transaction_id: string | null }>(
+          `SELECT oi.order_item_id, purchase.point_transaction_id FROM order_items oi
+           ${purchaseTransactionJoin} WHERE oi.order_id = $1`, [cached.id]);
+        const byItem = new Map(postings.rows.map(row => [row.order_item_id, row.point_transaction_id]));
+        return { ...cached, items: cached.items.map(item => ({ ...item, transactionReference: byItem.get(item.id) ?? null })) };
+      }
+      return cached;
+    }
     const products: Product[] = [];
     for (const item of [...input.items].sort((left, right) => `${left.kind}:${left.id}`.localeCompare(`${right.kind}:${right.id}`))) {
       products.push(await lockProduct(client, item));
@@ -266,7 +282,8 @@ export async function checkout(req: Request, res: Response) {
         await client.query(`INSERT INTO point_holds (purchase_transaction_id, points_amount, release_trigger)
           VALUES ($1, $2, 'course_start')`, [transactionId, product.pricePoints]);
       }
-      orderedItems.push({ id: orderItemId, kind: product.kind, productId: product.id, title: product.title, pricePoints: product.pricePoints });
+      orderedItems.push({ id: orderItemId, kind: product.kind, productId: product.id, title: product.title,
+        pricePoints: product.pricePoints, transactionReference: transactionId });
     }
     const pointAccount = await client.query<{ available_balance: string }>(`SELECT available_balance FROM point_accounts
       WHERE user_id = $1 AND account_status = 'active'`, [actor.id]);
@@ -317,8 +334,9 @@ export async function getOrder(req: Request, res: Response) {
   const itemRows = await query(`SELECT order_item_id, item_type, course_run_id, content_version_id, course_video_version_id, item_title_snapshot,
       points_amount, delivery_modes_snapshot_json, refund_policy_snapshot_json, refund_deadline_at, fulfilment_status,
       delivery_snapshot_json, revenue_share_snapshot_json, seller.user_id AS seller_user_id, seller.full_name AS seller_name,
-      COALESCE(course_download.download_completed_at, content_download.download_completed_at) AS download_completed_at
+      purchase.point_transaction_id, COALESCE(course_download.download_completed_at, content_download.download_completed_at) AS download_completed_at
     FROM order_items oi JOIN users seller ON seller.user_id = oi.seller_user_id
+    ${purchaseTransactionJoin}
     LEFT JOIN LATERAL (
       SELECT MAX(cap.download_completed_at) AS download_completed_at
       FROM course_enrolments ce JOIN course_access_progress cap ON cap.enrolment_id = ce.enrolment_id
@@ -346,7 +364,7 @@ export async function getOrder(req: Request, res: Response) {
     receipt: row.receipt_snapshot_json, createdAt: row.created_at, paidAt: row.paid_at,
     items: itemRows.rows.map((item) => ({ id: item.order_item_id, kind: item.item_type === 'course_run' ? 'course' : 'content',
       productId: item.course_run_id ?? item.content_version_id, courseVideoVersionId: item.course_video_version_id, title: item.item_title_snapshot, pricePoints: Number(item.points_amount),
-      seller: { id: item.seller_user_id, displayName: item.seller_name }, transactionReference: row.order_no,
+      seller: { id: item.seller_user_id, displayName: item.seller_name }, transactionReference: item.point_transaction_id,
       delivery: item.delivery_snapshot_json, fulfilmentInstructions: item.delivery_snapshot_json?.instructions ?? '',
       trainerContact: item.delivery_snapshot_json?.trainerContact ?? '', joinUrl: item.delivery_snapshot_json?.joinUrl ?? '',
       refundRecords: refundsByItem.get(item.order_item_id) ?? [],

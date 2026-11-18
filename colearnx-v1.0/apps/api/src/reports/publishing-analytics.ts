@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Actor } from '../auth/auth.js';
+import { eligibleSale, hasRecordedDownload } from '../catalog/listing-activity.js';
 import { ok } from '../lib/http.js';
 import { resolveUtcDateRange } from '../lib/reporting-dates.js';
 import { optionalReportingDate, safeMetric, withReadOnlySnapshot } from '../lib/reporting-query.js';
@@ -21,21 +22,7 @@ function metricsQuery(groupBy = false) {
       COALESCE(oi.course_run_id, oi.content_version_id)::text AS id,
       oi.item_title_snapshot AS title,
       COALESCE(earnings.points_amount, 0)::text AS revenue_points,
-      CASE
-        WHEN oi.item_type = 'course_run' THEN EXISTS (
-          SELECT 1
-            FROM course_enrolments ce
-            JOIN course_access_progress cap ON cap.enrolment_id = ce.enrolment_id
-           WHERE ce.order_item_id = oi.order_item_id
-             AND cap.download_completed_at IS NOT NULL
-        )
-        ELSE EXISTS (
-          SELECT 1
-            FROM content_access_grants cag
-           WHERE cag.order_item_id = oi.order_item_id
-             AND cag.first_accessed_at IS NOT NULL
-        )
-      END AS downloaded
+      ${hasRecordedDownload} AS downloaded
     FROM order_items oi
     JOIN orders o ON o.order_id = oi.order_id
     LEFT JOIN earnings_allocations earnings
@@ -44,8 +31,7 @@ function metricsQuery(groupBy = false) {
      AND earnings.allocation_status <> 'reversed'
     WHERE oi.seller_user_id = $1
       AND oi.item_type = $2
-      AND oi.fulfilment_status NOT IN ('refunded', 'cancelled')
-      AND o.paid_at IS NOT NULL
+      AND ${eligibleSale}
       AND o.paid_at >= ($3::date::timestamp AT TIME ZONE 'UTC')
       AND o.paid_at < (($4::date + 1)::timestamp AT TIME ZONE 'UTC')
   )

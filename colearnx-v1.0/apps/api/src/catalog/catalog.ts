@@ -10,6 +10,7 @@ import { parse, uuid } from '../lib/validation.js';
 import { assertCourseReadyForSubmission, assertTrainerOperational } from '../storage/course-delivery.js';
 import { purchaseRefundPolicyPreview } from '../refunds/purchase-policy.js';
 import { contentResponse } from './content-response.js';
+import { listingActivityColumn } from './listing-activity.js';
 
 const listQuery = z.object({ q: z.string().trim().max(120).optional(), category: z.string().trim().max(80).optional(), cursor: z.string().datetime().optional(), limit: z.coerce.number().int().min(1).max(100).default(20) });
 const courseInput = z.object({
@@ -73,7 +74,7 @@ function courseResponse(row: Record<string, unknown>) {
   return {
     id: row.course_run_id, courseId: row.course_id, title: row.title, description: row.description,
     pricePoints: Number(row.price_points), capacity: row.capacity, status: row.run_status,
-    startsAt: row.starts_at, endsAt: row.ends_at, hasCover: row.has_cover === true,
+    startsAt: row.starts_at, endsAt: row.ends_at, hasCover: row.has_cover === true, activity: row.activity,
     owner: { id: row.owner_user_id, displayName: row.owner_name },
     category: row.category_id ? { id: row.category_id, name: row.category_name } : null,
     deliveryModes: row.delivery_modes ?? [], progressTrackingType, onlineVideo: progressTrackingType === 'online_video',
@@ -85,6 +86,7 @@ function courseResponse(row: Record<string, unknown>) {
 export async function listCourses(req: Request, res: Response) {
   const input = parse(listQuery, req.query);
   const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, cr.progress_tracking_type, cr.total_duration_seconds, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cr.cover_image IS NOT NULL AS has_cover,
+    ${listingActivityColumn('course')},
     COALESCE(jsonb_agg(cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
     FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id JOIN users u ON u.user_id = c.owner_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id AND cdo.option_status = 'active'
@@ -101,6 +103,7 @@ export async function listCourses(req: Request, res: Response) {
 export async function getCourse(req: Request, res: Response) {
   const id = parse(uuid, req.params.id);
   const result = await query(`SELECT cr.course_run_id, c.course_id, c.title, c.description, cr.price_points, cr.capacity, cr.run_status, cr.starts_at, cr.ends_at, cr.progress_tracking_type, cr.total_duration_seconds, c.owner_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cr.cover_image IS NOT NULL AS has_cover,
+    ${listingActivityColumn('course')},
     COALESCE(jsonb_agg(cdo.delivery_type) FILTER (WHERE cdo.delivery_type IS NOT NULL), '[]'::jsonb) AS delivery_modes
     FROM course_runs cr JOIN courses c ON c.course_id = cr.course_id JOIN users u ON u.user_id = c.owner_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id LEFT JOIN course_delivery_options cdo ON cdo.course_run_id = cr.course_run_id AND cdo.option_status = 'active'
@@ -112,7 +115,8 @@ export async function getCourse(req: Request, res: Response) {
 
 export async function listContent(req: Request, res: Response) {
   const input = parse(listQuery, req.query);
-  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cv.cover_image IS NOT NULL AS has_cover
+  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cv.cover_image IS NOT NULL AS has_cover,
+    ${listingActivityColumn('content')}
     FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id AND cv.version_status = 'published' JOIN users u ON u.user_id = c.creator_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id
     WHERE c.publication_status = 'published' AND ($1::text IS NULL OR c.search_vector @@ websearch_to_tsquery('simple', $1))
@@ -124,7 +128,8 @@ export async function listContent(req: Request, res: Response) {
 
 export async function getContent(req: Request, res: Response) {
   const id = parse(uuid, req.params.id);
-  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cv.cover_image IS NOT NULL AS has_cover
+  const result = await query(`SELECT c.content_id, cv.content_version_id, c.title, c.description, c.content_type, c.price_points, c.publication_status, cv.published_at, c.creator_user_id, u.full_name AS owner_name, c.category_id, cat.category_name, cv.cover_image IS NOT NULL AS has_cover,
+    ${listingActivityColumn('content')}
     FROM contents c JOIN content_versions cv ON cv.content_id = c.content_id AND cv.version_status = 'published' JOIN users u ON u.user_id = c.creator_user_id
     LEFT JOIN categories cat ON cat.category_id = c.category_id WHERE cv.content_version_id = $1 AND c.publication_status = 'published'`, [id]);
   if (!result.rowCount) throw new ApiError(404, 'CONTENT_NOT_FOUND', 'Content version was not found.');

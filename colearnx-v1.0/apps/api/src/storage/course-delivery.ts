@@ -544,17 +544,20 @@ export async function createCourseDownloadUrl(req: Request, res: Response) {
     [assetId, access.course_run_id]);
     if (!asset.rowCount) throw new ApiError(404, 'COURSE_ASSET_NOT_FOUND', 'The authorised course file was not found.');
     const state = await currentProgress(client, access, 'cloud');
+    const file = asset.rows[0];
+    // Signing uses local credentials. A failed signature must not record a
+    // download or change the evidence used in a later refund decision.
+    const downloadUrl = await signDownload({ bucketName: file.bucket_name, objectKey: file.object_key },
+      file.verified_content_type ?? file.declared_content_type, file.original_filename, 'attachment');
     await client.query(`UPDATE course_access_progress SET download_completed_at = COALESCE(download_completed_at, now()), updated_at = now()
       WHERE access_progress_id = $1`, [state.progress.access_progress_id]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)
       VALUES ($1, 'course.delivery.download.authorized', 'order_items', $2, jsonb_build_object('assetId', $3::uuid), $4)`,
     [actor.id, orderItemId, assetId, res.locals.requestId]);
-    return asset.rows[0];
+    return { assetId: file.course_delivery_asset_id, filename: file.original_filename, downloadUrl };
   });
-  const downloadUrl = await signDownload({ bucketName: result.bucket_name, objectKey: result.object_key },
-    result.verified_content_type ?? result.declared_content_type, result.original_filename, 'attachment');
-  await recordDownloadIssued(req, res, actor.id, { assetId: result.course_delivery_asset_id, assetKind: 'course', mode: 'attachment' });
-  return ok(res, { assetId: result.course_delivery_asset_id, filename: result.original_filename, downloadUrl });
+  await recordDownloadIssued(req, res, actor.id, { assetId: result.assetId, assetKind: 'course', mode: 'attachment' });
+  return ok(res, result);
 }
 
 function mergedDuration(ranges: Array<[number, number]>, total: number) {

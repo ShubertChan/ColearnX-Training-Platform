@@ -2,7 +2,8 @@ import { getFormatLocale, useTranslation } from "../i18n/LanguageContext";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertCircle, ArrowRight, BookOpen, CheckCircle2, ChevronDown, ChevronUp, Download, FileArchive, FileText, GraduationCap, Link2, Mail, ReceiptText, ShoppingCart, Trash2, Video } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { usePlatform } from "../context/PlatformContext";
+import { mapOrder, usePlatform } from "../context/PlatformContext";
+import { getOrder } from "../api/commerce";
 import { listContentAssets, requestContentDownloadUrl } from "../api/uploads";
 import { getCourseDelivery, requestCourseDownloadUrl } from "../api/courseDelivery";
 import { isVideoAsset } from "../utils/videoContract";
@@ -73,14 +74,60 @@ function ReceiptItems({ order }) {
   return order.items.map((item) => <article className="receipt-item" key={item.id}><div className="summary-row"><span>{item.title}</span><b>{item.price}{t(" points")}</b></div><RefundStatusBar item={item} /><dl className="receipt-details"><div><dt>{t("Seller")}</dt><dd>{item.seller}</dd></div><div><dt>{t("Delivery")}</dt><dd>{item.kind === "content" ? t("Authorised digital download") : t(item.delivery)}</dd></div><div><dt>{t("Fulfilment")}</dt><dd>{t(item.fulfilmentStatus || "Recorded")}</dd></div><div><dt>{t("Refund snapshot")}</dt><dd>{t(item.refundPolicy)}</dd></div>{item.refundDeadlineAt && <div><dt>{t("Refund deadline")}</dt><dd>{new Date(item.refundDeadlineAt).toLocaleString(getFormatLocale())}</dd></div>}<div><dt>{t("Refund record")}</dt><dd>{item.refundRecords.length ? item.refundRecords.map((record) => `${record.reference || record.id}: ${t(record.status)}`).join(", ") : t("None")}</dd></div></dl><RefundLink item={item} /></article>);
 }
 
+function ReceiptTransactions({ order }) {
+  const { t } = useTranslation();
+  const chargedItems = order.items.filter(item => item.price > 0);
+  const multiple = chargedItems.length > 1;
+  return (
+    <div className="summary-row">
+      <span>{t(multiple ? "Wallet transactions" : "Wallet transaction")}</span>
+      {chargedItems.length > 0 ? <ul className="receipt-postings">
+          {chargedItems.map(item => <li key={item.id}>
+            {multiple && <small>{item.title}</small>}
+            <code>{item.transactionReference || (!multiple && order.transactionReference) || t("Reference unavailable")}</code>
+          </li>)}
+        </ul> : <b>{order.total === 0 ? t("No points charged") : order.transactionReference || t("Reference unavailable")}</b>}
+    </div>
+  );
+}
+
 export function CheckoutSuccessPage() {
   const { t } = useTranslation();
   const { orderId } = useParams();
-  const { lastOrder, orders, purchaseSyncWarning, retryPurchaseSync } = usePlatform();
+  const { lastOrder, orders, profile, purchaseSyncWarning, retryPurchaseSync } = usePlatform();
   const [syncing, setSyncing] = useState(false);
-  const order = orderId ? orders.find((item) => item.id === orderId) : lastOrder;
+  const [lookup, setLookup] = useState(null);
+  const [attempt, setAttempt] = useState(0);
+  const accountId = profile?.id;
+  const cached = orderId ? orders.find(item => item.id === orderId) : lastOrder;
+  useEffect(() => {
+    if (!orderId || cached) return;
+    let current = true;
+    getOrder(orderId).then(raw => {
+      if (current) setLookup({ orderId, accountId, order: mapOrder(raw), attempt });
+    }).catch(error => {
+      if (current) setLookup({ orderId, accountId, missing: error.status === 404, attempt });
+    });
+    return () => { current = false; };
+  }, [orderId, accountId, cached, attempt]);
+  const direct = lookup && lookup.orderId === orderId && lookup.accountId === accountId && lookup.attempt === attempt ? lookup : null;
+  const order = cached || direct?.order;
+  if (!order && orderId && !direct) return <p role="status">{t("Loading receipt…")}</p>;
+  if (!order && direct && !direct.missing) return <EmptyState icon={ReceiptText} title={t("Could not load the receipt")} action={<Button onClick={() => setAttempt(value => value + 1)}>{t("Retry")}</Button>} />;
   if (!order) return <EmptyState icon={ReceiptText} title={t("Order not found")} description={t("Refresh order history after a completed checkout.")} action={<Link className="button primary" to="/orders">{t("View order history")}</Link>} />;
-  return <Card className="order-receipt"><section><CheckCircle2 size={38} /><span className="eyebrow">{t("Checkout recorded")}</span><h2>{t("Thank you for your purchase")}</h2><p>{t("Your order is saved independently of secondary data refreshes.")}</p></section>{purchaseSyncWarning && <section className="sync-warning" role="status"><p>{t(purchaseSyncWarning)}</p><Button variant="secondary" size="sm" disabled={syncing} onClick={async () => { setSyncing(true); await retryPurchaseSync(); setSyncing(false); }}>{syncing ? t("Synchronising…") : t("Retry synchronisation")}</Button></section>}<section><div className="summary-row"><span>{t("Status")}</span><Badge tone="success">{t(order.status)}</Badge></div><div className="summary-row"><span>{t("Order number")}</span><b>{order.orderNo || order.id}</b></div><div className="summary-row"><span>{t("Wallet transaction")}</span><b>{order.transactionReference || t("Pending reference")}</b></div><div className="summary-row"><span>{t("Total")}</span><b>{order.total}{t(" points")}</b></div><div className="summary-row"><span>{t("Paid at")}</span><b>{order.paidAt ? new Date(order.paidAt).toLocaleString(getFormatLocale()) : "—"}</b></div></section><section><h3>{t("Purchased items")}</h3><ReceiptItems order={order} /></section><div className="button-row"><Link className="button secondary" to="/purchases">{t("My Learning")}</Link><Link className="button primary" to="/orders">{t("Order history")}</Link></div></Card>;
+  return <Card className="order-receipt">
+    <section><CheckCircle2 size={38} /><span className="eyebrow">{t("Checkout recorded")}</span><h2>{t("Thank you for your purchase")}</h2><p>{t("Your order is saved independently of secondary data refreshes.")}</p></section>
+    {purchaseSyncWarning && <section className="sync-warning" role="status"><p>{t(purchaseSyncWarning)}</p><Button variant="secondary" size="sm" disabled={syncing} onClick={async () => { setSyncing(true); await retryPurchaseSync(); setSyncing(false); }}>{syncing ? t("Synchronising…") : t("Retry synchronisation")}</Button></section>}
+    <section>
+      <div className="summary-row"><span>{t("Status")}</span><Badge tone="success">{t(order.status)}</Badge></div>
+      <div className="summary-row"><span>{t("Order number")}</span><b>{order.orderNo || order.id}</b></div>
+      <ReceiptTransactions order={order} />
+      <div className="summary-row"><span>{t("Total")}</span><b>{order.total}{t(" points")}</b></div>
+      <div className="summary-row"><span>{t("Paid at")}</span><b>{order.paidAt ? new Date(order.paidAt).toLocaleString(getFormatLocale()) : "—"}</b></div>
+    </section>
+    <section><h3>{t("Purchased items")}</h3><ReceiptItems order={order} /></section>
+    <div className="button-row"><Link className="button secondary" to="/purchases">{t("My Learning")}</Link><Link className="button primary" to="/orders">{t("Order history")}</Link></div>
+  </Card>;
 }
 
 export function OrderHistoryPage() {
@@ -163,7 +210,22 @@ export function PurchasesPage() {
   const { orders } = usePlatform();
   const items = useMemo(() => orders.flatMap((order) => order.items.map((item) => ({ ...item, order }))).filter((item) => ["paid", "reserved", "fulfilled"].includes(item.fulfilmentStatus)), [orders]);
   if (!items.length) return <EmptyState icon={BookOpen} title={t("No purchases yet")} description={t("Purchased courses and resources appear here after checkout.")} action={<Link className="button primary" to="/courses">{t("Explore courses")}</Link>} />;
-  return <div className="stack">{items.map((item) => <Card key={item.id} className="learning-row"><span className="list-icon">{item.kind === "course" ? <GraduationCap size={18} /> : <FileArchive size={18} />}</span><div><b>{item.title}</b><small>{item.kind === "course" ? getCourseTypeLabel(item) : t("Digital content")} · {item.price}{t(" points")}</small><p className="learning-policy">{item.kind === "content" ? t("Request a short-lived, purchase-authorised download link.") : deliveryDisclosures(item).join(" ")}</p><RefundStatusBar item={item} /></div>{item.kind === "content" ? <ContentDownloadButton contentVersionId={item.productId} /> : isVideoCourse(item) || item.courseVideoVersionId ? <Link className="button primary sm" to={`/purchases/${encodeURIComponent(item.id)}/watch`}>{t("Watch course ")}<ArrowRight size={15} /></Link> : <CourseDeliveryPanel item={item} />}<RefundLink item={item} /><Link className="button secondary sm" to={`/checkout-success/${item.order.id}`}>{t("View receipt")}</Link></Card>)}</div>;
+  return <div className="stack">{items.map(item => (
+    <Card key={item.id} className="learning-row">
+      <span className="list-icon">{item.kind === "course" ? <GraduationCap size={18} /> : <FileArchive size={18} />}</span>
+      <div className="learning-item-summary">
+        <b>{item.title}</b>
+        <small>{t(item.kind === "course" ? getCourseTypeLabel(item) : "Digital content")} · {item.price}{t(" points")}</small>
+        <p className="learning-policy">{item.kind === "content" ? t("Request a short-lived, purchase-authorised download link.") : deliveryDisclosures(item).map(line => t(line)).join(" ")}</p>
+        <RefundStatusBar item={item} />
+      </div>
+      {item.kind === "content" ? <ContentDownloadButton contentVersionId={item.productId} /> :
+        isVideoCourse(item) || item.courseVideoVersionId ? <Link className="button primary sm" to={`/purchases/${encodeURIComponent(item.id)}/watch`}>{t("Watch course ")}<ArrowRight size={15} /></Link> :
+          <CourseDeliveryPanel item={item} />}
+      <RefundLink item={item} />
+      <Link className="button secondary sm" to={`/checkout-success/${item.order.id}`}>{t("View receipt")}</Link>
+    </Card>
+  ))}</div>;
 }
 
 export function RefundPage() {
