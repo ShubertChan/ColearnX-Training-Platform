@@ -15,8 +15,12 @@ export const listListingVersions = (kind, id) => listAllPages(`${itemPath(kind, 
 export const archiveContent = (id, reason) => apiClient.post(`${itemPath("content", id)}/archive`, { reason }, writeOptions()).then(unwrap);
 export const cancelCourse = (id, reason) => apiClient.post(`${itemPath("course", id)}/cancel`, { reason }, writeOptions()).then(unwrap);
 export const validateCourseResources = (id, contentVersionIds) => apiClient.post(`${itemPath("course", id)}/resources/validate`, { contentVersionIds }).then(unwrap);
-export const saveCourseResources = (id, contentVersionIds, validationId) => apiClient.put(`${itemPath("course", id)}/resources`, { contentVersionIds, validationId }, writeOptions()).then(unwrap);
+export const listCourseResourceOptions = (id) => listAllPages(`${itemPath("course", id)}/resources`);
+export const saveCourseResources = (id, contentVersionIds, validationId, previousContentVersionIds) => apiClient.put(`${itemPath("course", id)}/resources`, { contentVersionIds, validationId, previousContentVersionIds }, writeOptions()).then(unwrap);
+export const listReuseLicences = (id) => listAllPages(`${itemPath("content", id)}/reuse-licences`);
+export const setReuseLicence = (id, licenceId, courseReuseAllowed) => apiClient.put(`${itemPath("content", id)}/reuse-licences/${encodeURIComponent(licenceId)}`, { courseReuseAllowed }, writeOptions()).then(unwrap);
 export const getPublishingAnalytics = (kind, filters) => apiClient.get("/my/analytics", { params: { kind, ...filters } }).then(unwrap);
+export const listCreatorCourseReuse = () => listAllPages("/my/course-reuse");
 export const submitReport = (input, requestKey) => apiClient.post("/reports", input, writeOptions(requestKey)).then(unwrap);
 export const listReports = (filters) => listAllPages("/admin/reports", filters);
 export const decideReport = (id, input, requestKey) => apiClient.post(`/admin/reports/${encodeURIComponent(id)}/decision`, input, writeOptions(requestKey)).then(unwrap);
