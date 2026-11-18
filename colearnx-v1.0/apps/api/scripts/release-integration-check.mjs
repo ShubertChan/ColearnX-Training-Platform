@@ -636,6 +636,9 @@ try {
   const { runAccessRiskChecks } = await import('./access-risk-checks.mjs');
   await runAccessRiskChecks({ owner, app, passed });
   await runReleasePreflightChecks({ owner, ownerUrl, passed });
+  const reuse = await ownerCommand('scripts/course-reuse-checks.mjs', runtimeUrl.href, { RELEASE_CHECK_DATABASE_URL: ownerUrl.href });
+  assert.equal(reuse.code, 0, reuse.stderr);
+  for (const result of reuse.stdout.split('\n')) passed(result);
   assert.equal(blockedHttpCalls, 0, 'No email, HIBP, alert, payment, or storage HTTP request may be attempted.');
   process.stdout.write(`SUCCESS ${checks} integration check groups passed; test-only data retained in disposable local PostgreSQL cluster.\n`);
 } finally {

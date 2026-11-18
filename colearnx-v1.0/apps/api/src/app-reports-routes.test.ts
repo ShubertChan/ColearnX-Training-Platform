@@ -18,6 +18,10 @@ test('reporting routes are registered behind authentication rather than the 404 
     ['get', '/api/v1/admin/audit-logs'],
     ['get', '/api/v1/admin/activity-report'],
     ['get', '/api/v1/my/analytics?kind=content'],
+    ['get', '/api/v1/my/course-reuse'],
+    ['get', '/api/v1/content/11111111-1111-4111-8111-111111111111/reuse-licences'],
+    ['put', '/api/v1/content/11111111-1111-4111-8111-111111111111/reuse-licences/22222222-2222-4222-8222-222222222222'],
+    ['get', '/api/v1/courses/11111111-1111-4111-8111-111111111111/resources'],
   ] as const) {
     const response = await request(app)[method](path);
     assert.equal(response.status, 401, `${method} ${path} should reach authenticate before notFound`);

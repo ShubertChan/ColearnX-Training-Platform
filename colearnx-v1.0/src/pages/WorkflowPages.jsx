@@ -1,6 +1,8 @@
 import DateInput from "../components/DateInput";
 import { useTranslation } from "../i18n/LanguageContext";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { RequestState, useRequest } from "../components/WorkflowRequest";
+import { CourseReuseReport, PurchasePermissions, CourseResourceEditor } from "../components/publishing/CourseReuse";
 import { Link } from "react-router-dom";
 import { usePlatform } from "../context/PlatformContext";
 import { Badge, Button, Card, FormField, Modal } from "../components/ui";
@@ -10,23 +12,6 @@ import VideoOperations from "../components/video/VideoOperations";
 import * as api from "../api/workflows";
 import { courseUpdatePayload, localDateTime } from "../utils/courseSchedule";
 
-function useRequest(loader) {
-  const revision = useRef(0);
-  const [state, setState] = useState({ data: null, status: "loading", error: "" });
-  const reload = useCallback(async () => {
-    const request = ++revision.current; setState({ data: null, status: "loading", error: "" });
-    try { const data = await loader(); if (request === revision.current) setState({ data, status: "ready", error: "" }); }
-    catch (error) { if (request === revision.current) setState({ data: null, status: "error", error: api.serviceMessage(error) }); }
-  }, [loader]);
-  useEffect(() => { void reload(); return () => { revision.current++; }; }, [reload]);
-  return [state, reload];
-}
-function RequestState({ state, reload, children }) {
-  const { t } = useTranslation();
-  if (state.status === "loading") return <p role="status">{t("Loading records…")}</p>;
-  if (state.status === "error") return <div className="catalog-error"><p role="alert">{t(state.error)}</p><Button variant="secondary" onClick={() => void reload()}>{t("Retry records")}</Button></div>;
-  return children;
-}
 function Records({ rows, columns }) {
   const { t } = useTranslation();
   if (!Array.isArray(rows) || !rows.length) return <p>{t("No records were returned.")}</p>;
@@ -51,19 +36,6 @@ function PublishingAnalytics({ kind }) {
     <dl className="receipt-details">{[["sales", "Sales"], ["revenuePoints", "Revenue in points"], ["downloads", "Downloads"], ["views", "Views"]].map(([key, label]) => <div key={key}><dt>{t(label)}</dt><dd>{key === "views" && state.data?.views === null ? t("Not tracked") : state.data?.[key] ?? t("Not supplied")}</dd></div>)}</dl>
     <Records rows={state.data?.items} columns={[["title", "Item"], ["sales", "Sales"], ["revenuePoints", "Revenue in points"], ["downloads", "Downloads"]]} />
   </RequestState></Card>;
-}
-function ResourceCombination({ courseId }) {
-  const { t } = useTranslation();
-  const { orders } = usePlatform();
-  const owned = [...new Map(orders.flatMap((order) => order.items).filter((item) => item.kind === "content" && ["paid", "fulfilled", "reserved"].includes(item.fulfilmentStatus)).map((item) => [item.productId, item])).values()];
-  const [selected, setSelected] = useState([]), [validation, setValidation] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [success, setSuccess] = useState("");
-  const check = async () => { setBusy(true); setError(""); setSuccess(""); setValidation(null); try { const result = await api.validateCourseResources(courseId, selected); if (result?.allowed !== true || !result.validationId) throw new Error(result?.explanation || "These resources are not approved for use in this course."); setValidation(result); } catch (error) { setError(api.serviceMessage(error)); } finally { setBusy(false); } };
-  const save = async () => { setBusy(true); setError(""); try { await api.saveCourseResources(courseId, selected, validation.validationId); setValidation(null); setSuccess("The course resource selection was saved by the service."); } catch (error) { setValidation(null); setError(api.serviceMessage(error)); } finally { setBusy(false); } };
-  return <Card><h3>{t("Combine purchased resources")}</h3><p>{t("A purchase does not automatically grant redistribution rights. Validate the selected licences before saving.")}</p>
-    {!owned.length && <p>{t("No eligible purchased resources are available.")}</p>}{owned.map((item) => <label className="check-label" key={item.productId}><input type="checkbox" disabled={busy} checked={selected.includes(item.productId)} onChange={() => { setSelected((items) => items.includes(item.productId) ? items.filter((id) => id !== item.productId) : [...items, item.productId]); setValidation(null); setSuccess(""); }} />{item.title}</label>)}
-    {error && <p role="alert" className="form-error">{t(error)}</p>}{success && <p role="status">{t(success)}</p>}
-    <div className="button-row"><Button variant="secondary" disabled={busy || !selected.length} onClick={() => void check()}>{t("Check selected licences")}</Button><Button disabled={busy || !validation} onClick={() => void save()}>{t("Confirm resource selection")}</Button></div>
-  </Card>;
 }
 function ListingManagement({ item }) {
   const { t } = useTranslation();
@@ -99,7 +71,9 @@ function ListingManagement({ item }) {
       {item.status === "Draft" && <Link className="button secondary" to={`/${item.kind === "course" ? "trainer/course-editor" : "creator/content-editor"}?draft=${encodeURIComponent(item.id)}`}>{t("Manage draft files")}</Link>}
     </div></Card>
     {item.kind === "course" && item.onlineVideo && hostedVideoEnabled && <TrainerVideoManagement courseId={item.id} />}
-    <VersionHistory kind={item.kind} id={item.id} />{item.kind === "course" && <ResourceCombination key={item.id} courseId={item.id} />}
+    {item.kind === "content" && <PurchasePermissions contentId={item.id} title={item.title} />}
+    {item.kind === "course" && item.status === "Draft" && <CourseResourceEditor courseId={item.id} />}
+    <VersionHistory kind={item.kind} id={item.id} />
     {action && <Modal title={action === "retire" ? t("Confirm withdrawal from publication") : t("Confirm listing update")} onClose={() => !busy && setAction("")} footer={<><Button variant="secondary" disabled={busy} onClick={() => setAction("")}>{t("Back")}</Button><Button variant={action === "retire" ? "danger" : "primary"} disabled={busy} onClick={() => void mutate()}>{busy ? t("Saving…") : t("Confirm change")}</Button></>}><p>{form.title} · {form.pricePoints}{t(" points")}</p><p>{reason}</p><p>{t("Existing learners and purchase records must be handled by the service. This action does not issue refunds locally.")}</p>{error && <p role="alert" className="form-error">{t(error)}</p>}</Modal>}
   </div>;
 }
@@ -110,7 +84,7 @@ export function PublishingToolsPage() {
   const loader = useCallback(() => refreshMyListings(), [refreshMyListings]);
   const [state, reload] = useRequest(loader); const [selected, setSelected] = useState("");
   const items = publishedItems.filter((item) => item.kind === kind), item = items.find((item) => item.id === selected);
-  return <div className="stack"><Card><h2>{t(role)}{t(" publishing tools")}</h2><p>{t("Manage existing listings, versions, licences and usage. Unavailable services display an error without pretending to save changes.")}</p><RequestState state={state} reload={reload}><FormField label={t("Choose a listing")}><select value={selected} onChange={(e) => setSelected(e.target.value)}><option value="">{t("Select a listing")}</option>{items.map((item) => <option key={item.id} value={item.id}>{item.title} — {t(item.status)}</option>)}</select></FormField></RequestState></Card>{item && <ListingManagement key={`${kind}:${item.id}`} item={item} />}<PublishingAnalytics kind={kind} /></div>;
+  return <div className="stack"><Card><h2>{t(role)}{t(" publishing tools")}</h2><p>{t("Manage existing listings, versions, licences and usage. Unavailable services display an error without pretending to save changes.")}</p><RequestState state={state} reload={reload}><FormField label={t("Choose a listing")}><select value={selected} onChange={(e) => setSelected(e.target.value)}><option value="">{t("Select a listing")}</option>{items.map((item) => <option key={item.id} value={item.id}>{item.title} — {t(item.status)}</option>)}</select></FormField></RequestState></Card>{item && <ListingManagement key={`${kind}:${item.id}`} item={item} />}{kind === "content" && <CourseReuseReport />}<PublishingAnalytics kind={kind} /></div>;
 }
 export function AdminOperationsPage() {
   const { t } = useTranslation();
