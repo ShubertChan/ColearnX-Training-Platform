@@ -4,6 +4,7 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import type { Actor } from '../auth/auth.js';
 import { query, withTransaction } from '../db/database.js';
+import { issueFileDownload } from './file-downloads.js';
 import { ApiError, ok } from '../lib/http.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 import {
@@ -497,13 +498,13 @@ export async function createContentDownloadUrl(req: Request, res: Response) {
   const actor = res.locals.actor as Actor;
   const contentVersionId = parse(uuid, req.params.contentVersionId);
   const selectedAssetId = parse(assetSelectionInput, req.body ?? {}).assetId ?? null;
-  const result = await query<AssetRow & { creator_user_id: string; has_grant: boolean }>(`SELECT sa.storage_asset_id,
+  const result = await query<AssetRow & { creator_user_id: string; order_item_id: string | null }>(`SELECT sa.storage_asset_id,
       sa.content_version_id, sa.owner_user_id, sa.bucket_name, sa.object_key, sa.original_filename,
       sa.declared_content_type, sa.declared_byte_size, sa.verified_content_type, sa.verified_byte_size, sa.etag,
       sa.asset_status, sa.upload_expires_at, c.creator_user_id,
-      EXISTS (SELECT 1 FROM content_access_grants cag
+      (SELECT cag.order_item_id FROM content_access_grants cag
         WHERE cag.content_version_id = cv.content_version_id AND cag.user_id = $3
-          AND (cag.expires_at IS NULL OR cag.expires_at > now())) AS has_grant
+          AND (cag.expires_at IS NULL OR cag.expires_at > now())) AS order_item_id
     FROM content_versions cv
     JOIN contents c ON c.content_id = cv.content_id
     JOIN storage_assets sa ON sa.content_version_id = cv.content_version_id
@@ -516,15 +517,19 @@ export async function createContentDownloadUrl(req: Request, res: Response) {
   const asset = result.rows[0];
   // Creator only; see listContentAssets for why administrators are excluded.
   const privileged = asset.creator_user_id === actor.id;
-  if (!privileged && !asset.has_grant) {
+  if (!privileged && !asset.order_item_id) {
     throw new ApiError(403, 'CONTENT_ACCESS_DENIED', 'You do not have access to this content file.');
   }
-  const downloadUrl = await signDownload({ bucketName: asset.bucket_name, objectKey: asset.object_key },
-    asset.verified_content_type ?? asset.declared_content_type, asset.original_filename, 'attachment');
-  if (!privileged) {
-    await query(`UPDATE content_access_grants SET first_accessed_at = COALESCE(first_accessed_at, now())
-      WHERE content_version_id = $1 AND user_id = $2 AND (expires_at IS NULL OR expires_at > now())`, [contentVersionId, actor.id]);
-  }
+  const downloadUrl = privileged
+    ? await signDownload({ bucketName: asset.bucket_name, objectKey: asset.object_key },
+      asset.verified_content_type ?? asset.declared_content_type, asset.original_filename, 'attachment')
+    : await withTransaction(async client => {
+      const grant = await client.query<{ order_item_id: string }>(`UPDATE content_access_grants
+        SET first_accessed_at = COALESCE(first_accessed_at, now()) WHERE order_item_id = $1 AND user_id = $2
+        AND (expires_at IS NULL OR expires_at > now()) RETURNING order_item_id`, [asset.order_item_id, actor.id]);
+      if (!grant.rowCount) throw new ApiError(403, 'CONTENT_ACCESS_DENIED', 'You do not have access to this content file.');
+      return issueFileDownload(client, grant.rows[0].order_item_id, 'content', asset.storage_asset_id);
+    });
   await recordDownloadIssued(req, res, actor.id, { assetId: asset.storage_asset_id, assetKind: 'content', mode: 'attachment' });
   return ok(res, { filename: asset.original_filename,
     mediaType: asset.verified_content_type ?? asset.declared_content_type,

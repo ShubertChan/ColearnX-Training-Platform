@@ -1,9 +1,8 @@
 // W8 (threat model F-20): presigned download links can be forwarded.
 //
-// A signed R2 URL is a bearer credential: whoever holds it can fetch the file
-// until it expires, and R2 does not tell the API when it is used. What the API
-// CAN see is every time it issues one -- to which account, for which file, from
-// which network. This module makes that visible and turns it into a signal:
+// Preview URLs and buyer file tickets are short-lived bearer credentials.
+// This audit records issuance by account, file and network. The buyer file
+// delivery endpoint independently counts completed HTTP transfers.
 //
 //   * recordDownloadIssued (request path) writes one content.download_issued
 //     row per signed URL into the append-only security ledger;

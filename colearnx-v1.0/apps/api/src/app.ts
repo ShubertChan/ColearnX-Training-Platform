@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { rateLimit } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 import pino from 'pino';
 import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
@@ -38,6 +38,7 @@ import { publishingAnalytics } from './reports/publishing-analytics.js';
 import { creatorCourseReuse } from './reports/course-reuse.js';
 import { listReuseLicences, setReuseLicence } from './catalog/reuse-licences.js';
 import { completeUploadIntent, createContentDownloadUrl, createUploadIntent, deleteUploadIntent, listContentAssets, previewContentAsset } from './storage/content-assets.js';
+import { serveFileDownload } from './storage/file-downloads.js';
 import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUploadIntent, deleteCourseUploadIntent, getCourseDelivery, listCourseAssets } from './storage/course-delivery.js';
 import { abortVideoMultipart, completeVideoMultipart, completeVideoUpload, createPlaybackSession, createPreviewPlaybackSession, createVideoUploadIntent, deleteVideoVersion, getCourseVideo, listVideoMultipartParts, listVideoOperations, recordVideoProgress, retryVideo, retryVideoForAdmin, signVideoMultipartPart } from './video/service.js';
 
@@ -63,6 +64,7 @@ const authLimiter = rateLimit(limiterOptions('auth', 15 * 60 * 1000, 20, 'Too ma
 const verificationLimiter = rateLimit(limiterOptions('verification', 15 * 60 * 1000, 10, 'Too many verification attempts.'));
 const mutationLimiter = rateLimit(limiterOptions('mutation', 60 * 1000, 60, 'Too many requests.'));
 const coverReadLimiter = rateLimit(limiterOptions('cover-read', 60 * 1000, 240, 'Too many requests.'));
+const fileReadLimiter = rateLimit(limiterOptions('file-read', 60 * 1000, 240, 'Too many file requests. Please try again shortly.'));
 const coverWriteLimiter = rateLimit(limiterOptions('cover-write', 60 * 1000, 20, 'Too many requests.'));
 // Password reset is the highest-value unauthenticated endpoint here and is
 // also an outbound email amplifier, so it gets its own budget rather than
@@ -81,7 +83,17 @@ export function createApp() {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', env.TRUST_PROXY);
-  app.use(pinoHttp({ logger, genReqId: (req, res) => {
+  app.use(pinoHttp({ logger, serializers: { req(request) {
+    if (/^\/api\/v1\/file-download\/?(?:\?|$)/i.test(request.url ?? '')) {
+      return { ...request, url: '/api/v1/file-download', query: undefined };
+    }
+    return request;
+  }, res(response) {
+    if (typeof response.headers?.location === 'string' && response.headers.location.includes('/file-download?')) {
+      return { ...response, headers: { ...response.headers, location: '[Redacted]' } };
+    }
+    return response;
+  } }, genReqId: (req, res) => {
     const supplied = req.headers['x-request-id'];
     const requestId = typeof supplied === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(supplied)
       ? supplied
@@ -115,6 +127,11 @@ export function createApp() {
   });
 
   const api = express.Router();
+  // Charge the file-serving budget before any account/entitlement lookup.
+  // Issuing a link also consumes the normal authenticated mutation budget.
+  api.use('/order-items/:orderItemId/delivery', fileReadLimiter, noStore);
+  api.use('/content-versions/:contentVersionId/download-url', fileReadLimiter, noStore);
+  api.get('/file-download', fileReadLimiter, serveFileDownload);
   api.get('/auth/csrf', csrf);
   api.get('/auth/human-check', noStore, humanCheckConfig);
   api.post('/auth/register', authLimiter, requireHumanCheck('register'), register);

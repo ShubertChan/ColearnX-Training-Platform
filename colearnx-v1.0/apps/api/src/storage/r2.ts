@@ -216,6 +216,29 @@ export async function streamStoredObject(locator: ObjectLocator, etag: string): 
   }
 }
 
+/** Read only the purchased bytes. Destroy the upstream stream on client disconnect. */
+export async function openDownloadStream(locator: ObjectLocator, etag: string | null, size: number,
+  span: { start: number; end: number } | undefined, signal: AbortSignal) {
+  try {
+    const object = await storageClient().send(new GetObjectCommand({
+      Bucket: locator.bucketName, Key: locator.objectKey,
+      IfMatch: etag ? `"${etag.replaceAll('"', '')}"` : undefined,
+      Range: span && `bytes=${span.start}-${span.end - 1}`,
+    }), { abortSignal: signal });
+    const expected = span ? span.end - span.start : size;
+    const sourceEtag = object.ETag?.replaceAll('"', '') || etag;
+    if (!object.Body || !sourceEtag || object.ContentLength !== expected ||
+        (span && object.ContentRange !== `bytes ${span.start}-${span.end - 1}/${size}`)) {
+      (object.Body as { destroy?: () => void } | undefined)?.destroy?.();
+      throw unavailable();
+    }
+    return { body: object.Body as AsyncIterable<Uint8Array>, sourceEtag };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw storageReadError(error);
+  }
+}
+
 /**
  * Server-side copy of the inspected object to its served key, conditional on
  * the source still having the inspected ETag.

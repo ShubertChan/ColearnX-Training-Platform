@@ -9,6 +9,7 @@ import { Badge, Button, Card, FormField, Modal } from "../components/ui";
 import { hostedVideoEnabled } from "../config/features";
 import TrainerVideoManagement from "../components/video/TrainerVideoManagement";
 import VideoOperations from "../components/video/VideoOperations";
+import { DownloadTrackingDate } from "../components/ListingActivity";
 import * as api from "../api/workflows";
 import { courseUpdatePayload, localDateTime } from "../utils/courseSchedule";
 
@@ -33,8 +34,9 @@ function PublishingAnalytics({ kind }) {
   const loader = useCallback(() => api.getPublishingAnalytics(kind, range), [kind, range]);
   const [state, reload] = useRequest(loader);
   return <Card><h3>{t("Sales and usage")}</h3><DateRange value={range} onChange={setRange} /><RequestState state={state} reload={reload}>
-    <dl className="receipt-details">{[["sales", "Sales"], ["revenuePoints", "Revenue in points"], ["downloads", "Downloads"], ["views", "Views"]].map(([key, label]) => <div key={key}><dt>{t(label)}</dt><dd>{key === "views" && state.data?.views === null ? t("Not tracked") : state.data?.[key] ?? t("Not supplied")}</dd></div>)}</dl>
-    <Records rows={state.data?.items} columns={[["title", "Item"], ["sales", "Sales"], ["revenuePoints", "Revenue in points"], ["downloads", "Downloads"]]} />
+    <dl className="receipt-details">{[["sales", "Sales"], ["revenuePoints", "Revenue in points"], ["downloads", "Orders claiming downloads"], ["fileDownloads", "File downloads"], ["views", "Views"]].map(([key, label]) => <div key={key}><dt>{t(label)}</dt><dd>{key === "views" && state.data?.views === null ? t("Not tracked") : state.data?.[key] ?? t("Not supplied")}</dd></div>)}</dl>
+    <DownloadTrackingDate since={state.data?.fileDownloadsSince} />
+    <Records rows={state.data?.items} columns={[["title", "Item"], ["sales", "Sales"], ["revenuePoints", "Revenue in points"], ["downloads", "Orders claiming downloads"], ["fileDownloads", "File downloads"]]} />
   </RequestState></Card>;
 }
 function ListingManagement({ item }) {

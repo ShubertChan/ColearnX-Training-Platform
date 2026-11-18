@@ -4,6 +4,7 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import type { Actor } from '../auth/auth.js';
 import { query, withTransaction } from '../db/database.js';
+import { issueFileDownload } from './file-downloads.js';
 import { ApiError, ok } from '../lib/http.js';
 import { idempotencyKey, parse, uuid } from '../lib/validation.js';
 import { env } from '../config/env.js';
@@ -12,7 +13,6 @@ import {
   createCourseObjectKey,
   deleteStoredObject,
   headUploadedObject,
-  signDownload,
   signUpload,
   validateUploadMetadata,
   type HeadedObject,
@@ -545,10 +545,7 @@ export async function createCourseDownloadUrl(req: Request, res: Response) {
     if (!asset.rowCount) throw new ApiError(404, 'COURSE_ASSET_NOT_FOUND', 'The authorised course file was not found.');
     const state = await currentProgress(client, access, 'cloud');
     const file = asset.rows[0];
-    // Signing uses local credentials. A failed signature must not record a
-    // download or change the evidence used in a later refund decision.
-    const downloadUrl = await signDownload({ bucketName: file.bucket_name, objectKey: file.object_key },
-      file.verified_content_type ?? file.declared_content_type, file.original_filename, 'attachment');
+    const downloadUrl = await issueFileDownload(client, orderItemId, 'course', assetId);
     await client.query(`UPDATE course_access_progress SET download_completed_at = COALESCE(download_completed_at, now()), updated_at = now()
       WHERE access_progress_id = $1`, [state.progress.access_progress_id]);
     await client.query(`INSERT INTO admin_action_logs (actor_user_id, action_type, target_table, target_record_id, details_json, request_id)

@@ -5,17 +5,20 @@ for (const [path, endpoint] of [["courses", "courses"], ["contents", "content"]]
   test(`${path} show the same sales and download counts on the card and detail`, async ({ page }) => {
     await mockVideoApi(page, "member");
     await page.route(`**/api/v1/${endpoint}?**`, route => route.fulfill({ json: { data: [
-      { id: "listing", title: "Workshop guide", status: "published", pricePoints: 10, activity: { sales: 2, downloads: 1 } },
-      { id: "new", title: "New listing", status: "published", pricePoints: 0, activity: { sales: 0, downloads: 0 } },
-      { id: "older", title: "Older response", status: "published", pricePoints: 10 },
+      { id: "listing", title: "Workshop guide", status: "published", pricePoints: 10, activity: { sales: 2, claimedOrders: 1, fileDownloads: 3, fileDownloadsSince: "2026-11-18T09:00:00Z" } },
+      { id: "new", title: "New listing", status: "published", pricePoints: 0, activity: { sales: 0, claimedOrders: 0, fileDownloads: 0 } },
+      { id: "older", title: "Older response", status: "published", pricePoints: 10, activity: { sales: 2, downloads: 1 } },
     ] } }));
     await page.goto(`/#/${path}`);
     const card = title => page.locator(".marketplace-listing-card").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
-    await expect(card("New listing").locator("dd")).toHaveText(["0", "0"]);
-    await expect(card("Older response").locator("dd")).toHaveText(["—", "—"]);
-    await expect(card("Workshop guide").locator("dd")).toHaveText(["2", "1"]);
+    await expect(card("New listing").locator("dd")).toHaveText(["0", "0", "0"]);
+    await expect(card("Older response").locator("dd")).toHaveText(["2", "1", "—"]);
+    await expect(card("Workshop guide").locator("dd")).toHaveText(["2", "1", "3"]);
+    await expect(card("Workshop guide").getByText(/File downloads tracked since.*2026/)).toBeVisible();
     await card("Workshop guide").getByRole("link", { name: "Workshop guide" }).click();
-    await expect(page.locator(".listing-activity dd")).toHaveText(["2", "1"]);
+    await expect(page.locator(".listing-activity dd")).toHaveText(["2", "1", "3"]);
+    await page.getByRole("combobox", { name: "Language" }).selectOption("zh-CN");
+    await expect(page.locator(".listing-activity dd")).toHaveText(["2 笔", "1 笔", "3 次"]);
   });
 }
 
