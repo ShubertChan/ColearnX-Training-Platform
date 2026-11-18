@@ -5,9 +5,10 @@ import LanguageSwitcher from "../../src/components/LanguageSwitcher";
 import { LanguageEffects, setLanguage } from "../../src/i18n/LanguageContext";
 import { LANGUAGE_STORAGE_KEY, readLanguage, translateText } from "../../src/i18n/locale";
 
-const mocks = vi.hoisted(() => ({ addToCart: vi.fn(), setRole: vi.fn() }));
+const mocks = vi.hoisted(() => ({ addToCart: vi.fn(), setRole: vi.fn(), refreshCatalog: vi.fn() }));
 vi.mock("../../src/context/PlatformContext", () => ({ usePlatform: () => ({
   signIn: vi.fn(), completeSignIn: vi.fn(), registerMember: vi.fn(),
+  refreshCatalog: mocks.refreshCatalog,
   courses: [{ id: "course", title: "Home", description: "An English description", trainer: "Alex", category: "Design", deliveryModes: ["live"], price: 100, purchaseEnabled: true, refundPolicyPreview: { summary: "Original purchase terms" } }],
   cart: [], authenticated: true, canPurchase: true, courseCatalogState: { status: "ready" },
   role: "Member", approvedRoles: ["Member", "Trainer"], balance: 1000,

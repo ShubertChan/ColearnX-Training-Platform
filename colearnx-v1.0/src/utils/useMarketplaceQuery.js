@@ -11,6 +11,9 @@ export function useMarketplaceQuery(kind, fallbackItems, fallbackState, refreshF
   const active = key !== "{}";
   const [attempt, setAttempt] = useState(0), [remote, setRemote] = useState({ key: "", data: null, status: "loading", error: "" });
   useEffect(() => {
+    if (!active) void refreshFallback();
+  }, [active, kind, refreshFallback]);
+  useEffect(() => {
     if (!active) return;
     let current = true;
     setRemote((old) => ({ key, data: old.key === key ? old.data : null, status: "loading", error: "" }));

@@ -176,6 +176,11 @@ select:focus-visible {
 .receipt-details > div { display: grid; grid-template-columns: minmax(100px, 0.4fr) minmax(0, 1fr); gap: 16px; }
 .receipt-details dt { color: var(--muted); }
 .receipt-details dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.receipt-postings { min-width: 0; margin: 0; padding: 0; list-style: none; text-align: end; }
+.receipt-postings li + li { margin-block-start: 8px; }
+.receipt-postings small, .receipt-postings code { display: block; overflow-wrap: anywhere; }
+.receipt-postings code { color: var(--ink); font-size: .8rem; user-select: all; }
+.wallet-posting-id { overflow-wrap: anywhere; }
 .delivery-panel:not([hidden]) { display: grid; gap: 16px; margin-top: 12px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
 .delivery-panel[hidden] { display: none; }
 .delivery-panel section { display: grid; gap: 12px; }
@@ -1637,6 +1642,9 @@ blockquote footer {
   gap: 16px;
   align-items: center;
 }
+.learning-item-summary { min-width: 0; overflow-wrap: anywhere; }
+.learning-item-summary > b, .learning-item-summary > small { display: block; }
+.learning-item-summary > small { margin-block-start: 4px; color: var(--muted); }
 .learning-icon {
   display: grid;
   place-items: center;

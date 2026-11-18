@@ -7,6 +7,7 @@ import { deliveryDisclosures, refundDisclosure, cartItemKey, hasPurchasePolicy }
 import ReportButton from "../components/ReportButton";
 import { listingCoverUrl } from "../components/ListingCover";
 import MarketplaceDescription from "../components/MarketplaceDescription";
+import ListingActivity from "../components/ListingActivity";
 import MarketplaceDateFilter from "../components/MarketplaceDateFilter";
 import { useMarketplaceQuery } from "../utils/useMarketplaceQuery";
 import { getCourseTypeLabel, isVideoCourse } from "../utils/coursePresentation";
@@ -60,6 +61,7 @@ function ListingCard({ item, kind }) {
       {(item.category || course) && <div className="badge-row">{item.category && <Badge>{t(item.category)}</Badge>}{course && <Badge tone="info">{type}</Badge>}</div>}
       <Link to={detail}><h3>{item.title}</h3></Link>
       <MarketplaceDescription text={item.description} />
+      <ListingActivity activity={item.activity} />
       <div className="market-card-footer">
         <span>{item.ownerId ? <Link to={`/public-profile/${item.ownerId}`}>{seller}</Link> : seller}</span>
         <b>{item.purchased ? t("Purchased") : t("{0} points", { 0: item.price })}</b>
@@ -100,6 +102,7 @@ export function CourseDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { courses, cart, addToCart, authenticated, canPurchase, courseCatalogState, refreshCatalog } = usePlatform();
+  useEffect(() => { void refreshCatalog(); }, [id, refreshCatalog]);
   const course = courses.find((item) => item.id === id);
   if (!course) return courseCatalogState.status === "ready" ? <EmptyState icon={GraduationCap} title={t("Course not found")} description={t("This course is unavailable or has not been published.")} /> : <CatalogStatus state={courseCatalogState} hasItems={false} onRetry={refreshCatalog} />;
   const inCart = cart.some((item) => cartItemKey(item) === cartItemKey({ kind: "course", id: course.id }));
@@ -114,6 +117,7 @@ export function CourseDetailPage() {
             <span className="course-overview-icon"><GraduationCap size={30} /></span>
             <div className="badge-row">{course.category && <Badge>{t(course.category)}</Badge>}<Badge tone="info">{typeLabel}</Badge></div>
             <h2>{course.title}</h2>
+            <ListingActivity activity={course.activity} explain />
             <div className="course-instructor"><span className="course-instructor-avatar"><UserRound size={18} /></span><div><small>{t("Meet your instructor")}</small>{course.ownerId ? <Link to={`/public-profile/${course.ownerId}`}>{course.trainer}</Link> : <strong>{course.trainer}</strong>}</div></div>
           </section>
           <Card className="course-about"><span className="eyebrow">{t("Learning essentials")}</span><h3>{t("About the course")}</h3><p>{course.description}</p></Card>
@@ -167,9 +171,10 @@ export function ContentDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams(); const navigate = useNavigate();
   const { contents, balance, cart, addToCart, authenticated, canPurchase, contentCatalogState, refreshCatalog } = usePlatform();
+  useEffect(() => { void refreshCatalog(); }, [id, refreshCatalog]);
   const item = contents.find((content) => content.id === id);
   if (!item) return contentCatalogState.status === "ready" ? <EmptyState icon={FileArchive} title={t("Content not found")} description={t("This resource is unavailable or has not been published.")} /> : <CatalogStatus state={contentCatalogState} hasItems={false} onRetry={refreshCatalog} />;
   const inCart = cart.some((entry) => cartItemKey(entry) === cartItemKey({ kind: "content", id: item.id }));
   const policyReady = hasPurchasePolicy(item);
-  return <><button className="back-link" onClick={() => navigate(-1)}><ArrowLeft size={16} />{t(" Back to marketplace")}</button><Card className="content-detail-hero"><div className="content-detail-mark"><FileArchive size={36} /><span>{t(item.type)}</span></div><div><div className="badge-row">{item.category && <Badge>{t(item.category)}</Badge>}{item.purchased && <Badge tone="success"><Check size={13} />{t(" Purchased")}</Badge>}</div><h2>{item.title}</h2><p>{item.description}</p><span>{item.ownerId ? <Link to={`/public-profile/${item.ownerId}`}>{item.creator}</Link> : item.creator}</span></div></Card><div className="content-grid detail-columns"><Card><span className="eyebrow">{t("Access")}</span><h3>{t("Authorised digital download")}</h3><p>{t("Purchased files are listed in My Learning. Each download uses a short-lived server URL; storage keys and credentials are never exposed.")}</p><DisclosureList item={item} /></Card><Card className="purchase-summary"><span className="eyebrow">{t("Purchase summary")}</span><div className="summary-row"><span>{t("Resource")}</span><b>{item.title}</b></div><div className="summary-row"><span>{t("Seller")}</span><b>{item.creator}</b></div><div className="summary-row"><span>{t("Price")}</span><b>{item.price}{t(" points")}</b></div>{authenticated && <div className="summary-row"><span>{t("Available balance")}</span><b>{balance}{t(" points")}</b></div>}{item.purchased ? <Link className="button secondary wide" to="/purchases">{t("Open purchased files")}</Link> : !authenticated ? <Link className="button primary wide" to="/login" state={{ from: { pathname: `/contents/${item.id}` } }}>{t("Sign in to add to cart")}</Link> : canPurchase ? <><Button className="wide" disabled={inCart || balance < item.price || !policyReady} onClick={() => addToCart("content", item.id)}><ShoppingCart size={16} /> {inCart ? t("Already in cart") : balance < item.price ? t("Insufficient balance") : !policyReady ? t("Policy unavailable") : t("Add to cart")}</Button>{!policyReady && <p className="form-error">{t("Checkout is paused until the server supplies the exact refund-policy preview.")}</p>}</> : <p className="form-error">{t("Administrator accounts cannot purchase marketplace items.")}</p>}</Card></div><ReportButton kind="content" productId={item.id} /></>;
+  return <><button className="back-link" onClick={() => navigate(-1)}><ArrowLeft size={16} />{t(" Back to marketplace")}</button><Card className="content-detail-hero"><div className="content-detail-mark"><FileArchive size={36} /><span>{t(item.type)}</span></div><div><div className="badge-row">{item.category && <Badge>{t(item.category)}</Badge>}{item.purchased && <Badge tone="success"><Check size={13} />{t(" Purchased")}</Badge>}</div><h2>{item.title}</h2><p>{item.description}</p><ListingActivity activity={item.activity} explain /><span>{item.ownerId ? <Link to={`/public-profile/${item.ownerId}`}>{item.creator}</Link> : item.creator}</span></div></Card><div className="content-grid detail-columns"><Card><span className="eyebrow">{t("Access")}</span><h3>{t("Authorised digital download")}</h3><p>{t("Purchased files are listed in My Learning. Each download uses a short-lived server URL; storage keys and credentials are never exposed.")}</p><DisclosureList item={item} /></Card><Card className="purchase-summary"><span className="eyebrow">{t("Purchase summary")}</span><div className="summary-row"><span>{t("Resource")}</span><b>{item.title}</b></div><div className="summary-row"><span>{t("Seller")}</span><b>{item.creator}</b></div><div className="summary-row"><span>{t("Price")}</span><b>{item.price}{t(" points")}</b></div>{authenticated && <div className="summary-row"><span>{t("Available balance")}</span><b>{balance}{t(" points")}</b></div>}{item.purchased ? <Link className="button secondary wide" to="/purchases">{t("Open purchased files")}</Link> : !authenticated ? <Link className="button primary wide" to="/login" state={{ from: { pathname: `/contents/${item.id}` } }}>{t("Sign in to add to cart")}</Link> : canPurchase ? <><Button className="wide" disabled={inCart || balance < item.price || !policyReady} onClick={() => addToCart("content", item.id)}><ShoppingCart size={16} /> {inCart ? t("Already in cart") : balance < item.price ? t("Insufficient balance") : !policyReady ? t("Policy unavailable") : t("Add to cart")}</Button>{!policyReady && <p className="form-error">{t("Checkout is paused until the server supplies the exact refund-policy preview.")}</p>}</> : <p className="form-error">{t("Administrator accounts cannot purchase marketplace items.")}</p>}</Card></div><ReportButton kind="content" productId={item.id} /></>;
 }

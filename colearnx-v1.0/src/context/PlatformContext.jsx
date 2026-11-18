@@ -80,6 +80,7 @@ const titleCase = (value) =>
 export const mapCourse = (course) => ({
   id: course.id,
   courseId: course.courseId,
+  activity: course.activity,
   title: course.title,
   description: course.description || "No public description has been provided.",
   price: Number(course.pricePoints || 0),
@@ -111,6 +112,7 @@ export const mapContent = (content) => ({
   id: content.id,
   contentVersionId: content.id,
   contentId: content.contentId,
+  activity: content.activity,
   title: content.title,
   description: content.description || content.summary || "No public description has been provided.",
   type: content.contentType || "Digital resource",
@@ -144,6 +146,7 @@ const transactionPresentation = (transaction) => {
             : "Spending";
   return {
     id: transaction.id,
+    entryRole: transaction.entryRole,
     createdAt: transaction.createdAt,
     type: String(transaction.type || "transaction").replaceAll("_", " "),
     item: String(transaction.reference || "CoLearnX transaction").replaceAll("_", " "),
@@ -159,7 +162,7 @@ const transactionPresentation = (transaction) => {
   };
 };
 
-const mapOrder = (order) => ({
+export const mapOrder = (order) => ({
   id: order.id,
   orderNo: order.orderNo,
   createdAt: order.createdAt,
@@ -172,6 +175,8 @@ const mapOrder = (order) => ({
     id: item.id,
     kind: item.kind,
     productId: item.productId,
+    // Older order-detail APIs returned the order number in this field.
+    transactionReference: item.transactionReference !== order.orderNo ? item.transactionReference : null,
     title: item.title,
     price: Number(item.pricePoints || 0),
     seller: item.seller?.displayName || item.sellerName || item.trainer || item.creator || "Seller recorded in order",

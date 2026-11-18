@@ -363,7 +363,7 @@ function TransactionTable({ transactions }) {
         </thead>
         <tbody>
           {transactions.map((tx) => (
-            <tr key={tx.id}>
+            <tr key={`${tx.id}:${tx.entryRole || ""}`}>
               <td>
                 {tx.createdAt
                   ? new Date(tx.createdAt).toLocaleString(getFormatLocale(), {
@@ -375,6 +375,7 @@ function TransactionTable({ transactions }) {
               <td>
                 <b>{t(tx.type)}</b>
                 <small className="table-subtitle">{tx.itemTranslationKey ? t(tx.itemTranslationKey) : tx.item}</small>
+                {tx.id && <small className="table-subtitle wallet-posting-id">{t("Transaction ID: {id}", { id: tx.id })}</small>}
                 {(tx.orderReference || tx.refundReference) && <small className="table-subtitle">{tx.orderReference && t("Order: {0}", { 0: tx.orderReference })}{tx.orderReference && tx.refundReference ? " · " : ""}{tx.refundReference && t("Refund: {0}", { 0: tx.refundReference })}</small>}
               </td>
               <td>
