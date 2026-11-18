@@ -21,7 +21,7 @@ import { createCheckoutSession, getCheckoutSession, getTopUp, stripeWebhook } fr
 import { topUpPackages, wallet, walletTransactions } from './wallet/wallet.js';
 import { getPublishedListingCover, parseCoverUpload, previewDraftListingCover, previewReviewListingCover, updateListingCover } from './catalog/listing-covers.js';
 import { createContent, createCourse, decideContentSubmission, decideCourseSubmission, deleteContentDraft, deleteCourseDraft, getContent, getCourse, listContent, listContentSubmissions, listCourseSubmissions, listCourses, listMyListings, submitContent, submitCourse, updateCourse } from './catalog/catalog.js';
-import { listContentVersions, listCourseVersions, saveCourseResources, validateCourseResources } from './catalog/publishing-tools.js';
+import { listContentVersions, listCourseResourceOptions, listCourseVersions, saveCourseResources, validateCourseResources } from './catalog/publishing-tools.js';
 import { checkout, getOrder, listOrders } from './orders/commerce.js';
 import { createRefundRequest, decideRefund, getRefundRequest, listRefundRequestsForAdmin } from './refunds/service.js';
 import { acknowledgeRefundNotification, listRefundNotifications } from './refunds/notifications.js';
@@ -35,6 +35,8 @@ import { listSecurityEvents, securitySummary } from './admin/security-dashboard.
 import { activityReport } from './admin/activity-report.js';
 import { createReport, decideReport, listReports } from './reports/reports.js';
 import { publishingAnalytics } from './reports/publishing-analytics.js';
+import { creatorCourseReuse } from './reports/course-reuse.js';
+import { listReuseLicences, setReuseLicence } from './catalog/reuse-licences.js';
 import { completeUploadIntent, createContentDownloadUrl, createUploadIntent, deleteUploadIntent, listContentAssets, previewContentAsset } from './storage/content-assets.js';
 import { completeCourseUploadIntent, createCourseDownloadUrl, createCourseUploadIntent, deleteCourseUploadIntent, getCourseDelivery, listCourseAssets } from './storage/course-delivery.js';
 import { abortVideoMultipart, completeVideoMultipart, completeVideoUpload, createPlaybackSession, createPreviewPlaybackSession, createVideoUploadIntent, deleteVideoVersion, getCourseVideo, listVideoMultipartParts, listVideoOperations, recordVideoProgress, retryVideo, retryVideoForAdmin, signVideoMultipartPart } from './video/service.js';
@@ -159,10 +161,14 @@ export function createApp() {
   api.get('/admin/listing-covers/:kind/:id', coverReadLimiter, authenticate, requireRole('admin'), requireAdminMfa, noStore, previewReviewListingCover);
   api.get('/my/listings', authenticate, listMyListings);
   api.get('/my/analytics', authenticate, publishingAnalytics);
+  api.get('/my/course-reuse', authenticate, requireRole('creator'), noStore, creatorCourseReuse);
+  api.get('/content/:id/reuse-licences', authenticate, requireRole('creator'), noStore, listReuseLicences);
+  api.put('/content/:id/reuse-licences/:licenceId', authenticate, requireRole('creator'), mutationLimiter, noStore, setReuseLicence);
   api.post('/courses', authenticate, mutationLimiter, createCourse);
   api.post('/courses/:id/submit', authenticate, mutationLimiter, submitCourse);
   api.patch('/courses/:id', authenticate, mutationLimiter, updateCourse);
   api.get('/courses/:id/versions', authenticate, listCourseVersions);
+  api.get('/courses/:id/resources', authenticate, noStore, listCourseResourceOptions);
   api.post('/courses/:id/resources/validate', authenticate, mutationLimiter, validateCourseResources);
   api.put('/courses/:id/resources', authenticate, mutationLimiter, saveCourseResources);
   api.delete('/courses/:id/draft', authenticate, mutationLimiter, deleteCourseDraft);

@@ -40,6 +40,12 @@ Authenticated routes require `Authorization: Bearer <access-token>`. The refresh
 | POST/GET | `/role-applications`, `/role-applications/me` | Request trainer or creator role and inspect decisions. |
 | POST/GET | `/trainer-certifications`, `/trainer-certifications/me` | Trainer certification workflow. |
 | GET | `/my/listings` | Current trainer/creator's own course drafts, course submissions, content drafts and content submissions. |
+| GET | `/my/course-reuse` | Creator's resources with `id`, `title` and `courseCount`, including zeros. Count distinct saved courses across versions, modules and offerings, including drafts and archives. Removing the last reference in a course reduces the count. The sales date filter applies only to sales analytics. |
+| GET | `/content/:id/reuse-licences` | Eligible purchases of this creator's resource, across versions. Identifies each purchase by display name, order number, version and purchase date. |
+| PUT | `/content/:id/reuse-licences/:licenceId` | Set `courseReuseAllowed` for that purchase. Repeating the same value is idempotent. Withdrawal blocks subsequent selections. Existing saved references are preserved. Refunded or expired licences cannot be granted. |
+| GET | `/courses/:id/resources` | Certified trainer's owned draft selections and available versions, with `selected` and `courseReuseAllowed`. These three list endpoints accept `limit` (1–100) and the returned `nextCursor`. |
+| POST | `/courses/:id/resources/validate` | Check up to 50 distinct `contentVersionIds` for an owned draft. A successful check returns a `validationId`. |
+| PUT | `/courses/:id/resources` | Revalidate and replace the saved selection. Pass `previousContentVersionIds` to detect concurrent edits (409). An empty selection clears the draft. |
 | GET | `/my/analytics?kind=course|content&from=YYYY-MM-DD&to=YYYY-MM-DD` | Authenticated publisher's non-refunded sales, revenue share and recorded downloads. The range is UTC-inclusive, defaults to the latest 30 days and cannot exceed 90 days. Listing-page views are unavailable until impression tracking exists. |
 | POST | `/courses`, `/courses/:id/submit` | Trainer creates/submits a course run. |
 | PATCH | `/courses/:id` | Trainer updates an owned draft with delivery modes, buyer-only Local/Live instructions, contact details, and optional hosted-video duration. |
