@@ -532,9 +532,10 @@ export function PlatformProvider({ children }) {
         }
         if (!current()) return false;
         if (!user) {
-          const refreshed = await restoreClientSession();
+          await restoreClientSession();
           if (!current()) return false;
-          user = refreshed.user || await readSessionIdentity();
+          // Refresh rotates credentials. /me supplies the saved profile and capabilities.
+          user = await readSessionIdentity();
         }
         if (!current()) return false;
         const roles = applyServerIdentity(user);
@@ -836,13 +837,17 @@ export function PlatformProvider({ children }) {
   };
 
   const saveProfile = async (nextProfile) => {
+    const revision = sessionRevision.current;
     await updateCurrentUser({
       fullName: nextProfile.name,
       phone: nextProfile.phone || null,
       location: nextProfile.location || null,
       bio: nextProfile.bio || null,
     });
-    applyServerIdentity(await getCurrentUser());
+    if (revision !== sessionRevision.current) return false;
+    const user = await getCurrentUser();
+    if (revision !== sessionRevision.current) return false;
+    applyServerIdentity(user);
     notify("Profile changes saved.");
     return true;
   };

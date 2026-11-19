@@ -1,9 +1,10 @@
 import React, { StrictMode } from "react";
 import axios from "axios";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { apiClient, hasAccessToken, setAccessToken, setCsrfToken } from "../../src/api/client";
 import { PlatformProvider, usePlatform } from "../../src/context/PlatformContext";
+import { ProfilePage } from "../../src/pages/AccountPlatformPages";
 
 let platform;
 const originalAdapter = apiClient.defaults.adapter;
@@ -27,9 +28,11 @@ afterEach(() => { apiClient.defaults.adapter = originalAdapter; setAccessToken("
 
 test("StrictMode and concurrent retry clicks share one bootstrap and one cookie rotation", async () => {
   const gate = deferred(); let reads = 0, posts = 0;
+  const profile = { displayName: "Edited name", phone: "1234", location: "Perth", bio: "My updated bio" };
   apiClient.defaults.adapter = async config => {
     if (config.url === "/auth/csrf") { reads++; await gate.promise; return response(config, { csrfToken: "csrf" }); }
     if (config.url === "/auth/refresh") { posts++; return response(config, { accessToken: "fresh", csrfToken: "csrf", user }); }
+    if (config.url === "/me") return response(config, { ...user, profile, capabilities: { canPurchase: true } });
     return fixture(config);
   };
   mount();
@@ -39,6 +42,8 @@ test("StrictMode and concurrent retry clicks share one bootstrap and one cookie 
   await act(async () => { gate.resolve(); await first; });
   await settled();
   expect(reads).toBe(1); expect(posts).toBe(1); expect(platform.profile.id).toBe(user.id);
+  expect(platform.profile).toMatchObject({ name: profile.displayName, phone: profile.phone, location: profile.location, bio: profile.bio });
+  expect(platform.capabilities.canPurchase).toBe(true);
 });
 
 test("a temporary GET failure recovers automatically without clearing the stored bearer", async () => {
@@ -51,6 +56,30 @@ test("a temporary GET failure recovers automatically without clearing the stored
   expect(hasAccessToken()).toBe(true); expect(platform.authenticated).toBe(false);
   await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(reads).toBe(2); expect(platform.authenticated).toBe(true); expect(platform.accountError).toBe("");
+});
+
+test("the profile form switches from the draft to the saved server values", async () => {
+  setAccessToken("stored");
+  let displayName = "Original name";
+  apiClient.defaults.adapter = async config => {
+    if (config.url !== "/me") return fixture(config);
+    if (config.method === "patch") {
+      displayName = JSON.parse(config.data).fullName.trim();
+      return response(config, { displayName });
+    }
+    return response(config, { ...user, profile: { displayName } });
+  };
+  function AccountPage() {
+    return usePlatform().authenticated ? <ProfilePage /> : null;
+  }
+  render(<PlatformProvider><AccountPage /></PlatformProvider>);
+  const name = await screen.findByLabelText("Full name");
+  fireEvent.click(screen.getByRole("button", { name: /Edit profile/ }));
+  fireEvent.change(name, { target: { value: "  Updated name  " } });
+  fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await screen.findByRole("heading", { name: "Updated name" });
+  expect(name.disabled).toBe(true);
+  expect(name.value).toBe("Updated name");
 });
 
 test("a minute-long cold start recovers automatically instead of stopping at the old 12-second timeout", async () => {
