@@ -954,17 +954,21 @@ export async function updateMe(req: Request, res: Response) {
     bio: z.string().trim().max(2000).nullable().optional(),
   }).refine((value) => Object.keys(value).length > 0), req.body);
   const fullName = input.fullName ?? input.displayName;
-  const has = (field: string) => Object.prototype.hasOwnProperty.call(input, field);
-  const result = await withTransaction(async (client) => {
-    const user = fullName ? await client.query(`UPDATE users SET full_name = $2, updated_at = now() WHERE user_id = $1 RETURNING full_name`, [actor.id, fullName]) : null;
-    await client.query(`UPDATE profiles SET
-      display_name = CASE WHEN $2 THEN $3 ELSE display_name END,
-      phone = CASE WHEN $4 THEN $5 ELSE phone END,
-      location = CASE WHEN $6 THEN $7 ELSE location END,
-      bio = CASE WHEN $8 THEN $9 ELSE bio END,
-      updated_at = now() WHERE user_id = $1`,
-      [actor.id, Boolean(fullName), fullName ?? null, has('phone'), input.phone ?? null, has('location'), input.location ?? null, has('bio'), input.bio ?? null]);
-    return user?.rows[0]?.full_name ?? input.displayName ?? null;
+  await withTransaction(async (client) => {
+    if (fullName !== undefined) {
+      await client.query('UPDATE users SET full_name = $2, updated_at = now() WHERE user_id = $1', [actor.id, fullName]);
+    }
+    // Older accounts may have a users row without a corresponding profile.
+    await client.query(`INSERT INTO profiles (user_id, display_name, phone, location, bio)
+      SELECT user_id, full_name, $3, $4, $5 FROM users WHERE user_id = $1
+      ON CONFLICT (user_id) DO UPDATE SET
+        display_name = COALESCE($2, profiles.display_name),
+        phone = CASE WHEN $6 THEN EXCLUDED.phone ELSE profiles.phone END,
+        location = CASE WHEN $7 THEN EXCLUDED.location ELSE profiles.location END,
+        bio = CASE WHEN $8 THEN EXCLUDED.bio ELSE profiles.bio END,
+        updated_at = now()`,
+      [actor.id, fullName ?? null, input.phone ?? null, input.location ?? null, input.bio ?? null,
+        input.phone !== undefined, input.location !== undefined, input.bio !== undefined]);
   });
-  return ok(res, { displayName: result });
+  return ok(res, { displayName: fullName ?? null });
 }

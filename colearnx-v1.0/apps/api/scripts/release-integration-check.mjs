@@ -276,6 +276,8 @@ try {
 
   const { createApp } = await import('../src/app.ts');
   const app = createApp();
+  const { runProfilePersistenceChecks } = await import('./profile-persistence-checks.mjs');
+  await runProfilePersistenceChecks({ owner, app, passed });
 
   const resetSubjects = [
     { label: 'legacy', id: randomUUID(), verified: false, required: false, status: 'active', issued: true },

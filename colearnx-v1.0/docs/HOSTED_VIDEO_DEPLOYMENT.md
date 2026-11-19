@@ -21,6 +21,14 @@ Keep `ENABLE_HOSTED_VIDEO=false` until all services below are ready. Before enab
 
 Keep `R2_*` credentials server-only. The API returns only short-lived R2 multipart `PUT` URLs to the trainer, never source URLs to learners.
 
+### Upload configuration
+
+For the main course video, set `VIDEO_SOURCE_MAX_BYTES` in the local `apps/api/.env` or in the Render API service’s **Environment** settings. The staging handoff records `104857600` (100 MiB). The example environment sets `21474836480` (20 GiB). A change takes effect for new upload requests after the API restarts or redeploys. [Staging handoff](LOCAL_VIDEO_BATCH_WORKER.md) · [API example](../apps/api/.env.example)
+
+The main-video uploader accepts MP4, MOV, M4V, WebM and MKV. Uploads go directly to R2 in parts. Once the worker and gateway are ready, set `OBJECT_STORAGE_PROVIDER=r2` and `ENABLE_HOSTED_VIDEO=true` on the API. Build the frontend with `VITE_ENABLE_HOSTED_VIDEO=true`, `VITE_UPLOAD_ORIGINS` set to the exact R2 upload origins and `VITE_MEDIA_ORIGINS` set to the playback gateway origin. The staging build takes its flag and origins from `deployment/staging.json`. Allow the web origin and expose the `ETag` response header in the source bucket’s CORS rules. A video stays queued until the transcoding worker processes it. [Frontend environment example](../.env.example) · [Staging build settings](../deployment/staging.json) · [Local worker operation](LOCAL_VIDEO_BATCH_WORKER.md)
+
+The duration ceiling is **14,400 seconds (4 hours)**. To change it, update the worker’s `ffprobe` duration check, the API’s ready-video metadata check, and the frontend’s `MAX_VIDEO_SECONDS`, upload hints and translations. Add a forward migration for both the video duration and watch-interval end constraints introduced in migration 016. Apply the migration and release the matching worker, API and frontend together. Playback ticket lifetimes and transcode timeouts control different operations. [Worker validation](../apps/video-worker/src/worker.ts) · [API validation](../apps/api/src/video/service.ts) · [Frontend contract](../src/utils/videoContract.js) · [Database constraints](../db/migrations/016_hosted_video.sql)
+
 ## 3. Run the FFmpeg worker on owned hardware
 
 Build/run `apps/video-worker` on a team-controlled computer with Docker and outbound TLS access to Neon and R2. Its environment needs:

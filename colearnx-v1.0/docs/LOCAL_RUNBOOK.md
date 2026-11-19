@@ -61,5 +61,5 @@ The approved seed configuration creates S$5/10/20/50 top-up packages at a 1:1 SG
 ## Current boundaries
 
 - The backend is verified against local Docker PostgreSQL. R2 storage stays disabled until a private bucket, its CORS rule and local secret variables are configured; file metadata and signed URL behavior must then be smoke-tested separately. Production payment, virus scanning and hosted-video progress callbacks remain disabled.
-- The React UI is a separate localStorage prototype. Its legacy payment request is not a production-compatible backend client yet.
+- The React profile page saves changes through `PATCH /api/v1/me`. Signing in or restoring a browser session reads the saved profile from `GET /api/v1/me`.
 - Password-reset email delivery and production monitoring/backup retention need their external provider decisions before they can be completed securely.
